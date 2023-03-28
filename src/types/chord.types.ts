@@ -7,6 +7,7 @@ export interface Chords {
 }
 
 export interface ChordsClass {
+  [key: string]: any;
   C: A[];
   Csharp: A[];
   D: A[];
@@ -25,7 +26,8 @@ export interface A {
   key: KEY_SIGNATURE;
   suffix: string;
   positions: Position[];
-  params: { id: string };
+  id?: string;
+  [key: string]: any;
 }
 
 export enum KEY_SIGNATURE {
@@ -50,6 +52,7 @@ export interface Position {
   barres: number[];
   midi: number[];
   capo?: boolean;
+  [key: string]: any;
 }
 
 export interface Main {

@@ -13,7 +13,7 @@ interface IChordSearch {
 
 export default function Searchbar() {
   const [searchChord, setSearchChord] = React.useState<string>("");
-  const [Data, setData] = React.useState<A[]>([]);
+  const [Data, setData] = React.useState<any>([]);
   const [singleDataForDynamicPage, setSingleDataForDynamicPage] =
     React.useState<A[]>([]);
 
@@ -22,11 +22,30 @@ export default function Searchbar() {
   );
   const dispatch = useAppDispatch();
 
-  console.log(singleData, "data");
-
+  // search functionality
   React.useEffect(() => {
-    setData(data?.chords[searchChord.toUpperCase()]);
-  }, [Data, searchChord]);
+    // setData(data?.chords[searchChord.toUpperCase()]);
+    const searchData = Object.values(data?.chords).filter((item) =>
+      item.find((c) => c.key.includes(searchChord))
+    );
+    setData(searchData);
+  }, [searchChord]);
+
+  // what i am trying to achieve is to set the id in all chords objects so that i can search by id as well as make dynamic detail page
+  // My approach is use forEach to loop over every object and set the id as keysuffix value
+
+  // this is an array with ids of chords
+  let arrayWithIDs: any = [];
+  // this is an array of chords without the ids
+  let arrayWithoutIDs: any = [];
+
+  const temp = Object.values(data.chords).forEach((item) => {
+    item.forEach((ch) => {
+      let id = (ch.key + ch.suffix).toLowerCase();
+      arrayWithIDs.push(id);
+      arrayWithoutIDs.push(ch);
+    });
+  });
 
   React.useEffect(() => {
     Data &&
@@ -57,17 +76,18 @@ export default function Searchbar() {
               </span>
             </div>
             <div className="flex flex-wrap items-center space-x-7 space-y-7">
-              {Data?.map((item, idx) => {
-                return (
-                  <div key={idx}>
-                    <span
-                      key={idx}
-                      className="cursor-pointer font-Lora text-white hover:text-[#1BD79E]"
-                    >
-                      {item?.suffix}
-                    </span>
-                  </div>
-                );
+              {Data?.map((item: any, idx: number) => {
+                // console.log(item, "ite");
+                // return (
+                //   <div key={idx}>
+                //     <span
+                //       key={idx}
+                //       className="cursor-pointer font-Lora text-white hover:text-[#1BD79E]"
+                //     >
+                //       {item?.suffix}
+                //     </span>
+                //   </div>
+                // );
               })}
             </div>
           </div>
