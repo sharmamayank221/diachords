@@ -1,11 +1,10 @@
 import React from "react";
-
-import data from "../chrods.json";
-import type { A, KEY_SIGNATURE } from "../types/chord.types";
-import type { RootState } from "../../app/store";
-import { useAppSelector, useAppDispatch } from "../../app/hooks";
-import { getSingleDataForDynamicPage } from "@/slices/searchDataSlice";
 import { useRouter } from "next/router";
+
+import data from "@/chrods.json";
+import type { A } from "@/types/chord.types";
+import { useAppDispatch } from "@/app/hooks";
+import { getSingleDataForDynamicPage } from "@/slices/searchDataSlice";
 
 interface IChordSearch {
   searchChord: string;
@@ -24,13 +23,14 @@ export default function Searchbar() {
 
   // search functionality
   React.useEffect(() => {
-    const searchData = WithIds.filter((item: any) =>
-      Object.values(item).find((c: any) =>
-        c.includes(searchChord.toLowerCase())
-      )
-    );
-
-    setData(searchData);
+    if (searchChord) {
+      const searchData = WithIds.filter((item: any) =>
+        Object.values(item).find((c: any) =>
+          c.includes(searchChord.toLowerCase())
+        )
+      );
+      setData(searchData);
+    }
   }, [WithIds, searchChord]);
 
   // what i am trying to achieve is to set the id in all chords objects so that i can search by id as well as make dynamic detail page
@@ -87,7 +87,9 @@ export default function Searchbar() {
                     <span
                       key={idx}
                       className="cursor-pointer font-Lora text-white hover:text-[#1BD79E]"
-                      onClick={() => router.push(`/chords/${item?.id}`)}
+                      onClick={() => {
+                        router.push(`/chords/${item?.id}`);
+                      }}
                     >
                       {item?.suffix}
                     </span>

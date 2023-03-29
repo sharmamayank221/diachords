@@ -2,9 +2,9 @@ import React from "react";
 import dynamic from "next/dynamic";
 import { type NextPage } from "next";
 
-import SearchBar from "../../components/SearchBar";
-import { useAppSelector } from "../../../app/hooks";
-import { RootState } from "../../../app/store";
+import { RootState } from "@/app/store";
+import { useAppSelector } from "@/app/hooks";
+import SearchBar from "@/components/SearchBar";
 
 const Chord: NextPage = () => {
   const singleData = useAppSelector(
@@ -17,10 +17,7 @@ const Chord: NextPage = () => {
   );
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-gradient-to-b from-[#0C0C0C] to-[#15162c]">
-      <div className="mb-10">
-        <SearchBar />
-      </div>
+    <div className="h-screen w-full overflow-hidden bg-black">
       <DynamicComponentWithNoSSR id={singleData?.[0]?.id} data={singleData} />
     </div>
   );

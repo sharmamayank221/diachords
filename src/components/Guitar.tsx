@@ -90,14 +90,12 @@ export default function Guitar({ data, id }: IGuitar) {
             return (
               <>
                 <div
-                  className="b-1 mr-[120px] h-[356px] w-1 bg-[#FFF]"
+                  className="b-1 mr-[120px] h-[356px] w-2 bg-[#FFF]"
                   id={`fret-${fret}`}
                   key={`fret-${fret}`}
                 ></div>
                 <span
-                  className={`text-white font-Lora text-3xl flex items-${
-                    fret % 2 == 0 ? "start -pt-8" : "end -pb-8"
-                  } `}
+                  className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8`}
                 >
                   {fret}
                 </span>
@@ -121,14 +119,14 @@ export default function Guitar({ data, id }: IGuitar) {
                 // fretNumber === -1 means not to be pressed and rendered
                 item?.fretNumber !== -1 && (
                   <div
-                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#1BD79E]`}
+                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF]`}
                     key={idx}
                     style={{
-                      left: `${fretDiv && fretDiv.x + 48}px`,
-                      top: `${stringDiv && stringDiv.y - 163}px`,
+                      left: `${fretDiv && fretDiv.x + 55}px`,
+                      top: `${stringDiv && stringDiv.y - 187}px`,
                     }}
                   >
-                    <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-white">
+                    <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-black">
                       {item?.fingerNumber}
                     </h3>
                   </div>
