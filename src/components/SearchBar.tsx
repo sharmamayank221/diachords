@@ -23,14 +23,12 @@ export default function Searchbar() {
 
   // search functionality
   React.useEffect(() => {
-    if (searchChord) {
-      const searchData = WithIds.filter((item: any) =>
-        Object.values(item).find((c: any) =>
-          c.includes(searchChord.toLowerCase())
-        )
-      );
-      setData(searchData);
-    }
+    const searchData = WithIds.filter((item: any) =>
+      Object.values(item).find((c: any) =>
+        c.includes(searchChord.toLowerCase())
+      )
+    );
+    setData(searchData);
   }, [WithIds, searchChord]);
 
   // what i am trying to achieve is to set the id in all chords objects so that i can search by id as well as make dynamic detail page
