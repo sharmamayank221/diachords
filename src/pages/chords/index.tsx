@@ -3,9 +3,14 @@ import dynamic from "next/dynamic";
 import { type NextPage } from "next";
 
 import SearchBar from "../../components/SearchBar";
+import { useAppSelector } from "../../../app/hooks";
+import { RootState } from "../../../app/store";
 
 const Chord: NextPage = () => {
-  const [searchChord, setSearchChord] = React.useState<string>("");
+  const singleData = useAppSelector(
+    (state: RootState) => state.searchDataSlice.singleData
+  );
+
   const DynamicComponentWithNoSSR = dynamic(
     () => import("../../components/Guitar"),
     { ssr: false }
@@ -16,7 +21,7 @@ const Chord: NextPage = () => {
       <div className="mb-10">
         <SearchBar />
       </div>
-      <DynamicComponentWithNoSSR />
+      <DynamicComponentWithNoSSR id={singleData?.[0]?.id} data={singleData} />
     </div>
   );
 };

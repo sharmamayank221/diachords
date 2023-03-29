@@ -5,6 +5,7 @@ import type { A, KEY_SIGNATURE } from "../types/chord.types";
 import type { RootState } from "../../app/store";
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
 import { getSingleDataForDynamicPage } from "@/slices/searchDataSlice";
+import { useRouter } from "next/router";
 
 interface IChordSearch {
   searchChord: string;
@@ -14,38 +15,42 @@ interface IChordSearch {
 export default function Searchbar() {
   const [searchChord, setSearchChord] = React.useState<string>("");
   const [Data, setData] = React.useState<any>([]);
+  const [WithIds, setWithIds] = React.useState<any>([]);
+  const router = useRouter();
   const [singleDataForDynamicPage, setSingleDataForDynamicPage] =
     React.useState<A[]>([]);
 
-  const singleData = useAppSelector(
-    (state: RootState) => state.searchDataSlice.singleData
-  );
   const dispatch = useAppDispatch();
 
   // search functionality
   React.useEffect(() => {
-    // setData(data?.chords[searchChord.toUpperCase()]);
-    const searchData = Object.values(data?.chords).filter((item) =>
-      item.find((c) => c.key.includes(searchChord))
+    const searchData = WithIds.filter((item: any) =>
+      Object.values(item).find((c: any) =>
+        c.includes(searchChord.toLowerCase())
+      )
     );
+
     setData(searchData);
-  }, [searchChord]);
+  }, [WithIds, searchChord]);
 
   // what i am trying to achieve is to set the id in all chords objects so that i can search by id as well as make dynamic detail page
   // My approach is use forEach to loop over every object and set the id as keysuffix value
-
-  // this is an array with ids of chords
-  let arrayWithIDs: any = [];
   // this is an array of chords without the ids
   let arrayWithoutIDs: any = [];
 
-  const temp = Object.values(data.chords).forEach((item) => {
-    item.forEach((ch) => {
-      let id = (ch.key + ch.suffix).toLowerCase();
-      arrayWithIDs.push(id);
-      arrayWithoutIDs.push(ch);
+  React.useEffect(() => {
+    Object.values(data.chords).forEach((item) => {
+      item.forEach((ch) => {
+        // this id will be used for searching the database and to generate next js dynamic detail pages
+        let id = (ch.key + ch.suffix).toLowerCase();
+        // for pushing the above id into respective objects
+        ch = Object.assign({ ...ch }, { id: id });
+        // finally to push each object into an array or state
+        arrayWithoutIDs.push(ch);
+        setWithIds([...arrayWithoutIDs].slice(0, 552));
+      });
     });
-  });
+  }, []);
 
   React.useEffect(() => {
     Data &&
@@ -77,17 +82,17 @@ export default function Searchbar() {
             </div>
             <div className="flex flex-wrap items-center space-x-7 space-y-7">
               {Data?.map((item: any, idx: number) => {
-                // console.log(item, "ite");
-                // return (
-                //   <div key={idx}>
-                //     <span
-                //       key={idx}
-                //       className="cursor-pointer font-Lora text-white hover:text-[#1BD79E]"
-                //     >
-                //       {item?.suffix}
-                //     </span>
-                //   </div>
-                // );
+                return (
+                  <div key={idx}>
+                    <span
+                      key={idx}
+                      className="cursor-pointer font-Lora text-white hover:text-[#1BD79E]"
+                      onClick={() => router.push(`/chords/${item?.id}`)}
+                    >
+                      {item?.suffix}
+                    </span>
+                  </div>
+                );
               })}
             </div>
           </div>

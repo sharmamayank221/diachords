@@ -1,14 +1,11 @@
+import { A } from "@/types/chord.types";
 import React from "react";
-import data from "../chrods.json";
 
 import ChordName from "./ChordName";
 
 const Strings = [1, 2, 3, 4, 5, 6];
 // TODO: make this array dynamic so as the user selects how many frets to show on the screen
 const Frets = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
-
-const finger = data?.chords.C[0]?.positions?.[0]?.fingers;
-const fret = data.chords.C[0]?.positions?.[0]?.frets;
 
 //  NOTES: what i figured out from chords.db json file for fret numbers
 //  1st index of frets array is the 6th string and last index is fisrt string
@@ -31,7 +28,16 @@ interface IPositionsToBePlaced {
   fingerNumber?: number;
 }
 
-export default function Guitar() {
+interface IGuitar {
+  id?: string;
+  data?: A[];
+}
+
+export default function Guitar({ data, id }: IGuitar) {
+  console.log(id, data, "guitar");
+  const finger = data?.[0]?.positions?.[0]?.fingers;
+  const fret = data?.[0]?.positions?.[0]?.frets;
+
   const [positionToPlaceFingers, setPositionToPlaceFingers] = React.useState<
     IPositionsToBePlaced[]
   >([]);
@@ -82,11 +88,20 @@ export default function Guitar() {
         <div className="frets absolute top-0 flex">
           {Frets.map((fret: number) => {
             return (
-              <div
-                className="b-1 mr-[120px] h-[356px] w-1 bg-[#FFF]"
-                id={`fret-${fret}`}
-                key={`fret-${fret}`}
-              ></div>
+              <>
+                <div
+                  className="b-1 mr-[120px] h-[356px] w-1 bg-[#FFF]"
+                  id={`fret-${fret}`}
+                  key={`fret-${fret}`}
+                ></div>
+                <span
+                  className={`text-white font-Lora text-3xl flex items-${
+                    fret % 2 == 0 ? "start -pt-8" : "end -pb-8"
+                  } `}
+                >
+                  {fret}
+                </span>
+              </>
             );
           })}
         </div>
