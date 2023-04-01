@@ -30,11 +30,10 @@ interface IPositionsToBePlaced {
 
 interface IGuitar {
   id?: string;
-  data?: A[];
+  data?: A;
 }
 
 export default function Guitar({ data, id }: IGuitar) {
-  console.log(id, data, "guitar");
   const finger = data?.[0]?.positions?.[0]?.fingers;
   const fret = data?.[0]?.positions?.[0]?.frets;
 

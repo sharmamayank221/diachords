@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import data from "@/chrods.json";
 import type { A } from "@/types/chord.types";
 import { useAppDispatch } from "@/app/hooks";
-import { getSingleDataForDynamicPage } from "@/slices/searchDataSlice";
+import { getSingleDataForDynamicPage } from "@/reducers/chord/searchDataSlice";
 
 interface IChordSearch {
   searchChord: string;
@@ -50,13 +50,16 @@ export default function Searchbar() {
     });
   }, []);
 
+  // need to optimize this
   React.useEffect(() => {
-    Data &&
-      Data.forEach((item: A, idx: number) => {
-        setSingleDataForDynamicPage([item]);
-      });
-  }, [Data, dispatch]);
-  dispatch(getSingleDataForDynamicPage(Data));
+    if (searchChord !== "") {
+      Data &&
+        Data.forEach((item: A, idx: number) => {
+          setSingleDataForDynamicPage([item]);
+        });
+      dispatch(getSingleDataForDynamicPage(Data));
+    }
+  }, [Data, dispatch, searchChord]);
 
   return (
     <div className="h-full">
@@ -87,6 +90,7 @@ export default function Searchbar() {
                       className="cursor-pointer font-Lora text-white hover:text-[#1BD79E]"
                       onClick={() => {
                         router.push(`/chords/${item?.id}`);
+                        setSearchChord("");
                       }}
                     >
                       {item?.suffix}

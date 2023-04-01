@@ -3,7 +3,6 @@ import dynamic from "next/dynamic";
 
 import { RootState } from "@/app/store";
 import { useAppSelector } from "@/app/hooks";
-import SearchBar from "@/components/SearchBar";
 
 export default function Home() {
   const singleData = useAppSelector(
@@ -14,6 +13,8 @@ export default function Home() {
     () => import("../components/Guitar"),
     { ssr: false }
   );
+
+  console.log(singleData, "data");
 
   return (
     <>
@@ -26,7 +27,7 @@ export default function Home() {
         <div className="h-[100%] w-full overflow-hidden bg-black">
           <DynamicComponentWithNoSSR
             id={singleData?.[0]?.id}
-            data={singleData}
+            data={singleData?.[0]}
           />
         </div>
       </main>

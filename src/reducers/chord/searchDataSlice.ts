@@ -1,10 +1,11 @@
 import { createSlice } from "@reduxjs/toolkit";
-import type { PayloadAction } from "@reduxjs/toolkit";
+import type { PayloadAction, createAction } from "@reduxjs/toolkit";
 
 import { A, KEY_SIGNATURE } from "@/types/chord.types";
 
 export interface singleDataForDynamicPage {
   singleData: A[];
+  apiData: A[];
 }
 
 const initialState: singleDataForDynamicPage = {
@@ -18,19 +19,27 @@ const initialState: singleDataForDynamicPage = {
       },
     },
   ],
+  apiData: [
+    {
+      key: KEY_SIGNATURE.A,
+      suffix: "",
+      positions: [],
+      id: "",
+    },
+  ],
 };
 
-export const searchDataSlice = createSlice({
+export const searchDataSliceReducer = createSlice({
   name: "searchdata",
   initialState,
   reducers: {
-    getSingleDataForDynamicPage: (state, action: PayloadAction<A[]>) => {
+    getSingleDataForDynamicPage: (state, action: PayloadAction<any>): void => {
       state.singleData = action.payload;
     },
   },
 });
 
 // Action creators are generated for each case reducer function
-export const { getSingleDataForDynamicPage } = searchDataSlice.actions;
+export const { getSingleDataForDynamicPage } = searchDataSliceReducer.actions;
 
-export default searchDataSlice.reducer;
+export default searchDataSliceReducer.reducer;

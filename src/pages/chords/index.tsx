@@ -4,7 +4,6 @@ import { type NextPage } from "next";
 
 import { RootState } from "@/app/store";
 import { useAppSelector } from "@/app/hooks";
-import SearchBar from "@/components/SearchBar";
 
 const Chord: NextPage = () => {
   const singleData = useAppSelector(
@@ -12,13 +11,16 @@ const Chord: NextPage = () => {
   );
 
   const DynamicComponentWithNoSSR = dynamic(
-    () => import("../../components/Guitar"),
+    () => import("@/components/Guitar"),
     { ssr: false }
   );
 
   return (
     <div className="h-screen w-full overflow-hidden bg-black">
-      <DynamicComponentWithNoSSR id={singleData?.[0]?.id} data={singleData} />
+      <DynamicComponentWithNoSSR
+        id={singleData?.[0]?.id}
+        data={singleData?.[0]}
+      />
     </div>
   );
 };
