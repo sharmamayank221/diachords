@@ -3,7 +3,32 @@ import React from "react";
 
 import ChordName from "./ChordName";
 
-const Strings = [1, 2, 3, 4, 5, 6];
+const Strings = [
+  {
+    string: 1,
+    h: 0.4,
+  },
+  {
+    string: 2,
+    h: 0.6,
+  },
+  {
+    string: 3,
+    h: 0.8,
+  },
+  {
+    string: 4,
+    h: 1,
+  },
+  {
+    string: 5,
+    h: 2,
+  },
+  {
+    string: 6,
+    h: 3,
+  },
+];
 // TODO: make this array dynamic so as the user selects how many frets to show on the screen
 const Frets = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 
@@ -72,35 +97,150 @@ export default function Guitar({ data, id }: IGuitar) {
 
   return (
     <>
-      <div className="relative w-full">
+      <div className="relative w-full container mx-auto  h-full py-5">
         <div className="strings">
-          {Strings.map((string: number) => {
-            return (
-              <div
-                className="relative mt-6 mb-[70px] h-[1px] w-full bg-[#FFF]"
-                id={`string-${string}`}
-                key={`string-${string}`}
-              ></div>
-            );
-          })}
+          <div
+            className={`relative mt-6 mb-[55px] h-[0.5px] w-full bg-[#FFF]`}
+            id="string-1"
+          ></div>
+          <div
+            className={`relative mt-6 mb-[55px] h-[0.8px] w-full bg-[#EA9E2D]`}
+            id="string-2"
+          ></div>
+          <div
+            className={`relative mt-6 mb-[55px] h-[1.2px] w-full bg-[#F642EF]`}
+            id="string-3"
+          ></div>
+          <div
+            className={`relative mt-6 mb-[55px] h-[2px] w-full bg-[#C2D934]`}
+            id="string-4"
+          ></div>
+          <div
+            className={`relative mt-6 mb-[55px] h-[3px] w-full bg-[#C65151]`}
+            id="string-5"
+          ></div>
+          <div
+            className={`relative mt-6 mb-[55px] h-1 w-full bg-[#38DBE5]`}
+            id="string-6"
+          ></div>
         </div>
-        <div className="frets absolute top-0 flex">
-          {Frets.map((fret: number) => {
-            return (
-              <>
-                <div
-                  className="b-1 mr-[120px] h-[356px] w-2 bg-[#FFF]"
-                  id={`fret-${fret}`}
-                  key={`fret-${fret}`}
-                ></div>
-                <span
-                  className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8`}
-                >
-                  {fret}
-                </span>
-              </>
-            );
-          })}
+        <div className="frets flex -mt-[22.1%]">
+          <div className="b-1 h-[284px] w-[120px]" id="fret-1">
+            <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3`}
+          >
+            1
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-2">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            2
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-3">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            3
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-4">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            4
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-5">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            5
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-6">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            6
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-7">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            7
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-8">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            8
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-9">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            9
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-10">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            10
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-11">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            11
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-12">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            12
+          </span>
+          <div className="b-1 h-[284px] w-[120px]" id="fret-13">
+            <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+          </div>
+          <span
+            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
+          >
+            13
+          </span>
         </div>
         <div className="fingers ">
           {positionToPlaceFingers
@@ -121,8 +261,8 @@ export default function Guitar({ data, id }: IGuitar) {
                     className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF]`}
                     key={idx}
                     style={{
-                      left: `${fretDiv && fretDiv.x + 55}px`,
-                      top: `${stringDiv && stringDiv.y - 187}px`,
+                      left: `${fretDiv && fretDiv.x - 140}px`,
+                      top: `${stringDiv && stringDiv.y - 162}px`,
                     }}
                   >
                     <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-black">
@@ -133,7 +273,6 @@ export default function Guitar({ data, id }: IGuitar) {
               );
             })}
         </div>
-        <ChordName />
       </div>
     </>
   );

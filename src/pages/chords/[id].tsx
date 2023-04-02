@@ -3,6 +3,7 @@ import { GetServerSideProps } from "next";
 
 import getChords from "@/helpers/getChods";
 import { ParsedUrlQuery } from "querystring";
+import ChordName from "@/components/ChordName";
 
 interface IParams extends ParsedUrlQuery {
   slug: string;
@@ -21,8 +22,9 @@ export default function Chord(props: any) {
   );
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-black">
+    <div className="h-full w-full overflow-hidden bg-black ">
       <DynamicComponentWithNoSSR data={singleData as any} id={id as string} />
+      <ChordName />
     </div>
   );
 }
@@ -44,7 +46,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       arrayWithoutIDs.push(ch);
     });
   });
-  console.log(arrayWithoutIDs);
 
   return {
     props: {

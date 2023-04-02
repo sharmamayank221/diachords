@@ -20,7 +20,7 @@ export default function Footer() {
         </span>
       </div>
       <div className="mt-1 flex items-center justify-start px-3 py-2">
-        <Image src="/hand.png" alt="finger-numbers" width={80} height={120} />
+        <Image src="/hand.png" alt="finger-numbers" width={135} height={180} />
         <span className="mr-4 font-Lora text-xl text-white">Left hand</span>
       </div>
       <span className="mr-4 font-Lora text-xl text-white w-1/2">

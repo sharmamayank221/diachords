@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 
 import { RootState } from "@/app/store";
 import { useAppSelector } from "@/app/hooks";
+import ChordName from "@/components/ChordName";
 
 export default function Home() {
   const singleData = useAppSelector(
@@ -24,12 +25,13 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <main>
-        <div className="h-[100%] w-full overflow-hidden bg-black">
+        <div className="w-full overflow-hidden bg-black h-full">
           <DynamicComponentWithNoSSR
             id={singleData?.[0]?.id}
             data={singleData?.[0]}
           />
         </div>
+        <ChordName />
       </main>
     </>
   );
