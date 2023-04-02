@@ -97,14 +97,14 @@ export default function Guitar({ data, id }: IGuitar) {
 
   return (
     <>
-      <div className="relative w-full container mx-auto  h-full py-5">
-        <div className="strings">
+      <div className="relative w-full container mx-auto  h-full py-14 ">
+        <div className="strings relative z-10">
           <div
             className={`relative mt-6 mb-[55px] h-[0.5px] w-full bg-[#FFF]`}
             id="string-1"
           ></div>
           <div
-            className={`relative mt-6 mb-[55px] h-[0.8px] w-full bg-[#EA9E2D]`}
+            className={`relative mt-6 mb-[55px] h-[1.8px] w-full bg-[#EA9E2D]`}
             id="string-2"
           ></div>
           <div
@@ -258,7 +258,7 @@ export default function Guitar({ data, id }: IGuitar) {
                 // fretNumber === -1 means not to be pressed and rendered
                 item?.fretNumber !== -1 && (
                   <div
-                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF]`}
+                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF] z-20`}
                     key={idx}
                     style={{
                       left: `${fretDiv && fretDiv.x - 140}px`,
@@ -273,6 +273,7 @@ export default function Guitar({ data, id }: IGuitar) {
               );
             })}
         </div>
+        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[250px] top-5 z-1"></div>
       </div>
     </>
   );

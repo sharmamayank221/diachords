@@ -12,7 +12,7 @@ interface IParams extends ParsedUrlQuery {
 export default function Chord(props: any) {
   const { id } = props;
   const { arrayWithoutIDs } = props;
-  console.log(id, arrayWithoutIDs, "id");
+
   const DynamicComponentWithNoSSR = dynamic(
     () => import("../../components/Guitar")
   );
