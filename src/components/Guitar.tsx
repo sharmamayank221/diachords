@@ -225,7 +225,8 @@ export default function Guitar({ data, id }: IGuitar) {
           </span>
           <div className="b-1 h-[284px] w-[120px]" id="fret-12">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
-            <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
+            <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[210px]"></div>
+            <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[106px]"></div>
           </div>
           <span
             className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
