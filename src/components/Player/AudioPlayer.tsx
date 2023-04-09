@@ -8,7 +8,7 @@ function AudioPlayer(): JSX.Element {
 
   function playMidiNote(noteNumber: number): void {
     if (midiOutput === null) {
-      console.log("No MIDI output available");
+      console.log("No MIDI output availabless");
       return;
     }
 
@@ -30,6 +30,7 @@ function AudioPlayer(): JSX.Element {
   }
 
   function play(): void {
+    initMidi();
     if (!playing) {
       setPlaying(true);
       setCurrentNote(0);
@@ -66,6 +67,8 @@ function AudioPlayer(): JSX.Element {
       // Get the first output port
       const output = midiAccess.outputs.values().next().value;
       setMidiOutput(output);
+
+      console.log(midiAccess, "output");
     });
   }
 

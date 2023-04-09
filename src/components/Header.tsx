@@ -18,7 +18,6 @@ export default function Header() {
           <div className="w-[80%]">
             <Searchbar />
           </div>
-          <AudioPlayer />
         </div>
       </div>
     </div>
