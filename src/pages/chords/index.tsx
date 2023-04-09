@@ -22,7 +22,7 @@ const Chord: NextPage = () => {
         id={singleData?.[0]?.id}
         data={singleData?.[0]}
       />
-      <ChordName />
+      <ChordName singleDatafromDynamicPage={singleData} />
     </div>
   );
 };

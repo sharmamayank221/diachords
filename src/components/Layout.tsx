@@ -6,7 +6,7 @@ export default function Layout({ children }: any) {
   return (
     <>
       <Header />
-      <main>{children}</main>
+      <main style={{ backgroundColor: "#000" }}>{children}</main>
       <Footer />
     </>
   );

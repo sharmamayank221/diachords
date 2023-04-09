@@ -3,8 +3,11 @@ import { useRouter } from "next/router";
 
 import data from "@/chrods.json";
 import type { A } from "@/types/chord.types";
-import { useAppDispatch } from "@/app/hooks";
-import { getSingleDataForDynamicPage } from "@/reducers/chord/searchDataSlice";
+import { useAppDispatch, useAppSelector } from "@/app/hooks";
+import {
+  getSingleDataForDynamicPage,
+  setSearchChordData,
+} from "@/reducers/chord/searchDataSlice";
 
 interface IChordSearch {
   searchChord: string;
@@ -12,7 +15,9 @@ interface IChordSearch {
 }
 
 export default function Searchbar() {
-  const [searchChord, setSearchChord] = React.useState<string>("");
+  const searchChord = useAppSelector(
+    (state) => state.searchDataSlice.searchChord
+  );
   const [Data, setData] = React.useState<any>([]);
   const [WithIds, setWithIds] = React.useState<any>([]);
   const router = useRouter();
@@ -29,7 +34,7 @@ export default function Searchbar() {
       )
     );
     setData(searchData);
-  }, [WithIds, searchChord]);
+  }, [WithIds, dispatch, searchChord]);
 
   // what i am trying to achieve is to set the id in all chords objects so that i can search by id as well as make dynamic detail page
   // My approach is use forEach to loop over every object and set the id as keysuffix value
@@ -57,9 +62,13 @@ export default function Searchbar() {
         Data.forEach((item: A, idx: number) => {
           setSingleDataForDynamicPage([item]);
         });
-      dispatch(getSingleDataForDynamicPage(Data));
     }
   }, [Data, dispatch, searchChord]);
+
+  // incase i need searchdata in any other component
+  React.useEffect(() => {
+    dispatch(getSingleDataForDynamicPage(singleDataForDynamicPage));
+  }, [dispatch, singleDataForDynamicPage]);
 
   return (
     <div className="h-full">
@@ -70,7 +79,7 @@ export default function Searchbar() {
           placeholder="search.."
           color="#FFF"
           onChange={(e: React.FormEvent<HTMLInputElement>) =>
-            setSearchChord(e?.currentTarget?.value)
+            dispatch(setSearchChordData(e?.currentTarget?.value))
           }
           value={searchChord}
         />
@@ -90,7 +99,7 @@ export default function Searchbar() {
                       className="cursor-pointer font-Lora text-white hover:text-[#1BD79E]"
                       onClick={() => {
                         router.push(`/chords/${item?.id}`);
-                        setSearchChord("");
+                        dispatch(setSearchChordData(""));
                       }}
                     >
                       {item?.suffix}

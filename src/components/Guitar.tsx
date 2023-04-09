@@ -1,34 +1,6 @@
 import { A } from "@/types/chord.types";
 import React from "react";
 
-import ChordName from "./ChordName";
-
-const Strings = [
-  {
-    string: 1,
-    h: 0.4,
-  },
-  {
-    string: 2,
-    h: 0.6,
-  },
-  {
-    string: 3,
-    h: 0.8,
-  },
-  {
-    string: 4,
-    h: 1,
-  },
-  {
-    string: 5,
-    h: 2,
-  },
-  {
-    string: 6,
-    h: 3,
-  },
-];
 // TODO: make this array dynamic so as the user selects how many frets to show on the screen
 const Frets = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 

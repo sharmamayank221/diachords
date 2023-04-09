@@ -4,6 +4,7 @@ import { GetServerSideProps } from "next";
 import getChords from "@/helpers/getChods";
 import { ParsedUrlQuery } from "querystring";
 import ChordName from "@/components/ChordName";
+import { A } from "@/types/chord.types";
 
 interface IParams extends ParsedUrlQuery {
   slug: string;
@@ -17,14 +18,14 @@ export default function Chord(props: any) {
     () => import("../../components/Guitar")
   );
 
-  const singleData = Object.values(arrayWithoutIDs)?.filter(
+  const singleData: A[] = Object.values(arrayWithoutIDs)?.filter(
     (item: any) => item?.id === id
-  );
+  ) as A[];
 
   return (
     <div className="h-full w-full overflow-hidden bg-black ">
       <DynamicComponentWithNoSSR data={singleData as any} id={id as string} />
-      <ChordName />
+      <ChordName singleDatafromDynamicPage={singleData} />
     </div>
   );
 }

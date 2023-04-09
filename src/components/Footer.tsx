@@ -29,19 +29,19 @@ export default function Footer() {
       <div className="mr-4 font-Lora text-xl text-white w-1/2 flex">
         Stirngs:
         <div className="flex items-center ">
-          <span className="text-[#38DBE5] ">6th String </span>
+          <span className="text-[#38DBE5] ">6th String, </span>
         </div>
         <div className="flex items-center ml-3">
-          <span className="text-[#C65151] ">5th String </span>
+          <span className="text-[#C65151] ">5th String, </span>
         </div>
         <div className="flex items-center ml-3">
-          <span className="text-[#C2D934] ">4th String </span>
+          <span className="text-[#C2D934] ">4th String, </span>
         </div>
         <div className="flex items-center ml-3">
-          <span className="text-[#F642EF] ">3rd String </span>
+          <span className="text-[#F642EF] ">3rd String, </span>
         </div>
         <div className="flex items-center ml-3">
-          <span className="text-[#EA9E2D] ">2nd String </span>
+          <span className="text-[#EA9E2D] ">2nd String, </span>
         </div>
         <div className="flex items-center ml-3">
           <span className="">1st String </span>

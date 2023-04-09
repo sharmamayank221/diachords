@@ -5,7 +5,7 @@ import { A, KEY_SIGNATURE } from "@/types/chord.types";
 
 export interface singleDataForDynamicPage {
   singleData: A[];
-  apiData: A[];
+  searchChord: string;
 }
 
 const initialState: singleDataForDynamicPage = {
@@ -19,14 +19,7 @@ const initialState: singleDataForDynamicPage = {
       },
     },
   ],
-  apiData: [
-    {
-      key: KEY_SIGNATURE.A,
-      suffix: "",
-      positions: [],
-      id: "",
-    },
-  ],
+  searchChord: "",
 };
 
 export const searchDataSliceReducer = createSlice({
@@ -36,10 +29,14 @@ export const searchDataSliceReducer = createSlice({
     getSingleDataForDynamicPage: (state, action: PayloadAction<any>): void => {
       state.singleData = action.payload;
     },
+    setSearchChordData: (state, action: PayloadAction<any>): void => {
+      state.searchChord = action.payload;
+    },
   },
 });
 
 // Action creators are generated for each case reducer function
-export const { getSingleDataForDynamicPage } = searchDataSliceReducer.actions;
+export const { getSingleDataForDynamicPage, setSearchChordData } =
+  searchDataSliceReducer.actions;
 
 export default searchDataSliceReducer.reducer;
