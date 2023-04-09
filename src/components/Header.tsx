@@ -3,6 +3,7 @@ import React from "react";
 import Searchbar from "@/components/SearchBar";
 import Image from "next/image";
 import Link from "next/link";
+import AudioPlayer from "./Player/AudioPlayer";
 
 export default function Header() {
   return (
@@ -17,6 +18,7 @@ export default function Header() {
           <div className="w-[80%]">
             <Searchbar />
           </div>
+          <AudioPlayer />
         </div>
       </div>
     </div>
