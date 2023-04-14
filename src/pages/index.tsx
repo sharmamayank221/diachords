@@ -4,8 +4,11 @@ import dynamic from "next/dynamic";
 import { RootState } from "@/app/store";
 import { useAppSelector } from "@/app/hooks";
 import ChordName from "@/components/ChordName";
+import { useRouter } from "next/router";
+import React from "react";
 
 export default function Home() {
+  const router = useRouter();
   const singleData = useAppSelector(
     (state: RootState) => state.searchDataSlice.singleData
   );
@@ -14,8 +17,15 @@ export default function Home() {
     () => import("../components/Guitar"),
     { ssr: false }
   );
+  console.log(router.asPath, "path");
 
   console.log(singleData, "data");
+
+  React.useEffect(() => {
+    if (router.asPath === "/") {
+      router.push("/chords/cmajor");
+    }
+  }, []);
 
   return (
     <>
