@@ -84,7 +84,7 @@ export default function Searchbar() {
           value={searchChord}
         />
         {searchChord !== "" && (
-          <div className="absolute top-28 z-30 mx-auto mt-[22px] w-[90%] rounded-[20px] border-none bg-[#2D2D2D] p-4">
+          <div className="absolute top-12 mx-auto mt-[22px] w-[90%] rounded-[20px] border-none bg-[#2D2D2D] p-4 z-50">
             <div className={`h-[32px] w-[32px] rounded-full bg-[#1BD79E]`}>
               <span className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-white">
                 {searchChord?.charAt(0)?.toUpperCase()}
