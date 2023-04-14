@@ -31,6 +31,8 @@ interface IGuitar {
 }
 
 export default function Guitar({ data, id }: IGuitar) {
+  console.log(data, "data");
+
   const finger = data?.[0]?.positions?.[0]?.fingers;
   const fret = data?.[0]?.positions?.[0]?.frets;
 
@@ -70,7 +72,7 @@ export default function Guitar({ data, id }: IGuitar) {
   return (
     <>
       <div className="relative w-full container mx-auto  h-full py-14 ">
-        <div className="strings relative z-10">
+        <div className="strings relative z-30">
           <div
             className={`relative mt-6 mb-[55px] h-[0.5px] w-full bg-[#FFF]`}
             id="string-1"
@@ -96,124 +98,136 @@ export default function Guitar({ data, id }: IGuitar) {
             id="string-6"
           ></div>
         </div>
-        <div className="frets flex -mt-[22.1%]">
-          <div className="b-1 h-[284px] w-[120px]" id="fret-1">
+        <div className="frets flex -mt-[22.1%] z-20 relative">
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-1">
             <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              1
+            </span>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3`}
-          >
-            1
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-2">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-2">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              2
+            </span>
             <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            2
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-3">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-3">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              3
+            </span>
             <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            3
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-4">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-4">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              4
+            </span>
             <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            4
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-5">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-5">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              5
+            </span>
             <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            5
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-6">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-6">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              6
+            </span>
             <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            6
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-7">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-7">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              7
+            </span>
             <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            7
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-8">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-8">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              8
+            </span>
             <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            8
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-9">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-9">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              9
+            </span>
             <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            9
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-10">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-10">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              10
+            </span>
             <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            10
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-11">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-11">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              11
+            </span>
             <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            11
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-12">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-12">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              12
+            </span>
             <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[210px]"></div>
             <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-14 -translate-y-[106px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            12
-          </span>
-          <div className="b-1 h-[284px] w-[120px]" id="fret-13">
+
+          <div className="b-1 h-[284px] w-[120px] relative" id="fret-13">
             <div className="b-1 mr-[120px] h-[284px] w-2 bg-[#FFF]"></div>
+            <span
+              className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+            >
+              13
+            </span>
             <div className="w-3 h-3 flex items-center justify-center rotate-45 translate-x-14 -translate-y-[152px]"></div>
           </div>
-          <span
-            className={`text-white h-[100%] font-Lora text-3xl flex items-end -mt-8 -mx-3`}
-          >
-            13
-          </span>
         </div>
         <div className="fingers ">
           {positionToPlaceFingers
@@ -231,10 +245,10 @@ export default function Guitar({ data, id }: IGuitar) {
                 // fretNumber === -1 means not to be pressed and rendered
                 item?.fretNumber !== -1 && (
                   <div
-                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF] z-20`}
+                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF] z-50`}
                     key={idx}
                     style={{
-                      left: `${fretDiv && fretDiv.x - 140}px`,
+                      left: `${fretDiv && fretDiv.x - 130}px`,
                       top: `${stringDiv && stringDiv.y - 162}px`,
                     }}
                   >
