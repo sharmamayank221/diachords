@@ -26,27 +26,6 @@ export default function Footer() {
       <span className="mr-4 font-Lora text-xl text-white w-[25%]">
         Standard tuning: E2,A2,D3,G3,B3,E4
       </span>
-      <div className="mr-4 font-Lora text-xl text-white w-1/2 flex">
-        Stirngs:
-        <div className="flex items-center ">
-          <span className="text-[#38DBE5] ">6th String, </span>
-        </div>
-        <div className="flex items-center ml-3">
-          <span className="text-[#C65151] ">5th String, </span>
-        </div>
-        <div className="flex items-center ml-3">
-          <span className="text-[#C2D934] ">4th String, </span>
-        </div>
-        <div className="flex items-center ml-3">
-          <span className="text-[#F642EF] ">3rd String, </span>
-        </div>
-        <div className="flex items-center ml-3">
-          <span className="text-[#EA9E2D] ">2nd String, </span>
-        </div>
-        <div className="flex items-center ml-3">
-          <span className="">1st String </span>
-        </div>
-      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 import { A } from "@/types/chord.types";
 import Image from "next/image";
 import React from "react";
+import Switch from "react-switch";
 
 // TODO: make this array dynamic so as the user selects how many frets to show on the screen
 const Frets = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
@@ -25,6 +26,8 @@ interface IPositionsToBePlaced {
   stringNumber: number;
   fretNumber: number;
   fingerNumber?: number;
+  hasCapo?: boolean;
+  hasBar?: [];
 }
 
 interface IGuitar {
@@ -33,133 +36,234 @@ interface IGuitar {
 }
 
 export default function Guitar({ data, id }: IGuitar) {
+  const [checked, setChecked] = React.useState<boolean>();
+
   const [position, setPosition] = React.useState(0);
-  const [fretsToUse, setFretsToUse] = React.useState([]);
-  const [fingersToUse, setFingersToUse] = React.useState([]);
+  const [fretsToUse, setFretsToUse] = React.useState(
+    data?.[0]?.positions?.[0]?.frets
+  );
+  const hasCapo = data?.[0]?.positions?.filter(
+    (item: any) => item?.frets === fretsToUse
+  )?.[0]?.capo;
+
+  const handleChange = (hasCapo: any) => {
+    if (hasCapo === true) {
+      setChecked(true);
+    } else {
+      setChecked(false);
+    }
+  };
+
+  console.log(hasCapo, checked, "capo");
+
+  const [fingersToUse, setFingersToUse] = React.useState(
+    data?.[0]?.positions?.[0]?.fingers
+  );
   const ref = React.useRef(null);
 
   const pos = useGetStringNumAndFretNum(fretsToUse, fingersToUse);
 
-  // gives DOMRECT : { x: 124, y: 148, width: 4, height: 356, top: 148, right: 128, bottom: 504, left: 124 }
-  // console.log(fret2?.getBoundingClientRect().x, "fret");
+  const hasBar = data?.[0]?.positions?.filter(
+    (item: any) => item.frets === fretsToUse
+  );
 
-  // gives DOMRect { x: 0, y: 219, width: 1920, height: 1, top: 219, right: 1920, bottom: 220, left: 0 }
-  // console.log(string2?.getBoundingClientRect().y, "string");
-
-  // need to optimize the default position of zero
   const hanldeNextPosition = () => {
     if (position < data?.[0]?.positions?.length - 1) {
       setPosition((prev) => prev + 1);
-      setFretsToUse(data?.[0]?.positions?.[position]?.frets);
-      setFingersToUse(data?.[0]?.positions?.[position]?.fingers);
     }
+
+    // position + 1 is to sync position outside and inside the handlenext and handlePrev func
+    setFretsToUse(data?.[0]?.positions?.[position + 1]?.frets);
+    setFingersToUse(data?.[0]?.positions?.[position + 1]?.fingers);
   };
 
   const handlePrevPosition = () => {
     if (position > 0) {
       setPosition((prev) => prev - 1);
-      setFretsToUse(data?.[0]?.positions?.[position]?.frets);
-      setFingersToUse(data?.[0]?.positions?.[position]?.fingers);
     }
+    setFretsToUse(data?.[0]?.positions?.[position - 1]?.frets);
+    setFingersToUse(data?.[0]?.positions?.[position - 1]?.fingers);
   };
-
-  console.log(pos, "posi");
+  const baseFretDiv = document
+    ?.getElementById(`fret-${hasBar?.[0]?.baseFret}`)
+    ?.getBoundingClientRect();
 
   return (
     <>
-      <div className="relative w-full container mx-auto  h-full py-14 ">
+      <div className="relative w-full h-full pt-14 ">
         <div className="strings relative z-30">
+          {checked && hasCapo && (
+            <div
+              className={`absolute top-[-10px] z-50`}
+              style={{
+                left: `${baseFretDiv && baseFretDiv.x + 54}px`,
+              }}
+            >
+              <Image
+                src="/capo.svg"
+                alt="capo"
+                width={36}
+                height={300}
+                className=""
+              />
+            </div>
+          )}
           <div
-            className={`relative mt-6 mb-[55px] h-[0.5px] w-full bg-[#FFF]`}
+            className={` mt-6 mb-[55px] h-[0.5px] w-full bg-[#FFF] relative`}
             id="string-1"
-          ></div>
+          >
+            <div className="bg-[#FFF] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
+              1st string
+            </div>
+          </div>
           <div
             className={`relative mt-6 mb-[55px] h-[1.8px] w-full bg-[#EA9E2D]`}
             id="string-2"
-          ></div>
+          >
+            <div className="bg-[#EA9E2D] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
+              2nd string
+            </div>
+          </div>
           <div
             className={`relative mt-6 mb-[55px] h-[1.2px] w-full bg-[#F642EF]`}
             id="string-3"
-          ></div>
+          >
+            <div className="bg-[#F642EF] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
+              3rd string
+            </div>
+          </div>
           <div
             className={`relative mt-6 mb-[55px] h-[2px] w-full bg-[#C2D934]`}
             id="string-4"
-          ></div>
+          >
+            <div className="bg-[#C2D934] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
+              4th string
+            </div>
+          </div>
           <div
             className={`relative mt-6 mb-[55px] h-[3px] w-full bg-[#C65151]`}
             id="string-5"
-          ></div>
+          >
+            <div className="bg-[#C65151] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
+              5th string
+            </div>
+          </div>
           <div
             className={`relative mt-6 mb-[55px] h-1 w-full bg-[#38DBE5]`}
             id="string-6"
-          ></div>
+          >
+            <div className="bg-[#38DBE5] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
+              6th string
+            </div>
+          </div>
         </div>
-        <div className="frets flex -mt-[22.1%] z-20 relative">
-          {Frets.map((fret, idx) => {
-            return (
-              <div
-                className="b-1 h-[284px] w-[120px] relative"
-                id={`fret-${idx + 1}`}
-                key={idx}
-                ref={ref}
-              >
-                <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
-                <span
-                  className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
-                >
-                  {fret}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="fingers ">
-          {pos?.map((item: IPositionsToBePlaced, idx: number) => {
-            const stringDiv = document
-              ?.getElementById(`string-${item?.stringNumber}`)
-              ?.getBoundingClientRect();
-
-            const fretDiv = document
-              ?.getElementById(`fret-${item?.fretNumber}`)
-              ?.getBoundingClientRect();
-
-            return (
-              // fretNumber === -1 means not to be pressed and rendered
-              item?.fretNumber !== -1 && (
+        <div className=" container mx-auto">
+          <div className="frets flex -mt-[22.1%] z-20 relative">
+            {Frets.map((fret, idx) => {
+              return (
                 <div
-                  className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF] z-50`}
+                  className="b-1 h-[284px] w-[120px] relative"
+                  id={`fret-${idx + 1}`}
                   key={idx}
-                  style={{
-                    left: `${fretDiv && fretDiv.x - 130}px`,
-                    top: `${stringDiv && stringDiv.y - 162}px`,
-                  }}
+                  ref={ref}
                 >
-                  <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-black">
-                    {item?.fingerNumber}
-                  </h3>
+                  <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
+                  <span
+                    className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+                  >
+                    {fret}
+                  </span>
+                  {fret === 5 && (
+                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                  )}
+                  {fret === 7 && (
+                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                  )}
+                  {fret === 3 && (
+                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                  )}
+                  {fret === 9 && (
+                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                  )}
+                  {fret === 12 && (
+                    <>
+                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[210px]"></div>
+                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[106px]"></div>
+                    </>
+                  )}
                 </div>
-              )
-            );
-          })}
+              );
+            })}
+          </div>
+          <div className="fingers ">
+            {pos?.map((item: IPositionsToBePlaced, idx: number) => {
+              const stringDiv = document
+                ?.getElementById(`string-${item?.stringNumber}`)
+                ?.getBoundingClientRect();
+              const fretDiv = document
+                ?.getElementById(`fret-${item?.fretNumber}`)
+                ?.getBoundingClientRect();
+
+              return (
+                // fretNumber === -1 means not to be pressed and rendered
+                item?.fretNumber !== -1 && (
+                  <div
+                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF] z-40`}
+                    key={idx}
+                    style={{
+                      left: `${
+                        fretDiv &&
+                        baseFretDiv &&
+                        fretDiv.x + baseFretDiv.x - 120
+                      }px`,
+                      top: `${stringDiv && stringDiv.y - 162}px`,
+                    }}
+                  >
+                    <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-black">
+                      {item?.fingerNumber}
+                    </h3>
+                  </div>
+                )
+              );
+            })}
+          </div>
+          <div className="positions flex items-center justify-center w-full ">
+            <label className="text-white font-Lora text-3xl flex items-center">
+              Capo : {""}
+              <Switch
+                onChange={handleChange}
+                checked={checked as boolean}
+                className="react-switch ml-2"
+                disabled={!hasCapo as boolean}
+                boxShadow="0px 1px 5px rgba(0, 0, 0, 0.6)"
+                activeBoxShadow="0px 0px 1px 10px rgba(0, 0, 0, 0.2)"
+                uncheckedIcon={false}
+                checkedIcon={false}
+                onColor="#1BD79E"
+              />
+            </label>
+            <div onClick={handlePrevPosition} className="cursor-pointer">
+              <Image
+                src="/arrowRight.svg"
+                alt="next"
+                width={80}
+                height={80}
+                className="rotate-180 origin-center"
+              />
+            </div>
+            <h2 className="text-white text-center font-Lora text-3xl">
+              Variation: {position}
+            </h2>
+
+            <div
+              onClick={hanldeNextPosition}
+              className="-mt-[10px] cursor-pointer"
+            >
+              <Image src="/arrowRight.svg" alt="next" width={80} height={80} />
+            </div>
+          </div>
         </div>
         <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[250px] top-5 z-1"></div>
-        <div className="positions flex items-center justify-center w-full">
-          <div onClick={handlePrevPosition}>
-            <Image
-              src="/arrowRight.svg"
-              alt="next"
-              width={80}
-              height={80}
-              className="rotate-180 origin-center"
-            />
-          </div>
-          <h2 className="text-white text-center font-Lora text-3xl">
-            Position: {position}
-          </h2>
-          <div onClick={hanldeNextPosition} className="-mt-[10px]">
-            <Image src="/arrowRight.svg" alt="next" width={80} height={80} />
-          </div>
-        </div>
       </div>
     </>
   );

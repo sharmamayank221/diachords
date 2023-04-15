@@ -17,9 +17,6 @@ export default function Home() {
     () => import("../components/Guitar"),
     { ssr: false }
   );
-  console.log(router.asPath, "path");
-
-  console.log(singleData, "data");
 
   React.useEffect(() => {
     if (router.asPath === "/") {
