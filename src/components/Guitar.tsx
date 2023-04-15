@@ -1,3 +1,4 @@
+import getIDs from "@/helpers/getIDs";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 import { A } from "@/types/chord.types";
 import Image from "next/image";
@@ -40,9 +41,9 @@ export default function Guitar({ data, id }: IGuitar) {
 
   const [position, setPosition] = React.useState(0);
   const [fretsToUse, setFretsToUse] = React.useState(
-    data?.[0]?.positions?.[0]?.frets
+    data?.positions?.[0]?.frets
   );
-  const hasCapo = data?.[0]?.positions?.filter(
+  const hasCapo = data?.positions?.filter(
     (item: any) => item?.frets === fretsToUse
   )?.[0]?.capo;
 
@@ -55,32 +56,35 @@ export default function Guitar({ data, id }: IGuitar) {
   };
 
   const [fingersToUse, setFingersToUse] = React.useState(
-    data?.[0]?.positions?.[0]?.fingers
+    data?.positions?.[0]?.fingers
   );
   const ref = React.useRef(null);
 
-  const pos = useGetStringNumAndFretNum(fretsToUse, fingersToUse);
+  const pos = useGetStringNumAndFretNum(
+    fretsToUse as number[],
+    fingersToUse as number[]
+  );
 
-  const hasBar = data?.[0]?.positions?.filter(
+  const hasBar = data?.positions?.filter(
     (item: any) => item.frets === fretsToUse
   );
 
   const hanldeNextPosition = () => {
-    if (position < data?.[0]?.positions?.length - 1) {
+    if (data?.positions?.length && position < data?.positions?.length - 1) {
       setPosition((prev) => prev + 1);
     }
 
     // position + 1 is to sync position outside and inside the handlenext and handlePrev func
-    setFretsToUse(data?.[0]?.positions?.[position + 1]?.frets);
-    setFingersToUse(data?.[0]?.positions?.[position + 1]?.fingers);
+    setFretsToUse(data?.positions?.[position + 1]?.frets);
+    setFingersToUse(data?.positions?.[position + 1]?.fingers);
   };
 
   const handlePrevPosition = () => {
     if (position > 0) {
       setPosition((prev) => prev - 1);
     }
-    setFretsToUse(data?.[0]?.positions?.[position - 1]?.frets);
-    setFingersToUse(data?.[0]?.positions?.[position - 1]?.fingers);
+    setFretsToUse(data?.positions?.[position - 1]?.frets);
+    setFingersToUse(data?.positions?.[position - 1]?.fingers);
   };
   const baseFretDiv = document
     ?.getElementById(`fret-${hasBar?.[0]?.baseFret}`)

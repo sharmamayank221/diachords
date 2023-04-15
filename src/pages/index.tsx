@@ -38,7 +38,7 @@ export default function Home() {
             data={singleData?.[0]}
           />
         </div>
-        <ChordName singleDatafromDynamicPage={singleData} />
+        <ChordName singleDatafromDynamicPage={singleData?.[0]} />
       </main>
     </>
   );
