@@ -67,8 +67,6 @@ function AudioPlayer(): JSX.Element {
       // Get the first output port
       const output = midiAccess.outputs.values().next().value;
       setMidiOutput(output);
-
-      console.log(midiAccess, "output");
     });
   }
 

@@ -54,8 +54,6 @@ export default function Guitar({ data, id }: IGuitar) {
     }
   };
 
-  console.log(hasCapo, checked, "capo");
-
   const [fingersToUse, setFingersToUse] = React.useState(
     data?.[0]?.positions?.[0]?.fingers
   );
@@ -214,7 +212,7 @@ export default function Guitar({ data, id }: IGuitar) {
                       left: `${
                         fretDiv &&
                         baseFretDiv &&
-                        fretDiv.x + baseFretDiv.x - 120
+                        fretDiv.x + baseFretDiv.x - 128
                       }px`,
                       top: `${stringDiv && stringDiv.y - 162}px`,
                     }}
