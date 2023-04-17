@@ -4,6 +4,7 @@ import Searchbar from "@/components/SearchBar";
 import Image from "next/image";
 import Link from "next/link";
 import AudioPlayer from "./Player/AudioPlayer";
+import GuitarHintsModal from "./Modal/GuitarHintsModal";
 
 export default function Header() {
   return (
@@ -15,9 +16,10 @@ export default function Header() {
               <Image src="/Logo.svg" alt="logo" width={41} height={41} />
             </Link>
           </div>
-          <div className="w-[80%]">
+          <div className="w-[60%]">
             <Searchbar />
           </div>
+          {/* <GuitarHintsModal /> */}
         </div>
       </div>
     </div>

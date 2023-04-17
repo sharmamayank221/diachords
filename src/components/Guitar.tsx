@@ -1,4 +1,3 @@
-import getIDs from "@/helpers/getIDs";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 import { A } from "@/types/chord.types";
 import Image from "next/image";
@@ -36,7 +35,7 @@ interface IGuitar {
   data?: A;
 }
 
-export default function Guitar({ data, id }: IGuitar) {
+export default function Guitar({ data }: IGuitar) {
   const [checked, setChecked] = React.useState<boolean>();
 
   const [position, setPosition] = React.useState(0);
@@ -93,25 +92,25 @@ export default function Guitar({ data, id }: IGuitar) {
   return (
     <>
       <div className="relative w-full h-full pt-14 ">
-        <div className="strings relative z-30">
+        <div className="strings relative ">
           {checked && hasCapo && (
             <div
               className={`absolute top-[-10px] z-50`}
               style={{
-                left: `${baseFretDiv && baseFretDiv.x + 54}px`,
+                left: `${baseFretDiv && baseFretDiv.x + 50}px`,
               }}
             >
               <Image
                 src="/capo.svg"
                 alt="capo"
                 width={36}
-                height={300}
+                height={320}
                 className=""
               />
             </div>
           )}
           <div
-            className={` mt-6 mb-[55px] h-[0.5px] w-full bg-[#FFF] relative`}
+            className={` mt-6 mb-[55px] h-[0.5px] w-full bg-[#FFF] relative z-20`}
             id="string-1"
           >
             <div className="bg-[#FFF] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
@@ -119,7 +118,7 @@ export default function Guitar({ data, id }: IGuitar) {
             </div>
           </div>
           <div
-            className={`relative mt-6 mb-[55px] h-[1.8px] w-full bg-[#EA9E2D]`}
+            className={`relative mt-6 mb-[55px] h-[1.8px] w-full bg-[#EA9E2D] z-20`}
             id="string-2"
           >
             <div className="bg-[#EA9E2D] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
@@ -127,7 +126,7 @@ export default function Guitar({ data, id }: IGuitar) {
             </div>
           </div>
           <div
-            className={`relative mt-6 mb-[55px] h-[1.2px] w-full bg-[#F642EF]`}
+            className={`relative mt-6 mb-[55px] h-[1.2px] w-full bg-[#F642EF] z-20`}
             id="string-3"
           >
             <div className="bg-[#F642EF] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
@@ -135,7 +134,7 @@ export default function Guitar({ data, id }: IGuitar) {
             </div>
           </div>
           <div
-            className={`relative mt-6 mb-[55px] h-[2px] w-full bg-[#C2D934]`}
+            className={`relative mt-6 mb-[55px] h-[2px] w-full bg-[#C2D934] z-20`}
             id="string-4"
           >
             <div className="bg-[#C2D934] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
@@ -143,7 +142,7 @@ export default function Guitar({ data, id }: IGuitar) {
             </div>
           </div>
           <div
-            className={`relative mt-6 mb-[55px] h-[3px] w-full bg-[#C65151]`}
+            className={`relative mt-6 mb-[55px] h-[3px] w-full bg-[#C65151] z-20`}
             id="string-5"
           >
             <div className="bg-[#C65151] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
@@ -151,7 +150,7 @@ export default function Guitar({ data, id }: IGuitar) {
             </div>
           </div>
           <div
-            className={`relative mt-6 mb-[55px] h-1 w-full bg-[#38DBE5]`}
+            className={`relative mt-6 mb-[55px] h-1 w-full bg-[#38DBE5] z-20`}
             id="string-6"
           >
             <div className="bg-[#38DBE5] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
@@ -210,13 +209,15 @@ export default function Guitar({ data, id }: IGuitar) {
                 // fretNumber === -1 means not to be pressed and rendered
                 item?.fretNumber !== -1 && (
                   <div
-                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#FFF] z-40`}
+                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#1BD79E] ${
+                      checked ? "z-20" : "z-40"
+                    }`}
                     key={idx}
                     style={{
                       left: `${
                         fretDiv &&
                         baseFretDiv &&
-                        fretDiv.x + baseFretDiv.x - 128
+                        fretDiv.x + baseFretDiv.x - 140
                       }px`,
                       top: `${stringDiv && stringDiv.y - 162}px`,
                     }}
@@ -241,7 +242,7 @@ export default function Guitar({ data, id }: IGuitar) {
                 activeBoxShadow="0px 0px 1px 10px rgba(0, 0, 0, 0.2)"
                 uncheckedIcon={false}
                 checkedIcon={false}
-                onColor="#1BD79E"
+                onColor="#FFF"
               />
             </label>
             <div onClick={handlePrevPosition} className="cursor-pointer">
