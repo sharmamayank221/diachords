@@ -3,6 +3,8 @@ import { A } from "@/types/chord.types";
 import Image from "next/image";
 import React from "react";
 import Switch from "react-switch";
+import "react-tooltip/dist/react-tooltip.css";
+import { Tooltip as ReactTooltip } from "react-tooltip";
 
 // TODO: make this array dynamic so as the user selects how many frets to show on the screen
 const Frets = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
@@ -162,37 +164,42 @@ export default function Guitar({ data }: IGuitar) {
           <div className="frets flex -mt-[22.1%] z-20 relative">
             {Frets.map((fret, idx) => {
               return (
-                <div
-                  className="b-1 h-[284px] w-[120px] relative"
-                  id={`fret-${idx + 1}`}
-                  key={idx}
-                  ref={ref}
-                >
-                  <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
-                  <span
-                    className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+                <>
+                  <div
+                    className="b-1 h-[284px] w-[120px] relative"
+                    id={`fret-${idx + 1}`}
+                    key={idx}
+                    ref={ref}
+                    data-tooltip-id={`fret-${idx + 1}`}
+                    data-tooltip-content={`fret number  ${idx + 1}`}
                   >
-                    {fret}
-                  </span>
-                  {fret === 5 && (
-                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                  )}
-                  {fret === 7 && (
-                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                  )}
-                  {fret === 3 && (
-                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                  )}
-                  {fret === 9 && (
-                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                  )}
-                  {fret === 12 && (
-                    <>
-                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[210px]"></div>
-                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[106px]"></div>
-                    </>
-                  )}
-                </div>
+                    <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
+                    <span
+                      className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+                    >
+                      {fret}
+                    </span>
+                    {fret === 5 && (
+                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                    )}
+                    {fret === 7 && (
+                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                    )}
+                    {fret === 3 && (
+                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                    )}
+                    {fret === 9 && (
+                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                    )}
+                    {fret === 12 && (
+                      <>
+                        <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[210px]"></div>
+                        <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[106px]"></div>
+                      </>
+                    )}
+                  </div>
+                  <ReactTooltip id={`fret-${idx + 1}`} />
+                </>
               );
             })}
           </div>
@@ -208,24 +215,33 @@ export default function Guitar({ data }: IGuitar) {
               return (
                 // fretNumber === -1 means not to be pressed and rendered
                 item?.fretNumber !== -1 && (
-                  <div
-                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#1BD79E] ${
-                      checked ? "z-20" : "z-40"
-                    }`}
-                    key={idx}
-                    style={{
-                      left: `${
-                        fretDiv &&
-                        baseFretDiv &&
-                        fretDiv.x + baseFretDiv.x - 140
-                      }px`,
-                      top: `${stringDiv && stringDiv.y - 162}px`,
-                    }}
-                  >
-                    <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-black">
-                      {item?.fingerNumber}
-                    </h3>
-                  </div>
+                  <>
+                    <div
+                      className={`absolute h-[32px] w-[32px] rounded-full bg-[#1BD79E] ${
+                        checked ? "z-20" : "z-40"
+                      }`}
+                      data-tooltip-id="finger-number"
+                      data-tooltip-content={` ${
+                        item?.fingerNumber !== 0
+                          ? "finger " + "" + item?.fingerNumber
+                          : "string 0"
+                      }`}
+                      key={idx}
+                      style={{
+                        left: `${
+                          fretDiv &&
+                          baseFretDiv &&
+                          fretDiv.x + baseFretDiv.x - 140
+                        }px`,
+                        top: `${stringDiv && stringDiv.y - 162}px`,
+                      }}
+                    >
+                      <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-black">
+                        {item?.fingerNumber}
+                      </h3>
+                    </div>
+                    <ReactTooltip id="finger-number" />
+                  </>
                 )
               );
             })}
