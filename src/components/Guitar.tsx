@@ -222,7 +222,7 @@ export default function Guitar({ data }: IGuitar) {
                       }`}
                       data-tooltip-id="finger-number"
                       data-tooltip-content={` ${
-                        item?.fingerNumber !== 0
+                        item?.fingerNumber && item?.fingerNumber !== 0
                           ? "finger " + "" + item?.fingerNumber
                           : "string 0"
                       }`}
