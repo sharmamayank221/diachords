@@ -3,9 +3,9 @@ import { A } from "@/types/chord.types";
 import Image from "next/image";
 import React from "react";
 import Switch from "react-switch";
+import Fret from "./Fret";
 
 // TODO: make this array dynamic so as the user selects how many frets to show on the screen
-const Frets = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 //  NOTES: what i figured out from chords.db json file for fret numbers
 //  1st index of frets array is the 6th string and last index is fisrt string
@@ -36,6 +36,7 @@ interface IGuitar {
 }
 
 export default function Guitar({ data }: IGuitar) {
+  const Frets = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
   const [checked, setChecked] = React.useState<boolean>();
 
   const [position, setPosition] = React.useState(0);
@@ -57,12 +58,22 @@ export default function Guitar({ data }: IGuitar) {
   const [fingersToUse, setFingersToUse] = React.useState(
     data?.positions?.[0]?.fingers
   );
-  const ref = React.useRef(null);
 
   const pos = useGetStringNumAndFretNum(
     fretsToUse as number[],
     fingersToUse as number[]
   );
+
+  const fretObjects = Frets.map((fretNum) => {
+    return {
+      fretNum: fretNum,
+      fretId: pos
+        .map((item: any) => item.fretNumber)
+        .find((item: any) => item === fretNum),
+    };
+  });
+
+  console.log(fretObjects, "fo");
 
   const hasBar = data?.positions?.filter(
     (item: any) => item.frets === fretsToUse
@@ -92,7 +103,7 @@ export default function Guitar({ data }: IGuitar) {
   return (
     <>
       <div className="relative w-full h-full pt-14 ">
-        <div className="strings relative ">
+        {/* <div className="strings relative ">
           {checked && hasCapo && (
             <div
               className={`absolute top-[-10px] z-50`}
@@ -157,46 +168,55 @@ export default function Guitar({ data }: IGuitar) {
               6th string
             </div>
           </div>
-        </div>
+        </div> */}
         <div className=" container mx-auto">
-          <div className="frets flex -mt-[22.1%] z-20 relative">
-            {Frets.map((fret, idx) => {
+          <div className="frets flex z-20 -mt-2 relative">
+            {fretObjects.map((fret, idx) => {
               return (
-                <div
-                  className="b-1 h-[284px] w-[120px] relative"
-                  id={`fret-${idx + 1}`}
-                  key={idx}
-                  ref={ref}
-                >
-                  <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
-                  <span
-                    className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
-                  >
-                    {fret}
-                  </span>
-                  {fret === 5 && (
-                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                  )}
-                  {fret === 7 && (
-                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                  )}
-                  {fret === 3 && (
-                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                  )}
-                  {fret === 9 && (
-                    <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                  )}
-                  {fret === 12 && (
-                    <>
-                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[210px]"></div>
-                      <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[106px]"></div>
-                    </>
-                  )}
-                </div>
+                // <div
+                //   className="b-1 h-[284px] w-[120px] relative"
+                //   id={`fret-${idx + 1}`}
+                //   key={idx}
+                //   ref={ref}
+                // >
+                //   <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
+                //   <span
+                //     className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
+                //   >
+                //     {fret}
+                //   </span>
+                //   {fret === 5 && (
+                //     <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                //   )}
+                //   {fret === 7 && (
+                //     <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                //   )}
+                //   {fret === 3 && (
+                //     <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                //   )}
+                //   {fret === 9 && (
+                //     <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
+                //   )}
+                //   {fret === 12 && (
+                //     <>
+                //       <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[210px]"></div>
+                //       <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[106px]"></div>
+                //     </>
+                //   )}
+                // </div>
+                <Fret
+                  fretsToUse={
+                    (fret.fretId === fret.fretNum && fretsToUse) as number[]
+                  }
+                  fingersToUse={fingersToUse}
+                  fretId={fret.fretId}
+                  key={fret.fretId}
+                  fretIndex={fret.fretNum}
+                />
               );
             })}
           </div>
-          <div className="fingers ">
+          {/* <div className="fingers ">
             {pos?.map((item: IPositionsToBePlaced, idx: number) => {
               const stringDiv = document
                 ?.getElementById(`string-${item?.stringNumber}`)
@@ -229,7 +249,7 @@ export default function Guitar({ data }: IGuitar) {
                 )
               );
             })}
-          </div>
+          </div> */}
           <div className="positions flex items-center justify-center w-full ">
             <label className="text-white font-Lora text-3xl flex items-center">
               Capo : {""}
