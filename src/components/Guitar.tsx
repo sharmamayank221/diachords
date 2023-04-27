@@ -36,13 +36,18 @@ interface IGuitar {
 }
 
 export default function Guitar({ data }: IGuitar) {
-  const Frets = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+  console.log(data, "data");
+  const Frets = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   const [checked, setChecked] = React.useState<boolean>();
 
   const [position, setPosition] = React.useState(0);
   const [fretsToUse, setFretsToUse] = React.useState(
     data?.positions?.[0]?.frets
   );
+  const base = data?.positions?.filter(
+    (item: any) => item.frets === fretsToUse
+  );
+
   const hasCapo = data?.positions?.filter(
     (item: any) => item?.frets === fretsToUse
   )?.[0]?.capo;
@@ -61,7 +66,8 @@ export default function Guitar({ data }: IGuitar) {
 
   const pos = useGetStringNumAndFretNum(
     fretsToUse as number[],
-    fingersToUse as number[]
+    fingersToUse as number[],
+    base?.[0]?.baseFret as number
   );
 
   const fretObjects = Frets.map((fretNum) => {
@@ -73,8 +79,6 @@ export default function Guitar({ data }: IGuitar) {
     };
   });
 
-  console.log(fretObjects, "fo");
-
   const hasBar = data?.positions?.filter(
     (item: any) => item.frets === fretsToUse
   );
@@ -85,16 +89,16 @@ export default function Guitar({ data }: IGuitar) {
     }
 
     // position + 1 is to sync position outside and inside the handlenext and handlePrev func
-    setFretsToUse(data?.positions?.[position + 1]?.frets);
-    setFingersToUse(data?.positions?.[position + 1]?.fingers);
+    setFretsToUse(data?.positions?.[position]?.frets);
+    setFingersToUse(data?.positions?.[position]?.fingers);
   };
 
   const handlePrevPosition = () => {
     if (position > 0) {
       setPosition((prev) => prev - 1);
     }
-    setFretsToUse(data?.positions?.[position - 1]?.frets);
-    setFingersToUse(data?.positions?.[position - 1]?.fingers);
+    setFretsToUse(data?.positions?.[position]?.frets);
+    setFingersToUse(data?.positions?.[position]?.fingers);
   };
   const baseFretDiv = document
     ?.getElementById(`fret-${hasBar?.[0]?.baseFret}`)
@@ -102,74 +106,8 @@ export default function Guitar({ data }: IGuitar) {
 
   return (
     <>
-      <div className="relative w-full h-full pt-14 ">
-        {/* <div className="strings relative ">
-          {checked && hasCapo && (
-            <div
-              className={`absolute top-[-10px] z-50`}
-              style={{
-                left: `${baseFretDiv && baseFretDiv.x + 50}px`,
-              }}
-            >
-              <Image
-                src="/capo.svg"
-                alt="capo"
-                width={36}
-                height={320}
-                className=""
-              />
-            </div>
-          )}
-          <div
-            className={` mt-6 mb-[55px] h-[0.5px] w-full bg-[#FFF] relative z-20`}
-            id="string-1"
-          >
-            <div className="bg-[#FFF] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
-              1st string
-            </div>
-          </div>
-          <div
-            className={`relative mt-6 mb-[55px] h-[1.8px] w-full bg-[#EA9E2D] z-20`}
-            id="string-2"
-          >
-            <div className="bg-[#EA9E2D] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
-              2nd string
-            </div>
-          </div>
-          <div
-            className={`relative mt-6 mb-[55px] h-[1.2px] w-full bg-[#F642EF] z-20`}
-            id="string-3"
-          >
-            <div className="bg-[#F642EF] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
-              3rd string
-            </div>
-          </div>
-          <div
-            className={`relative mt-6 mb-[55px] h-[2px] w-full bg-[#C2D934] z-20`}
-            id="string-4"
-          >
-            <div className="bg-[#C2D934] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
-              4th string
-            </div>
-          </div>
-          <div
-            className={`relative mt-6 mb-[55px] h-[3px] w-full bg-[#C65151] z-20`}
-            id="string-5"
-          >
-            <div className="bg-[#C65151] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
-              5th string
-            </div>
-          </div>
-          <div
-            className={`relative mt-6 mb-[55px] h-1 w-full bg-[#38DBE5] z-20`}
-            id="string-6"
-          >
-            <div className="bg-[#38DBE5] p-2 w-[100px] -translate-y-5 translate-x-6 rounded-full opacity-70 text-center">
-              6th string
-            </div>
-          </div>
-        </div> */}
-        <div className=" container mx-auto">
+      <div className="relative w-full h-full pt-14 flex items-center container mx-auto">
+        <div className="">
           <div className="frets flex z-20 -mt-2 relative">
             {fretObjects.map((fret, idx) => {
               return (
@@ -211,6 +149,7 @@ export default function Guitar({ data }: IGuitar) {
                   fingersToUse={fingersToUse}
                   fretId={fret.fretId}
                   key={fret.fretId}
+                  baseFret={base?.[0]?.baseFret}
                   fretIndex={fret.fretNum}
                 />
               );
@@ -250,7 +189,7 @@ export default function Guitar({ data }: IGuitar) {
               );
             })}
           </div> */}
-          <div className="positions flex items-center justify-center w-full ">
+          <div className="positions flex items-center justify-center w-full container mx-auto">
             <label className="text-white font-Lora text-3xl flex items-center">
               Capo : {""}
               <Switch

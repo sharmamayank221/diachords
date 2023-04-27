@@ -7,7 +7,11 @@ interface IPositionsToBePlaced {
 }
 
 // a function that will give me string number and fret number from the fret array's individual indexes
-function useGetStringNumAndFretNum(fret: number[], finger: number[]) {
+function useGetStringNumAndFretNum(
+  fret: number[],
+  finger: number[],
+  baseFret: number
+) {
   const [positionToPlaceFingers, setPositionToPlaceFingers] = React.useState<
     IPositionsToBePlaced[]
   >([]);
@@ -25,12 +29,13 @@ function useGetStringNumAndFretNum(fret: number[], finger: number[]) {
                 stringNumber: fret?.length - idx,
                 fretNumber: item,
                 fingerNumber: finger[idx],
+                baseFret: baseFret,
               },
             ] || []
         );
       });
     }
-  }, [finger, fret]);
+  }, [finger, fret, baseFret]);
   return positionToPlaceFingers.slice(-n);
 }
 

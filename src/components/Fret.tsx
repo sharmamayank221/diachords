@@ -1,5 +1,6 @@
 import React from "react";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
+import Image from "next/image";
 
 interface IFret {
   stringNum?: number;
@@ -10,6 +11,7 @@ interface IFret {
   fingersToUse?: number[];
   fretId?: number;
   fretIndex?: number;
+  baseFret?: number;
 }
 
 export default function Fret({
@@ -17,10 +19,12 @@ export default function Fret({
   fingersToUse,
   fretId,
   fretIndex,
+  baseFret,
 }: IFret) {
   const FingerPositionOnStringsWithFretNums = useGetStringNumAndFretNum(
     fretsToUse as number[],
-    fingersToUse as number[]
+    fingersToUse as number[],
+    baseFret as number
   );
 
   const Strings = [
@@ -39,25 +43,27 @@ export default function Fret({
           obj.stringNumber === stringObj.stringNum && obj.fretNumber === fretId
       );
 
-      console.log(matchingObj, "st");
+      console.log(matchingObj, "mat");
 
       return {
         ...stringObj,
         fingerNum: matchingObj && matchingObj.fingerNumber,
         fretNum: matchingObj && matchingObj.fretNumber,
+        baseFret: baseFret,
       };
     }
   );
+  console.log(StringsWithMatchedFingerNumbersOfAGivenChord, "bae");
 
   return (
     <div className="flex flex-col items-center">
       <p className="text-white text-center pb-2 text-2xl font-Lora">
-        {fretIndex}
+        {fretIndex === 0
+          ? "Open"
+          : baseFret && fretIndex && baseFret - 1 + fretIndex}
       </p>
       <div
-        className={`b-1 h-[284px] w-[120px] relative b-[#FFF] border-r-8 border-l-[${
-          fretIndex === 0 ? "0" : "8px"
-        }] border-collapse`}
+        className={`b-1 h-[284px] w-[120px] relative b-[#FFF] border-r-8 border-l-8 border-collapse`}
         id={`fret-1`}
       >
         {StringsWithMatchedFingerNumbersOfAGivenChord?.map((stirng: any) => {
