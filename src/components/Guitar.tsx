@@ -36,9 +36,12 @@ interface IGuitar {
 }
 
 export default function Guitar({ data }: IGuitar) {
-  console.log(data, "data");
   const Frets = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   const [checked, setChecked] = React.useState<boolean>();
+  const [PreviousButtonDisabled, setPreviousButtonDisabled] =
+    React.useState<boolean>(false);
+  const [NextButtonDisabled, setNextButtonDisabled] =
+    React.useState<boolean>(false);
 
   const [position, setPosition] = React.useState(0);
   const [fretsToUse, setFretsToUse] = React.useState(
@@ -89,59 +92,42 @@ export default function Guitar({ data }: IGuitar) {
     }
 
     // position + 1 is to sync position outside and inside the handlenext and handlePrev func
-    setFretsToUse(data?.positions?.[position]?.frets);
-    setFingersToUse(data?.positions?.[position]?.fingers);
+    setFretsToUse(data?.positions?.[position + 1]?.frets);
+    setFingersToUse(data?.positions?.[position + 1]?.fingers);
   };
 
   const handlePrevPosition = () => {
     if (position > 0) {
       setPosition((prev) => prev - 1);
     }
-    setFretsToUse(data?.positions?.[position]?.frets);
-    setFingersToUse(data?.positions?.[position]?.fingers);
+
+    setFretsToUse(data?.positions?.[position - 1]?.frets);
+    setFingersToUse(data?.positions?.[position - 1]?.fingers);
   };
   const baseFretDiv = document
     ?.getElementById(`fret-${hasBar?.[0]?.baseFret}`)
     ?.getBoundingClientRect();
 
+  React.useEffect(() => {
+    if (position === 0) {
+      setPreviousButtonDisabled(true);
+    } else {
+      setPreviousButtonDisabled(false);
+    }
+    if (data?.positions?.length && position === data?.positions?.length - 1) {
+      setNextButtonDisabled(true);
+    } else {
+      setNextButtonDisabled(false);
+    }
+  }, [data?.positions?.length, position]);
+
   return (
     <>
       <div className="relative w-full h-full pt-14 flex items-center container mx-auto">
         <div className="">
-          <div className="frets flex z-20 -mt-2 relative">
+          <div className="frets flex z-20 -mt-2 relative overflow-x-scroll h-[400px] w-full sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
             {fretObjects.map((fret, idx) => {
               return (
-                // <div
-                //   className="b-1 h-[284px] w-[120px] relative"
-                //   id={`fret-${idx + 1}`}
-                //   key={idx}
-                //   ref={ref}
-                // >
-                //   <div className="b-1 mr-[120px] h-[284px] w-3 bg-[#FFF]"></div>
-                //   <span
-                //     className={`text-white h-[100%] font-Lora text-3xl flex flex-column justify-end -mt-8 -mx-3 absolute top-[-32px] left-[72px]`}
-                //   >
-                //     {fret}
-                //   </span>
-                //   {fret === 5 && (
-                //     <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                //   )}
-                //   {fret === 7 && (
-                //     <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                //   )}
-                //   {fret === 3 && (
-                //     <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                //   )}
-                //   {fret === 9 && (
-                //     <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[152px]"></div>
-                //   )}
-                //   {fret === 12 && (
-                //     <>
-                //       <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[210px]"></div>
-                //       <div className="w-3 h-3 bg-[#FFF] flex items-center justify-center rotate-45 translate-x-16 -translate-y-[106px]"></div>
-                //     </>
-                //   )}
-                // </div>
                 <Fret
                   fretsToUse={
                     (fret.fretId === fret.fretNum && fretsToUse) as number[]
@@ -155,41 +141,8 @@ export default function Guitar({ data }: IGuitar) {
               );
             })}
           </div>
-          {/* <div className="fingers ">
-            {pos?.map((item: IPositionsToBePlaced, idx: number) => {
-              const stringDiv = document
-                ?.getElementById(`string-${item?.stringNumber}`)
-                ?.getBoundingClientRect();
-              const fretDiv = document
-                ?.getElementById(`fret-${item?.fretNumber}`)
-                ?.getBoundingClientRect();
 
-              return (
-                // fretNumber === -1 means not to be pressed and rendered
-                item?.fretNumber !== -1 && (
-                  <div
-                    className={`absolute h-[32px] w-[32px] rounded-full bg-[#1BD79E] ${
-                      checked ? "z-20" : "z-40"
-                    }`}
-                    key={idx}
-                    style={{
-                      left: `${
-                        fretDiv &&
-                        baseFretDiv &&
-                        fretDiv.x + baseFretDiv.x - 140
-                      }px`,
-                      top: `${stringDiv && stringDiv.y - 162}px`,
-                    }}
-                  >
-                    <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-black">
-                      {item?.fingerNumber}
-                    </h3>
-                  </div>
-                )
-              );
-            })}
-          </div> */}
-          <div className="positions flex items-center justify-center w-full container mx-auto">
+          <div className="positions flex items-center justify-start lg:justify-center w-full container mx-auto">
             <label className="text-white font-Lora text-3xl flex items-center">
               Capo : {""}
               <Switch
@@ -204,28 +157,37 @@ export default function Guitar({ data }: IGuitar) {
                 onColor="#FFF"
               />
             </label>
-            <div onClick={handlePrevPosition} className="cursor-pointer">
+            <button
+              onClick={handlePrevPosition}
+              className="cursor-pointer"
+              disabled={PreviousButtonDisabled}
+            >
               <Image
                 src="/arrowRight.svg"
                 alt="next"
                 width={80}
                 height={80}
-                className="rotate-180 origin-center"
+                className={`rotate-180 origin-center ${
+                  PreviousButtonDisabled ? "opacity-50" : "opacity-100"
+                }`}
               />
-            </div>
+            </button>
             <h2 className="text-white text-center font-Lora text-3xl">
-              Variation: {position}
+              Variation: {position + 1}
             </h2>
 
-            <div
+            <button
               onClick={hanldeNextPosition}
-              className="-mt-[10px] cursor-pointer"
+              className={`-mt-[10px] cursor-pointer ${
+                NextButtonDisabled ? "opacity-50" : "opacity-100"
+              }`}
+              disabled={NextButtonDisabled}
             >
               <Image src="/arrowRight.svg" alt="next" width={80} height={80} />
-            </div>
+            </button>
           </div>
         </div>
-        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[250px] top-5 z-1"></div>
+        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[250px] top-5 z-1 hidden md:block"></div>
       </div>
     </>
   );

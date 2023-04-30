@@ -28,7 +28,7 @@ export default function Fret({
   );
 
   const Strings = [
-    { stringNum: 1, color: "#FFF" },
+    { stringNum: 1, color: "#FFFF" },
     { stringNum: 2, color: "#EA9E2D" },
     { stringNum: 3, color: "#F642EF" },
     { stringNum: 4, color: "#C2D934" },
@@ -43,8 +43,6 @@ export default function Fret({
           obj.stringNumber === stringObj.stringNum && obj.fretNumber === fretId
       );
 
-      console.log(matchingObj, "mat");
-
       return {
         ...stringObj,
         fingerNum: matchingObj && matchingObj.fingerNumber,
@@ -53,7 +51,8 @@ export default function Fret({
       };
     }
   );
-  console.log(StringsWithMatchedFingerNumbersOfAGivenChord, "bae");
+
+  console.log(fretIndex && fretIndex % 2, "index");
 
   return (
     <div className="flex flex-col items-center">
@@ -63,16 +62,17 @@ export default function Fret({
           : baseFret && fretIndex && baseFret - 1 + fretIndex}
       </p>
       <div
-        className={`b-1 h-[284px] w-[120px] relative b-[#FFF] border-r-8 border-l-8 border-collapse`}
-        id={`fret-1`}
+        className={`b-1  h-[284px] w-[120px] relative b-[#FFF] border-r-8 border-l-8 border-collapse`}
+        id={`${fretIndex}`}
       >
         {StringsWithMatchedFingerNumbersOfAGivenChord?.map((stirng: any) => {
           return (
             <>
               <div
-                className={`w-[103px] bg-[${stirng.color}] mb-[52px] h-1 relative`}
+                className={`w-[103px] mb-[52px] h-1 relative`}
                 id={`string-${stirng.stringNum}`}
                 key={stirng.stringNum}
+                style={{ background: `${stirng.color}` }}
               >
                 <div
                   className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]  h-[32px] w-[32px] rounded-full bg-[${
@@ -89,6 +89,14 @@ export default function Fret({
             </>
           );
         })}
+
+        {fretIndex &&
+          fretIndex !== 1 &&
+          fretIndex !== 11 &&
+          fretIndex !== 4 &&
+          fretIndex % 2 !== 0 && (
+            <div className="w-3 h-3 bg-[#FFF] absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] rotate-45"></div>
+          )}
       </div>
     </div>
   );
