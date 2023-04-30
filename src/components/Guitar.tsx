@@ -143,7 +143,7 @@ export default function Guitar({ data }: IGuitar) {
           </div>
 
           <div className="positions flex items-center justify-start lg:justify-center w-full container mx-auto">
-            <label className="text-white font-Lora text-3xl flex items-center">
+            <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
               Capo : {""}
               <Switch
                 onChange={handleChange}
@@ -172,7 +172,7 @@ export default function Guitar({ data }: IGuitar) {
                 }`}
               />
             </button>
-            <h2 className="text-white text-center font-Lora text-3xl">
+            <h2 className="text-white text-center font-Lora text-xl md:text-3xl">
               Variation: {position + 1}
             </h2>
 
