@@ -125,7 +125,7 @@ export default function Guitar({ data }: IGuitar) {
     <>
       <div className="relative w-full h-full pt-14 flex items-center container mx-auto">
         <div className="">
-          <div className="frets flex z-20 -mt-2 relative overflow-x-scroll h-[400px] w-full sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
+          <div className="frets flex z-20 -mt-2 relative overflow-x-scroll h-[400px] w-[600px] sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
             {fretObjects.map((fret, idx) => {
               return (
                 <Fret
