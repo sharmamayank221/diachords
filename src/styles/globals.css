@@ -3,3 +3,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.native-scroll{
+    -webkit-overflow-scrolling: touch;
+}
