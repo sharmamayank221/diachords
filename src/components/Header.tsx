@@ -34,7 +34,7 @@ export default function Header() {
             <button
               type="button"
               onClick={openModal}
-              className="rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-2xl font-medium text-[#1BD79E] hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75"
+              className="rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium text-[#1BD79E] hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75"
             >
               Hints
             </button>

@@ -7,3 +7,11 @@
 .native-scroll{
     -webkit-overflow-scrolling: touch;
 }
+
+
+@media screen and (orientation: landscape) {
+    .mediaManage {
+     display: none;
+    }
+  }
+  
