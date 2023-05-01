@@ -11,7 +11,7 @@ export default function Layout({ children }: any) {
         {children}
       </main>
 
-      <div className="h-screen bg-black flex flex-col items-center justify-center md:hidden">
+      <div className="h-screen bg-black flex flex-col items-center justify-center sm:hidden">
         <div className="relative w-[214px] h-[185px]">
           <Image src="/rotate.svg" alt="rotate-screen" fill />
         </div>
