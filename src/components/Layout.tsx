@@ -4,15 +4,15 @@ import Header from "./Header";
 import Image from "next/image";
 
 export default function Layout({ children }: any) {
-  React.useEffect(() => {
-    // Check if the device is a mobile device
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  // React.useEffect(() => {
+  //   // Check if the device is a mobile device
+  //   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-    if (isMobile) {
-      // Request fullscreen mode to force the user to rotate their device
-      document.documentElement.requestFullscreen();
-    }
-  }, []);
+  //   if (isMobile) {
+  //     // Request fullscreen mode to force the user to rotate their device
+  //     document.documentElement.requestFullscreen();
+  //   }
+  // }, []);
 
   return (
     <div>
