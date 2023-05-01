@@ -52,8 +52,6 @@ export default function Fret({
     }
   );
 
-  console.log(fretIndex && fretIndex % 2, "index");
-
   return (
     <div className="flex flex-col items-center">
       <p className="text-white text-center pb-2 text-2xl font-Lora">

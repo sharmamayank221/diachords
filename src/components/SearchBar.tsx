@@ -36,8 +36,6 @@ export default function Searchbar() {
     setData(searchData);
   }, [WithIds, dispatch, searchChord]);
 
-  console.log(Data, "searcdata");
-
   // what i am trying to achieve is to set the id in all chords objects so that i can search by id as well as make dynamic detail page
   // My approach is use forEach to loop over every object and set the id as keysuffix value
   // this is an array of chords without the ids
