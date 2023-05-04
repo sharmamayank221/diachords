@@ -75,7 +75,7 @@ export default function Searchbar() {
       <form className=" relative flex w-full items-start justify-start">
         <input
           type="text"
-          className="focus:shadow-outline shadow-none h-[60px] w-[90%] rounded-full border-none bg-[#2D2D2D] pl-4 font-Lora text-lg text-[#FFF] outline-none focus:outline-none w-full"
+          className="focus:shadow-outline shadow-none h-[48px] md:h-[60px] rounded-full border-none bg-[#2D2D2D] pl-4 font-Lora text-base md:text-lg text-[#FFF] outline-none focus:outline-none w-full"
           placeholder="search.."
           color="#FFF"
           onChange={(e: React.FormEvent<HTMLInputElement>) =>

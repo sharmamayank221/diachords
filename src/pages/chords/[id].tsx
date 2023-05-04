@@ -7,7 +7,6 @@ import ChordName from "@/components/ChordName";
 import { A } from "@/types/chord.types";
 import getIDs from "@/helpers/getIDs";
 import { useRouter } from "next/router";
-import Layout from "@/components/Layout";
 
 interface IParams extends ParsedUrlQuery {
   slug: string;
@@ -112,7 +111,7 @@ export default function Chord(props: any) {
   }
 
   return (
-    <div className="h-full w-full overflow-hidden">
+    <div className="h-full w-full overflow-hidden pt-10">
       <DynamicComponentWithNoSSR data={chordData as A} id={id as string} />
 
       <ChordName singleDatafromDynamicPage={chordData} />
