@@ -185,7 +185,7 @@ export default function Guitar({ data }: IGuitar) {
           })}
         </div>
 
-        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[50px] -top-[30px] z-[-1] hidden md:block"></div>
+        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[50px] -top-[20px] z-[-1] hidden md:block"></div>
       </div>
       <div className="relative w-full h-full md:pt-14 flex items-center justify-center container mx-auto">
         <div className="">
