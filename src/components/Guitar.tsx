@@ -167,23 +167,27 @@ export default function Guitar({ data }: IGuitar) {
           <Image src="/arrowRight.svg" alt="next" width={80} height={80} />
         </button>
       </div>
-      <div className="frets flex z-20 -mt-2 relative overflow-x-scroll h-[276px] md:h-[400px] w-[600px] sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
-        {fretObjects.map((fret, idx) => {
-          return (
-            <Fret
-              fretsToUse={
-                (fret.fretId === fret.fretNum && fretsToUse) as number[]
-              }
-              fingersToUse={fingersToUse}
-              fretId={fret.fretId}
-              key={fret.fretId}
-              baseFret={base?.[0]?.baseFret}
-              fretIndex={fret.fretNum}
-            />
-          );
-        })}
+      <div className="frets  z-20 -mt-2 relative ">
+        <div className="overflow-x-scroll flex h-[276px] md:h-[400px] w-[600px] sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
+          {fretObjects.map((fret, idx) => {
+            return (
+              <Fret
+                fretsToUse={
+                  (fret.fretId === fret.fretNum && fretsToUse) as number[]
+                }
+                fingersToUse={fingersToUse}
+                fretId={fret.fretId}
+                key={fret.fretId}
+                baseFret={base?.[0]?.baseFret}
+                fretIndex={fret.fretNum}
+              />
+            );
+          })}
+        </div>
+
+        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[50px] -top-[30px] z-[-1] hidden md:block"></div>
       </div>
-      <div className="relative w-full h-full md:pt-14 flex items-center container mx-auto">
+      <div className="relative w-full h-full md:pt-14 flex items-center justify-center container mx-auto">
         <div className="">
           <div className="positions hidden items-center justify-start lg:justify-center w-full container mx-auto md:flex ">
             <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
@@ -230,7 +234,6 @@ export default function Guitar({ data }: IGuitar) {
             </button>
           </div>
         </div>
-        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[250px] top-5 z-1 hidden md:block"></div>
       </div>
     </>
   );

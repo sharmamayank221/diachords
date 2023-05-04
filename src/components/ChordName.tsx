@@ -10,7 +10,7 @@ interface IChordName {
 export default function ChordName({ singleDatafromDynamicPage }: IChordName) {
   return (
     <>
-      <div className="flex items-center justify-center font-Lora mb-[30%]">
+      <div className="flex items-center justify-center font-Lora mb-[40%] md:mb-0">
         <div className="line1 h-[2px] w-[309px] bg-white"></div>
         <div className="relative ml-12 mr-24 py-14">
           <h2 className="text-[76px] md:text-[100px] text-white">
