@@ -54,31 +54,31 @@ export default function Fret({
 
   return (
     <div className="flex flex-col items-center">
-      <p className="text-white text-center pb-2 text-2xl font-Lora">
+      <p className="text-white text-center pb-2 text-xl md:text-2xl font-Lora">
         {fretIndex === 0
           ? "Open"
           : baseFret && fretIndex && baseFret - 1 + fretIndex}
       </p>
       <div
-        className={`b-1  h-[284px] w-[120px] relative b-[#FFF] border-r-8 border-l-8 border-collapse`}
+        className={`b-1  h-[204px] md:h-[284px] w-[100px] md:w-[120px] relative b-[#FFF] border-r-8 border-l-8 border-collapse`}
         id={`${fretIndex}`}
       >
         {StringsWithMatchedFingerNumbersOfAGivenChord?.map((stirng: any) => {
           return (
             <>
               <div
-                className={`w-[103px] mb-[52px] h-1 relative`}
+                className={`w-[84px] md:w-[103px] mb-9 md:mb-[52px] h-1 relative`}
                 id={`string-${stirng.stringNum}`}
                 key={stirng.stringNum}
                 style={{ background: `${stirng.color}` }}
               >
                 <div
-                  className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]  h-[32px] w-[32px] rounded-full bg-[${
+                  className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full bg-[${
                     stirng.fretNum !== undefined ? "#1BD79E" : ""
                   }]`}
                 >
                   {stirng.fretNum !== undefined && (
-                    <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-black">
+                    <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-base md:text-2xl text-black">
                       {stirng?.fingerNum}
                     </h3>
                   )}

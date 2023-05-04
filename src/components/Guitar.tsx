@@ -123,26 +123,69 @@ export default function Guitar({ data }: IGuitar) {
 
   return (
     <>
-      <div className="relative w-full h-full pt-14 flex items-center container mx-auto">
-        <div className="">
-          <div className="frets flex z-20 -mt-2 relative overflow-x-scroll h-[400px] w-[600px] sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
-            {fretObjects.map((fret, idx) => {
-              return (
-                <Fret
-                  fretsToUse={
-                    (fret.fretId === fret.fretNum && fretsToUse) as number[]
-                  }
-                  fingersToUse={fingersToUse}
-                  fretId={fret.fretId}
-                  key={fret.fretId}
-                  baseFret={base?.[0]?.baseFret}
-                  fretIndex={fret.fretNum}
-                />
-              );
-            })}
-          </div>
+      <div className="positions flex items-center justify-center w-full container mx-auto md:hidden mb-4">
+        <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
+          <h4>Capo : {""}</h4>
+          <Switch
+            onChange={handleChange}
+            checked={checked as boolean}
+            className="react-switch ml-2"
+            disabled={!hasCapo as boolean}
+            boxShadow="0px 1px 5px rgba(0, 0, 0, 0.6)"
+            activeBoxShadow="0px 0px 1px 10px rgba(0, 0, 0, 0.2)"
+            uncheckedIcon={false}
+            checkedIcon={false}
+            onColor="#FFF"
+          />
+        </label>
+        <button
+          onClick={handlePrevPosition}
+          className="cursor-pointer"
+          disabled={PreviousButtonDisabled}
+        >
+          <Image
+            src="/arrowRight.svg"
+            alt="next"
+            width={80}
+            height={80}
+            className={`rotate-180 origin-center w-[60px] h-[60px] md:w-[80px] md:[80px] ${
+              PreviousButtonDisabled ? "opacity-50" : "opacity-100"
+            }`}
+          />
+        </button>
+        <h2 className="text-white text-center font-Lora text-xl md:text-3xl">
+          Variation: {position + 1}
+        </h2>
 
-          <div className="positions flex items-center justify-start lg:justify-center w-full container mx-auto">
+        <button
+          onClick={hanldeNextPosition}
+          className={`-mt-[10px] cursor-pointer w-[60px] h-[60px] md:w-[80px] md:[80px] ${
+            NextButtonDisabled ? "opacity-50" : "opacity-100"
+          }`}
+          disabled={NextButtonDisabled}
+        >
+          <Image src="/arrowRight.svg" alt="next" width={80} height={80} />
+        </button>
+      </div>
+      <div className="frets flex z-20 -mt-2 relative overflow-x-scroll h-[276px] md:h-[400px] w-[600px] sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
+        {fretObjects.map((fret, idx) => {
+          return (
+            <Fret
+              fretsToUse={
+                (fret.fretId === fret.fretNum && fretsToUse) as number[]
+              }
+              fingersToUse={fingersToUse}
+              fretId={fret.fretId}
+              key={fret.fretId}
+              baseFret={base?.[0]?.baseFret}
+              fretIndex={fret.fretNum}
+            />
+          );
+        })}
+      </div>
+      <div className="relative w-full h-full md:pt-14 flex items-center container mx-auto">
+        <div className="">
+          <div className="positions hidden items-center justify-start lg:justify-center w-full container mx-auto md:flex ">
             <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
               Capo : {""}
               <Switch

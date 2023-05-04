@@ -7,7 +7,6 @@ import ChordName from "@/components/ChordName";
 import { A } from "@/types/chord.types";
 import getIDs from "@/helpers/getIDs";
 import { useRouter } from "next/router";
-import Layout from "@/components/Layout";
 
 interface IParams extends ParsedUrlQuery {
   slug: string;
