@@ -1,12 +1,14 @@
+import Head from "next/head";
 import dynamic from "next/dynamic";
 import { GetStaticPaths } from "next";
-import { GetStaticProps, GetStaticPropsContext } from "next";
-import getChords from "@/helpers/getChods";
-import { ParsedUrlQuery } from "querystring";
-import ChordName from "@/components/ChordName";
-import { A } from "@/types/chord.types";
-import getIDs from "@/helpers/getIDs";
 import { useRouter } from "next/router";
+import { ParsedUrlQuery } from "querystring";
+import { GetStaticProps, GetStaticPropsContext } from "next";
+
+import getIDs from "@/helpers/getIDs";
+import { A } from "@/types/chord.types";
+import getChords from "@/helpers/getChods";
+import ChordName from "@/components/ChordName";
 
 interface IParams extends ParsedUrlQuery {
   slug: string;
@@ -16,6 +18,8 @@ export default function Chord(props: any) {
   const router = useRouter();
   const { id } = props;
   const { chordData } = props;
+
+  console.log(chordData, "data");
 
   const DynamicComponentWithNoSSR = dynamic(
     () => import("../../components/Guitar")
@@ -111,11 +115,13 @@ export default function Chord(props: any) {
   }
 
   return (
-    <div className="h-full w-full overflow-hidden pt-10">
-      <DynamicComponentWithNoSSR data={chordData as A} id={id as string} />
+    <>
+      <div className="h-full w-full overflow-hidden pt-10">
+        <DynamicComponentWithNoSSR data={chordData as A} id={id as string} />
 
-      <ChordName singleDatafromDynamicPage={chordData} />
-    </div>
+        <ChordName singleDatafromDynamicPage={chordData} />
+      </div>
+    </>
   );
 }
 
