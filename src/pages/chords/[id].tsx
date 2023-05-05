@@ -19,8 +19,6 @@ export default function Chord(props: any) {
   const { id } = props;
   const { chordData } = props;
 
-  console.log(chordData, "data");
-
   const DynamicComponentWithNoSSR = dynamic(
     () => import("../../components/Guitar")
   );
