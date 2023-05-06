@@ -9,30 +9,12 @@ import Layout from "@/components/Layout";
 
 export default function Home() {
   const router = useRouter();
-  const singleData = useAppSelector(
-    (state: RootState) => state.searchDataSlice.singleData
-  );
-
-  const DynamicComponentWithNoSSR = dynamic(
-    () => import("../components/Guitar"),
-    { ssr: false }
-  );
 
   React.useEffect(() => {
     if (router.asPath === "/") {
       router.push("/chords/cmajor");
     }
-  }, []);
+  }, [router]);
 
-  return (
-    <Layout>
-      <div className="w-full overflow-hidden bg-black h-full">
-        <DynamicComponentWithNoSSR
-          id={singleData?.[0]?.id}
-          data={singleData?.[0]}
-        />
-      </div>
-      <ChordName singleDatafromDynamicPage={singleData?.[0]} />
-    </Layout>
-  );
+  return <></>;
 }
