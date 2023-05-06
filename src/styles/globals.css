@@ -15,3 +15,28 @@
     }
   }
   
+/* Customize Firefox scrollbar */
+/* Track */
+::-moz-scrollbar-track {
+    background-color: #1BD79E80;
+    border-radius: 10px;
+}
+
+/* Thumb */
+::-moz-scrollbar-thumb {
+    background-color: #1BD79E;
+    border-radius: 10px;
+}
+
+/* Customize Chrome scrollbar */
+/* Track */
+::-webkit-scrollbar-track {
+    background-color: #1BD79E80;
+    border-radius: 10px;
+}
+
+/* Thumb */
+::-webkit-scrollbar-thumb {
+    background-color: #1BD79E;
+    border-radius: 10px;
+}
