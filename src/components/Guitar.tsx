@@ -123,7 +123,7 @@ export default function Guitar({ data }: IGuitar) {
 
   return (
     <>
-      <div className="positions flex items-center justify-center w-full container mx-auto md:hidden mb-4">
+      <div className="positions flex items-center justify-center w-full container mx-auto  mb-4">
         <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
           <h4>Capo : {""}</h4>
           <Switch
@@ -148,7 +148,7 @@ export default function Guitar({ data }: IGuitar) {
             alt="next"
             width={80}
             height={80}
-            className={`rotate-180 origin-center w-[60px] h-[60px] md:w-[80px] md:[80px] ${
+            className={`rotate-180 origin-center w-[60px] h-[60px] md:w-[80px] md:h-[80px] ${
               PreviousButtonDisabled ? "opacity-50" : "opacity-100"
             }`}
           />
@@ -159,7 +159,7 @@ export default function Guitar({ data }: IGuitar) {
 
         <button
           onClick={hanldeNextPosition}
-          className={`-mt-[10px] cursor-pointer w-[60px] h-[60px] md:w-[80px] md:[80px] ${
+          className={` -mt-[10px] md:-mt-[30px] cursor-pointer w-[60px] h-[60px] md:w-[80px] md:[80px] ${
             NextButtonDisabled ? "opacity-50" : "opacity-100"
           }`}
           disabled={NextButtonDisabled}
@@ -168,7 +168,7 @@ export default function Guitar({ data }: IGuitar) {
         </button>
       </div>
       <div className="frets  z-20 -mt-2 relative ">
-        <div className="overflow-x-scroll flex h-[276px] md:h-[400px] w-[600px] sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
+        <div className="overflow-x-scroll flex h-[276px] md:h-[350px] w-[600px] sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
           {fretObjects.map((fret, idx) => {
             return (
               <Fret
@@ -189,7 +189,7 @@ export default function Guitar({ data }: IGuitar) {
       </div>
       <div className="relative w-full h-full md:pt-14 flex items-center justify-center container mx-auto">
         <div className="">
-          <div className="positions hidden items-center justify-start lg:justify-center w-full container mx-auto md:flex ">
+          {/* <div className="positions hidden items-center justify-start lg:justify-center w-full container mx-auto md:flex ">
             <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
               Capo : {""}
               <Switch
@@ -232,7 +232,7 @@ export default function Guitar({ data }: IGuitar) {
             >
               <Image src="/arrowRight.svg" alt="next" width={80} height={80} />
             </button>
-          </div>
+          </div> */}
         </div>
       </div>
     </>
