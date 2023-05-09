@@ -114,9 +114,8 @@ export default function Chord(props: any) {
 
   return (
     <>
-      <div className="h-full w-full overflow-hidden pt-10">
+      <div className="h-full w-full overflow-hidden pt-2">
         <DynamicComponentWithNoSSR data={chordData as A} id={id as string} />
-
         <ChordName singleDatafromDynamicPage={chordData} />
       </div>
     </>

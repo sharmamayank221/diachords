@@ -8,6 +8,7 @@ import {
   getSingleDataForDynamicPage,
   setSearchChordData,
 } from "@/reducers/chord/searchDataSlice";
+import { KEY_SIGNATURE } from "@/types/chord.types";
 
 interface IChordSearch {
   searchChord: string;
@@ -28,13 +29,14 @@ export default function Searchbar() {
 
   // search functionality
   React.useEffect(() => {
-    const searchData = WithIds.filter((item: any) =>
-      Object.values(item).find((c: any) =>
-        c.includes(searchChord.toLowerCase())
-      )
-    );
-    setData(searchData);
-  }, [WithIds, dispatch, searchChord]);
+    // const searchData = Object.values(data?.chords).filter((item: any) => {
+    //   // console.log(item);
+    // });
+
+    setData(data.chords[searchChord.toUpperCase() as KEY_SIGNATURE.A]);
+  }, [dispatch, searchChord]);
+
+  console.log(Object.keys(data?.chords));
 
   // what i am trying to achieve is to set the id in all chords objects so that i can search by id as well as make dynamic detail page
   // My approach is use forEach to loop over every object and set the id as keysuffix value
@@ -57,7 +59,7 @@ export default function Searchbar() {
 
   // need to optimize this
   React.useEffect(() => {
-    if (searchChord !== "") {
+    if (searchChord) {
       Data &&
         Data.forEach((item: A, idx: number) => {
           setSingleDataForDynamicPage([item]);
@@ -70,9 +72,11 @@ export default function Searchbar() {
     dispatch(getSingleDataForDynamicPage(singleDataForDynamicPage));
   }, [dispatch, singleDataForDynamicPage]);
 
+  console.log(searchChord, "sc");
+
   return (
     <div className="h-full">
-      <form className=" relative flex w-full items-start justify-start">
+      <form className=" relative flex w-full">
         <input
           type="text"
           className="focus:shadow-outline shadow-none h-[48px] md:h-[60px] rounded-full border-none bg-[#2D2D2D] pl-4 font-Lora text-base md:text-lg text-[#FFF] outline-none focus:outline-none w-full"
@@ -83,8 +87,9 @@ export default function Searchbar() {
           }
           value={searchChord}
         />
-        {searchChord !== "" && (
-          <div className="absolute top-12 mx-auto mt-[22px] w-[90%] rounded-[20px] border-none bg-[#2D2D2D] p-4 z-50">
+
+        {searchChord && (
+          <div className="absolute top-12 mx-auto mt-[22px] w-full rounded-[20px] border-none bg-[#2D2D2D] p-4 z-50">
             <div className={`h-[32px] w-[32px] rounded-full bg-[#1BD79E]`}>
               <span className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-white">
                 {searchChord?.charAt(0)?.toUpperCase()}
@@ -98,7 +103,9 @@ export default function Searchbar() {
                       key={idx}
                       className="cursor-pointer font-Lora text-white hover:text-[#1BD79E]"
                       onClick={() => {
-                        router.push(`/chords/${item?.id}`);
+                        router.push(
+                          `/chords/${item?.key.toLowerCase() + item.suffix}`
+                        );
                         dispatch(setSearchChordData(""));
                       }}
                     >

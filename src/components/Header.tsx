@@ -20,8 +20,8 @@ export default function Header() {
 
   return (
     <div className="bg-black">
-      <div className="container mx-auto ">
-        <div className="pb-10 flex justify-center items-center w-full pt-12">
+      <div className="">
+        <div className="pb-5 flex justify-center items-center w-full pt-5">
           <div className="w-[10%] flex items-center justify-center pr-2">
             <Link href={"/chords/cmajor"}>
               <Image src="/Logo.svg" alt="logo" width={41} height={41} />
