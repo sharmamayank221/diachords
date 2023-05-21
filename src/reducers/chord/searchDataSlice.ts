@@ -5,7 +5,7 @@ import { A, KEY_SIGNATURE } from "@/types/chord.types";
 
 export interface singleDataForDynamicPage {
   singleData: A[];
-  searchChord: KEY_SIGNATURE;
+  searchChord: string;
 }
 
 const initialState: singleDataForDynamicPage = {
@@ -19,7 +19,7 @@ const initialState: singleDataForDynamicPage = {
       },
     },
   ],
-  searchChord: KEY_SIGNATURE.A,
+  searchChord: "",
 };
 
 export const searchDataSliceReducer = createSlice({

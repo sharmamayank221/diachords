@@ -124,7 +124,7 @@ export default function Guitar({ data }: IGuitar) {
   return (
     <>
       <div className="positions flex items-center justify-center w-full container mx-auto  mb-4">
-        <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
+        {/* <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
           <h4>Capo : {""}</h4>
           <Switch
             onChange={handleChange}
@@ -137,7 +137,7 @@ export default function Guitar({ data }: IGuitar) {
             checkedIcon={false}
             onColor="#FFF"
           />
-        </label>
+        </label> */}
         <button
           onClick={handlePrevPosition}
           className="cursor-pointer"

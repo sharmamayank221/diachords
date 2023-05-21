@@ -20,7 +20,6 @@ export default function Searchbar() {
     (state) => state.searchDataSlice.searchChord
   );
   const [Data, setData] = React.useState<any>([]);
-  const [WithIds, setWithIds] = React.useState<any>([]);
   const router = useRouter();
   const [singleDataForDynamicPage, setSingleDataForDynamicPage] =
     React.useState<A[]>([]);
@@ -29,33 +28,8 @@ export default function Searchbar() {
 
   // search functionality
   React.useEffect(() => {
-    // const searchData = Object.values(data?.chords).filter((item: any) => {
-    //   // console.log(item);
-    // });
-
     setData(data.chords[searchChord.toUpperCase() as KEY_SIGNATURE.A]);
   }, [dispatch, searchChord]);
-
-  console.log(Object.keys(data?.chords));
-
-  // what i am trying to achieve is to set the id in all chords objects so that i can search by id as well as make dynamic detail page
-  // My approach is use forEach to loop over every object and set the id as keysuffix value
-  // this is an array of chords without the ids
-  let arrayWithoutIDs: any = [];
-
-  React.useEffect(() => {
-    Object.values(data.chords).forEach((item) => {
-      item.forEach((ch) => {
-        // this id will be used for searching the database and to generate next js dynamic detail pages
-        let id = (ch.key + ch.suffix).toLowerCase();
-        // for pushing the above id into respective objects
-        ch = Object.assign({ ...ch }, { id: id });
-        // finally to push each object into an array or state
-        arrayWithoutIDs.push(ch);
-        setWithIds([...arrayWithoutIDs].slice(0, 552));
-      });
-    });
-  }, []);
 
   // need to optimize this
   React.useEffect(() => {
@@ -72,15 +46,13 @@ export default function Searchbar() {
     dispatch(getSingleDataForDynamicPage(singleDataForDynamicPage));
   }, [dispatch, singleDataForDynamicPage]);
 
-  console.log(searchChord, "sc");
-
   return (
     <div className="h-full">
       <form className=" relative flex w-full">
         <input
           type="text"
           className="focus:shadow-outline shadow-none h-[48px] md:h-[60px] rounded-full border-none bg-[#2D2D2D] pl-4 font-Lora text-base md:text-lg text-[#FFF] outline-none focus:outline-none w-full"
-          placeholder="search.."
+          placeholder="search any chord here"
           color="#FFF"
           onChange={(e: React.FormEvent<HTMLInputElement>) =>
             dispatch(setSearchChordData(e?.currentTarget?.value))
@@ -91,8 +63,8 @@ export default function Searchbar() {
         {searchChord && (
           <div className="absolute top-12 mx-auto mt-[22px] w-full rounded-[20px] border-none bg-[#2D2D2D] p-4 z-50">
             <div className={`h-[32px] w-[32px] rounded-full bg-[#1BD79E]`}>
-              <span className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-white">
-                {searchChord?.charAt(0)?.toUpperCase()}
+              <span className="mt-[-2px] flex items-center justify-center font-Lora text-2xl text-white capitalize">
+                {Data && searchChord ? searchChord : "!"}
               </span>
             </div>
             <div className="flex flex-wrap items-center space-x-7 space-y-7">
@@ -115,6 +87,11 @@ export default function Searchbar() {
                 );
               })}
             </div>
+            {!Data && (
+              <span className="text-white font-Lora">
+                Sorry No Chords found!
+              </span>
+            )}
           </div>
         )}
       </form>
