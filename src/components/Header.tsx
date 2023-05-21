@@ -99,6 +99,19 @@ export default function Header() {
               <span className="mr-4 font-Lora text-lg text-black w-[25%]">
                 Standard tuning: E2,A2,D3,G3,B3,E4
               </span>
+              <span className="mr-4 font-Lora text-xl text-black  block border-b-2 border-[#E5EFE1] pb-2 mt-2">
+                String Colors{" "}
+              </span>
+              <span className="mr-4 font-Lora text-lg text-black ">
+                <div>
+                  <span className="text-[#38DBE5]">6th </span>
+                  <span className="text-[#C65151]">5th </span>
+                  <span className="text-[#C2D934]">4th </span>
+                  <span className="text-[#F642EF]">3rd </span>
+                  <span className="text-[#EA9E2D]">2nd </span>
+                  <span className="text-[#9c70e7]">1st </span>
+                </div>
+              </span>
               <div className="mt-4">
                 <button
                   type="button"

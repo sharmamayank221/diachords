@@ -28,12 +28,12 @@ export default function Fret({
   );
 
   const Strings = [
-    { stringNum: 1, color: "#FFFF" },
-    { stringNum: 2, color: "#EA9E2D" },
-    { stringNum: 3, color: "#F642EF" },
-    { stringNum: 4, color: "#C2D934" },
-    { stringNum: 5, color: "#C65151" },
-    { stringNum: 6, color: "#38DBE5" },
+    { stringNum: 1, color: "#9c70e7", h: "1px" },
+    { stringNum: 2, color: "#EA9E2D", h: "2px" },
+    { stringNum: 3, color: "#F642EF", h: "3px" },
+    { stringNum: 4, color: "#C2D934", h: "3.5px" },
+    { stringNum: 5, color: "#C65151", h: "4px" },
+    { stringNum: 6, color: "#38DBE5", h: "5px" },
   ];
 
   const StringsWithMatchedFingerNumbersOfAGivenChord = Strings.map(
@@ -60,7 +60,7 @@ export default function Fret({
           : baseFret && fretIndex && baseFret - 1 + fretIndex}
       </p>
       <div
-        className={`b-1  h-[204px] md:h-[284px] w-[100px] md:w-[120px] relative b-[#FFF] border-r-8 border-l-8 border-collapse`}
+        className={`b-1  h-[199px] md:h-[279px] w-[100px] md:w-[120px] relative b-[#FFF] border-r-8 border-l-8 border-collapse`}
         id={`${fretIndex}`}
       >
         {StringsWithMatchedFingerNumbersOfAGivenChord?.map((stirng: any) => {
@@ -70,7 +70,10 @@ export default function Fret({
                 className={`w-[84px] md:w-[103px] mb-9 md:mb-[52px] h-1 relative`}
                 id={`string-${stirng.stringNum}`}
                 key={stirng.stringNum}
-                style={{ background: `${stirng.color}` }}
+                style={{
+                  background: `${stirng.color}`,
+                  height: `${stirng.h}`,
+                }}
               >
                 <div
                   className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full bg-[${
@@ -83,6 +86,9 @@ export default function Fret({
                     </h3>
                   )}
                 </div>
+                {fretIndex === 0 && (
+                  <div className="text-white">{stirng.stringNum}</div>
+                )}
               </div>
             </>
           );
