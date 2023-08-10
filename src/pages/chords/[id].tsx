@@ -9,6 +9,7 @@ import getIDs from "@/helpers/getIDs";
 import { A } from "@/types/chord.types";
 import getChords from "@/helpers/getChods";
 import ChordName from "@/components/ChordName";
+import MetaTags from "@/components/Meta/Meta";
 
 interface IParams extends ParsedUrlQuery {
   slug: string;
@@ -18,6 +19,8 @@ export default function Chord(props: any) {
   const router = useRouter();
   const { id } = props;
   const { chordData } = props;
+
+  console.log(chordData, "data");
 
   const DynamicComponentWithNoSSR = dynamic(
     () => import("../../components/Guitar")
@@ -114,6 +117,11 @@ export default function Chord(props: any) {
 
   return (
     <>
+      <MetaTags
+        currentPageTitle={chordData.id}
+        // title={chordData.id}
+        description={`How to play ${chordData.id} guitar chord`}
+      />
       <div className="h-full w-full overflow-hidden pt-2">
         <DynamicComponentWithNoSSR data={chordData as A} id={id as string} />
         <ChordName singleDatafromDynamicPage={chordData} />
