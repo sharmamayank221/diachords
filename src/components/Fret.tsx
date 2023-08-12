@@ -71,7 +71,7 @@ export default function Fret({
                 id={`string-${stirng.stringNum}`}
                 key={stirng.stringNum}
                 style={{
-                  background: `${stirng.color}`,
+                  background: `#FFF`,
                   height: `${stirng.h}`,
                 }}
               >
