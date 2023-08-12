@@ -10,6 +10,7 @@ import { A } from "@/types/chord.types";
 import getChords from "@/helpers/getChods";
 import ChordName from "@/components/ChordName";
 import MetaTags from "@/components/Meta/Meta";
+import MidiPlayer from "@/components/Player/AudioPlayer";
 
 interface IParams extends ParsedUrlQuery {
   slug: string;
@@ -19,8 +20,6 @@ export default function Chord(props: any) {
   const router = useRouter();
   const { id } = props;
   const { chordData } = props;
-
-  console.log(chordData, "data");
 
   const DynamicComponentWithNoSSR = dynamic(
     () => import("../../components/Guitar")
@@ -124,6 +123,7 @@ export default function Chord(props: any) {
       />
       <div className="h-full w-full overflow-hidden pt-2">
         <DynamicComponentWithNoSSR data={chordData as A} id={id as string} />
+        {/* <MidiPlayer /> */}
         <ChordName singleDatafromDynamicPage={chordData} />
       </div>
     </>
