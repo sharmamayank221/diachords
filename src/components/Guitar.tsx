@@ -63,8 +63,6 @@ export default function Guitar({ data }: IGuitar) {
     }
   };
 
-  console.log(data, "data");
-
   const [fingersToUse, setFingersToUse] = React.useState(
     data?.positions?.[0]?.fingers
   );
