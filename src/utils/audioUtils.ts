@@ -4,7 +4,6 @@ let sampler: Tone.Sampler | null = null;
 
 export const initAudio = async () => {
   if (!sampler) {
-    console.log("Initializing sampler...");
     sampler = new Tone.Sampler({
       urls: {
         A2: "A2.mp3",
@@ -26,7 +25,6 @@ export const initAudio = async () => {
       },
       baseUrl: "/guitar-acoustic/",
       onload: () => {
-        console.log("Sampler loaded successfully");
       },
     }).toDestination();
     
@@ -41,7 +39,6 @@ export const playChord = async (midiNotes: number[]) => {
 
   if (!sampler) return;
 
-  console.log(`Playing chord: ${midiNotes}`);
   midiNotes.forEach(playNoteSingle);
 };
 
@@ -49,7 +46,6 @@ function playNoteSingle(midiNote: number): void {
   const now = Tone.now();
   const duration = 2; // Play for 2 seconds
   const freq = Tone.Frequency(midiNote, "midi").toFrequency();
-  console.log(`Playing note: ${midiNote} (${freq} Hz)`);
   sampler!.triggerAttackRelease(freq, duration, now);
 };
 
