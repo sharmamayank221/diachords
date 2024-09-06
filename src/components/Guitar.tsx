@@ -252,7 +252,7 @@ export default function Guitar({ data }: IGuitar) {
       </div>
       
       <div className="mt-4 flex justify-center">
-        <AudioPlayer midiNotes={midiNotes} />
+        <AudioPlayer midiNotes={midiNotes}  individualNotes={midiNotes}/>
       </div>
     </>
   );
