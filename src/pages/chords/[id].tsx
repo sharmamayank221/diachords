@@ -10,7 +10,6 @@ import { A } from "@/types/chord.types";
 import getChords from "@/helpers/getChods";
 import ChordName from "@/components/ChordName";
 import MetaTags from "@/components/Meta/Meta";
-import MidiPlayer from "@/components/Player/AudioPlayer";
 
 interface IParams extends ParsedUrlQuery {
   slug: string;

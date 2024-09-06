@@ -4,6 +4,7 @@ import Image from "next/image";
 import React from "react";
 import Switch from "react-switch";
 import Fret from "./Fret";
+import AudioPlayer from "./Player/AudioPlayer";
 
 // TODO: make this array dynamic so as the user selects how many frets to show on the screen
 
@@ -121,6 +122,20 @@ export default function Guitar({ data }: IGuitar) {
     }
   }, [data?.positions?.length, position]);
 
+  const [midiNotes, setMidiNotes] = React.useState<number[]>([]);
+
+  React.useEffect(() => {
+    // Calculate MIDI notes based on fretsToUse
+    if (fretsToUse) {
+      const notes = fretsToUse.map((fret, index) => {
+        if (fret === -1) return -1; // Muted string
+        const baseNote = [40, 45, 50, 55, 59, 64][index]; // MIDI notes for standard tuning
+        return baseNote + fret;
+      }).filter(note => note !== -1);
+      setMidiNotes(notes);
+    }
+  }, [fretsToUse]);
+
   return (
     <>
       <div className="positions flex items-center justify-center w-full container mx-auto  mb-4">
@@ -234,6 +249,10 @@ export default function Guitar({ data }: IGuitar) {
             </button>
           </div> */}
         </div>
+      </div>
+      
+      <div className="mt-4 flex justify-center">
+        <AudioPlayer midiNotes={midiNotes} />
       </div>
     </>
   );

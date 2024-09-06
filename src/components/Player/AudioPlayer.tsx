@@ -1,85 +1,43 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { initAudio, playChord } from "../../utils/audioUtils";
 
-function AudioPlayer(): JSX.Element {
-  const [midiOutput, setMidiOutput] = useState<MIDIOutput | null>(null);
-  const [notes, setNotes] = useState<number[]>([48, 55, 60, 64, 67]);
-  const [currentNote, setCurrentNote] = useState<number>(0);
+interface AudioPlayerProps {
+  midiNotes: number[];
+}
+
+function AudioPlayer({ midiNotes }: AudioPlayerProps): JSX.Element {
   const [playing, setPlaying] = useState<boolean>(false);
 
-  function playMidiNote(noteNumber: number): void {
-    if (midiOutput === null) {
-      console.log("No MIDI output availabless");
-      return;
-    }
-
-    const NOTE_ON = 0x90;
-    const NOTE_VELOCITY = 127;
-
-    midiOutput.send([NOTE_ON, noteNumber, NOTE_VELOCITY]);
-  }
-
-  function stopMidiNote(noteNumber: number): void {
-    if (midiOutput === null) {
-      console.log("No MIDI output available");
-      return;
-    }
-
-    const NOTE_OFF = 0x80;
-
-    midiOutput.send([NOTE_OFF, noteNumber, 0]);
-  }
+  useEffect(() => {
+    initAudio();
+  }, []);
 
   function play(): void {
-    initMidi();
     if (!playing) {
       setPlaying(true);
-      setCurrentNote(0);
-      playNextNote();
-    }
-  }
-
-  function playNextNote(): void {
-    if (currentNote < notes.length) {
-      const noteNumber = notes[currentNote];
-      playMidiNote(noteNumber);
+      playChord(midiNotes);
       setTimeout(() => {
-        stopMidiNote(noteNumber);
-        setCurrentNote(currentNote + 1);
-        playNextNote();
-      }, 500);
-    } else {
-      setPlaying(false);
+        setPlaying(false);
+      }, 2000); // Match the duration in audioUtils.ts
     }
-  }
-
-  function stop(): void {
-    setPlaying(false);
-    stopMidiNote(notes[currentNote]);
-    setCurrentNote(0);
-  }
-
-  function initMidi(): void {
-    navigator.requestMIDIAccess({ sysex: true }).then((midiAccess) => {
-      midiAccess.onstatechange = () => {
-        console.log("MIDI state changed:", midiAccess);
-      };
-
-      // Get the first output port
-      const output = midiAccess.outputs.values().next().value;
-      setMidiOutput(output);
-    });
   }
 
   return (
-    <div>
-      <h1>Play MIDI Notes</h1>
-      <button onClick={play} className="text-white">
-        Play
-      </button>
-      <button onClick={stop} className="text-white">
-        Stop
-      </button>
-      {midiOutput === null && <div>No MIDI output available</div>}
+    <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md mx-auto">
+      <h1 className="text-2xl font-bold text-white mb-4">Chord Player</h1>
+      <div className="flex justify-center">
+        <button
+          onClick={play}
+          className={`px-8 py-3 rounded-full font-semibold text-lg text-white transition-colors ${
+            playing
+              ? "bg-gray-600 cursor-not-allowed"
+              : "bg-[#1BD79E] hover:bg-[#5ebca0]"
+          }`}
+          disabled={playing}
+        >
+          {playing ? "Playing..." : "Play Chord"}
+        </button>
+      </div>
     </div>
   );
 }
