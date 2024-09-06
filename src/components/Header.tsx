@@ -29,6 +29,7 @@ export default function Header() {
           </div>
           <div className="w-[60%]">
             <Searchbar />
+        
           </div>
           <div className="">
             <button

@@ -4,6 +4,7 @@ import { A } from "@/types/chord.types";
 import Image from "next/image";
 import getChords from "@/helpers/getChods";
 import { useRouter } from "next/router";
+import AudioPlayer from "./Player/AudioPlayer";
 
 interface IChordName {
   singleDatafromDynamicPage: A;
@@ -15,6 +16,8 @@ export default function ChordName({ singleDatafromDynamicPage }: IChordName) {
   const [currentChordIndex, setCurrentChordIndex] = useState(0);
   const router = useRouter();
   const currentChordUrl = router?.asPath;
+
+  console.log(chordData, "chordData");
 
   useEffect(() => {
     // Fetch the chord data when the component mounts
