@@ -17,7 +17,6 @@ export default function ChordName({ singleDatafromDynamicPage }: IChordName) {
   const router = useRouter();
   const currentChordUrl = router?.asPath;
 
-  console.log(chordData, "chordData");
 
   useEffect(() => {
     // Fetch the chord data when the component mounts
