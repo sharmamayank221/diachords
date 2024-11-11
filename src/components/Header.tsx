@@ -1,11 +1,11 @@
-import React, { useState } from "react";
 
-import Searchbar from "@/components/SearchBar";
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
+import React, { useState } from "react";
+import { Dialog } from "@headlessui/react";
+import Searchbar from "@/components/SearchBar";
 import AudioPlayer from "./Player/AudioPlayer";
 import GuitarHintsModal from "./Modal/GuitarHintsModal";
-import { Dialog } from "@headlessui/react";
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState<boolean>(false);

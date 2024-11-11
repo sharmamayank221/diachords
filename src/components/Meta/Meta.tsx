@@ -1,6 +1,5 @@
-import { FC, useEffect } from "react";
 import Head from "next/head";
-
+import { FC, useEffect } from "react";
 /**
  * Returns a Next JS Head section to include the required meta tags for SEO purpose
  * @props currentPageTitle <string> - Title of the current page to be included

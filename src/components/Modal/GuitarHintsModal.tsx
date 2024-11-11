@@ -1,6 +1,6 @@
-import { Dialog, Transition } from "@headlessui/react";
 import Image from "next/image";
 import { Fragment, ReactNode, useState } from "react";
+import { Dialog, Transition } from "@headlessui/react";
 
 type Props = {
   isOpen: boolean;

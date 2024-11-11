@@ -1,14 +1,9 @@
 import React from "react";
-import { useRouter } from "next/router";
-
 import data from "@/chrods.json";
+import { useRouter } from "next/router";
 import type { A } from "@/types/chord.types";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
-import {
-  getSingleDataForDynamicPage,
-  setSearchChordData,
-} from "@/reducers/chord/searchDataSlice";
-import { KEY_SIGNATURE } from "@/types/chord.types";
+import { getSingleDataForDynamicPage,setSearchChordData} from "@/reducers/chord/searchDataSlice";
 
 interface IChordSearch {
   searchChord: string;
