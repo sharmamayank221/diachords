@@ -1,12 +1,9 @@
-import React, { useEffect, useReducer, useState } from "react";
-
-import { A } from "@/types/chord.types";
 import Image from "next/image";
-import getChords from "@/helpers/getChods";
+import { A } from "@/types/chord.types";
 import { useRouter } from "next/router";
+import getChords from "@/helpers/getChods";
 import AudioPlayer from "./Player/AudioPlayer";
-
-interface IChordName {
+import React, { useEffect, useReducer, useState } from "react";interface IChordName {
   singleDatafromDynamicPage: A;
 }
 

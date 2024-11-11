@@ -1,7 +1,6 @@
 import React from "react";
-import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 import Image from "next/image";
-
+import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 interface IFret {
   stringNum?: number;
   fretNum?: number;

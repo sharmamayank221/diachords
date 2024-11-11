@@ -1,10 +1,10 @@
-import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
-import { A } from "@/types/chord.types";
-import Image from "next/image";
-import React from "react";
-import Switch from "react-switch";
 import Fret from "./Fret";
+import React from "react";
+import Image from "next/image";
+import Switch from "react-switch";
+import { A } from "@/types/chord.types";
 import AudioPlayer from "./Player/AudioPlayer";
+import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 
 interface IPositionsToBePlaced {
   stringNumber: number;
