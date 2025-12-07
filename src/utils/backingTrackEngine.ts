@@ -375,11 +375,19 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
   await initSynths();
   await Tone.start();
   
-  // Stop any existing sequences
-  if (drumSequence) { drumSequence.stop(); drumSequence.dispose(); }
-  if (bassSequence) { bassSequence.stop(); bassSequence.dispose(); }
-  if (rhythmSequence) { rhythmSequence.stop(); rhythmSequence.dispose(); }
-  if (chordTrackingPart) { chordTrackingPart.stop(); chordTrackingPart.dispose(); }
+  // Stop any existing sequences safely
+  try {
+    if (drumSequence) { drumSequence.stop(); drumSequence.dispose(); }
+  } catch (e) { /* ignore */ }
+  try {
+    if (bassSequence) { bassSequence.stop(); bassSequence.dispose(); }
+  } catch (e) { /* ignore */ }
+  try {
+    if (rhythmSequence) { rhythmSequence.stop(); rhythmSequence.dispose(); }
+  } catch (e) { /* ignore */ }
+  try {
+    if (chordTrackingPart) { chordTrackingPart.stop(); chordTrackingPart.dispose(); }
+  } catch (e) { /* ignore */ }
   
   Tone.Transport.bpm.value = settings.bpm;
   Tone.Transport.stop();
@@ -436,17 +444,13 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
     
     stop: () => {
       isPlaying = false;
-      try {
-        Tone.Transport.stop();
-        Tone.Transport.cancel(); // Cancel all scheduled events
-        drumSequence?.stop(0);
-        bassSequence?.stop(0);
-        rhythmSequence?.stop(0);
-        chordTrackingPart?.stop(0);
-      } catch (e) {
-        // Ignore stop errors - can happen with timing edge cases
-        console.warn("Stop error:", e);
-      }
+      // Stop each component separately to avoid one failure stopping others
+      try { Tone.Transport.stop(); } catch (e) { /* ignore */ }
+      try { Tone.Transport.cancel(); } catch (e) { /* ignore */ }
+      try { drumSequence?.stop(0); } catch (e) { /* ignore */ }
+      try { bassSequence?.stop(0); } catch (e) { /* ignore */ }
+      try { rhythmSequence?.stop(0); } catch (e) { /* ignore */ }
+      try { chordTrackingPart?.stop(0); } catch (e) { /* ignore */ }
     },
     
     setBpm: (bpm: number) => {
@@ -471,16 +475,12 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
 
 // Cleanup function
 export function disposeBackingTrack() {
-  try {
-    Tone.Transport.stop();
-    Tone.Transport.cancel();
-    drumSequence?.dispose();
-    bassSequence?.dispose();
-    rhythmSequence?.dispose();
-    chordTrackingPart?.dispose();
-  } catch (e) {
-    // Ignore cleanup errors
-  }
+  try { Tone.Transport.stop(); } catch (e) { /* ignore */ }
+  try { Tone.Transport.cancel(); } catch (e) { /* ignore */ }
+  try { drumSequence?.dispose(); } catch (e) { /* ignore */ }
+  try { bassSequence?.dispose(); } catch (e) { /* ignore */ }
+  try { rhythmSequence?.dispose(); } catch (e) { /* ignore */ }
+  try { chordTrackingPart?.dispose(); } catch (e) { /* ignore */ }
   drumSequence = null;
   bassSequence = null;
   rhythmSequence = null;
