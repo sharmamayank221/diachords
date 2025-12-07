@@ -2,6 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import React, { useState } from "react";
+import { useRouter } from "next/router";
 import { Dialog } from "@headlessui/react";
 import Searchbar from "@/components/SearchBar";
 import AudioPlayer from "./Player/AudioPlayer";
@@ -9,6 +10,7 @@ import GuitarHintsModal from "./Modal/GuitarHintsModal";
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const router = useRouter();
 
   function closeModal() {
     setIsOpen(false);
@@ -17,6 +19,11 @@ export default function Header() {
   function openModal() {
     setIsOpen(true);
   }
+
+  // Check which nav item is active
+  const isChordPage = router.pathname.startsWith("/chords") || router.pathname === "/";
+  const isScalePage = router.pathname === "/scales";
+  const isTunerPage = router.pathname === "/tuner";
 
   return (
     <div className="bg-black">
@@ -29,16 +36,36 @@ export default function Header() {
           </div>
           <div className="w-[60%]">
             <Searchbar />
-        
           </div>
-          <div className="">
-            <button
-              type="button"
-              onClick={openModal}
-              className="rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium text-white hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75"
+          <div className="flex items-center justify-center pr-2">
+            <Link
+              href={"/chords/cmajor"}
+              className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
+                isChordPage ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
+              }`}
             >
-              Hints
-            </button>
+              Chords
+            </Link>
+          </div>
+          <div className="flex items-center justify-center pr-2">
+            <Link
+              href={"/scales"}
+              className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
+                isScalePage ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
+              }`}
+            >
+              Scales
+            </Link>
+          </div>
+          <div className="flex items-center justify-center pr-2">
+            <Link
+              href={"/tuner"}
+              className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
+                isTunerPage ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
+              }`}
+            >
+              Tuner
+            </Link>
           </div>
           <GuitarHintsModal isOpen={isOpen} onClose={closeModal}>
             {" "}

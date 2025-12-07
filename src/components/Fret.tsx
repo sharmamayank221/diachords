@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
+
 interface IFret {
   stringNum?: number;
   fretNum?: number;
@@ -11,7 +12,11 @@ interface IFret {
   fretId?: number;
   fretIndex?: number;
   baseFret?: number;
+  onNotePlay?: (midiNote: number, stringNum: number) => void;
 }
+
+// Base MIDI notes for each string (E2, A2, D3, G3, B3, E4)
+const STRING_BASE_NOTES = [64, 59, 55, 50, 45, 40]; // 1st to 6th string
 
 export default function Fret({
   fretsToUse,
@@ -19,7 +24,10 @@ export default function Fret({
   fretId,
   fretIndex,
   baseFret,
+  onNotePlay,
 }: IFret) {
+  const [playingString, setPlayingString] = useState<number | null>(null);
+
   const FingerPositionOnStringsWithFretNums = useGetStringNumAndFretNum(
     fretsToUse as number[],
     fingersToUse as number[],
@@ -51,6 +59,23 @@ export default function Fret({
     }
   );
 
+  const handleFingerClick = (stringNum: number, fretNum: number | undefined) => {
+    if (fretNum === undefined) return;
+    
+    // Calculate MIDI note: base note + fret position
+    const baseNote = STRING_BASE_NOTES[stringNum - 1];
+    const midiNote = baseNote + fretNum;
+    
+    // Visual feedback
+    setPlayingString(stringNum);
+    setTimeout(() => setPlayingString(null), 500);
+    
+    // Play the note
+    if (onNotePlay) {
+      onNotePlay(midiNote, stringNum);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center">
       <p className="text-white text-center pb-2 text-xl md:text-2xl font-Lora">
@@ -63,33 +88,45 @@ export default function Fret({
         id={`${fretIndex}`}
       >
         {StringsWithMatchedFingerNumbersOfAGivenChord?.map((stirng: any) => {
+          const isPlaying = playingString === stirng.stringNum;
+          const hasFingerPosition = stirng.fretNum !== undefined;
+          
           return (
-            <>
-              <div
-                className={`w-[84px] md:w-[103px] mb-9 md:mb-[52px] h-1 relative`}
-                id={`string-${stirng.stringNum}`}
-                key={stirng.stringNum}
-                style={{
-                  background: `#FFF`,
-                  height: `${stirng.h}`,
-                }}
-              >
-                <div
-                  className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full bg-[${
-                    stirng.fretNum !== undefined ? "#1BD79E" : ""
-                  }]`}
+            <div
+              className={`w-[84px] md:w-[103px] mb-9 md:mb-[52px] h-1 relative`}
+              id={`string-${stirng.stringNum}`}
+              key={stirng.stringNum}
+              style={{
+                background: `#FFF`,
+                height: `${stirng.h}`,
+              }}
+            >
+              {hasFingerPosition ? (
+                <button
+                  onClick={() => handleFingerClick(stirng.stringNum, stirng.fretNum)}
+                  className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full transition-all duration-150 bg-[#1BD79E] cursor-pointer hover:scale-125 hover:shadow-lg active:scale-95 focus:outline-none focus:ring-2 focus:ring-white ${
+                    isPlaying ? "scale-125 ring-4 ring-white ring-opacity-50" : ""
+                  }`}
+                  style={
+                    isPlaying
+                      ? {
+                          boxShadow: `0 0 20px ${stirng.color}, 0 0 40px ${stirng.color}`,
+                        }
+                      : {}
+                  }
+                  aria-label={`Play finger ${stirng.fingerNum} on string ${stirng.stringNum}`}
                 >
-                  {stirng.fretNum !== undefined && (
-                    <h3 className="mt-[-2px] flex items-center justify-center font-Lora text-base md:text-2xl text-black">
-                      {stirng?.fingerNum}
-                    </h3>
-                  )}
-                </div>
-                {fretIndex === 0 && (
-                  <div className="text-white">{stirng.stringNum}</div>
-                )}
-              </div>
-            </>
+                  <span className="mt-[-2px] flex items-center justify-center font-Lora text-base md:text-2xl text-black">
+                    {stirng?.fingerNum}
+                  </span>
+                </button>
+              ) : (
+                <div className="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full" />
+              )}
+              {fretIndex === 0 && (
+                <div className="text-white">{stirng.stringNum}</div>
+              )}
+            </div>
           );
         })}
 

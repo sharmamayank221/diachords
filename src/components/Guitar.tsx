@@ -5,6 +5,7 @@ import Switch from "react-switch";
 import { A } from "@/types/chord.types";
 import AudioPlayer from "./Player/AudioPlayer";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
+import { initAudio, playNote } from "@/utils/audioUtils";
 
 interface IPositionsToBePlaced {
   stringNumber: number;
@@ -105,6 +106,11 @@ export default function Guitar({ data }: IGuitar) {
 
   const [midiNotes, setMidiNotes] = React.useState<number[]>([]);
 
+  // Initialize audio on mount
+  React.useEffect(() => {
+    initAudio();
+  }, []);
+
   React.useEffect(() => {
     if (fretsToUse) {
       const notes = fretsToUse.map((fret, index) => {
@@ -115,6 +121,11 @@ export default function Guitar({ data }: IGuitar) {
       setMidiNotes(notes);
     }
   }, [fretsToUse]);
+
+  // Handler for playing notes from fretboard clicks
+  const handleFretboardNotePlay = (midiNote: number, stringNum: number) => {
+    playNote(midiNote);
+  };
 
   return (
     <>
@@ -179,6 +190,7 @@ export default function Guitar({ data }: IGuitar) {
                   fretId={fret.fretId}
                   baseFret={base?.[0]?.baseFret}
                   fretIndex={fret.fretNum}
+                  onNotePlay={handleFretboardNotePlay}
                 />
                 {isCapoFret && capo && (
                   <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
@@ -203,7 +215,12 @@ export default function Guitar({ data }: IGuitar) {
       </div>
       
       <div className="mt-4 flex justify-center">
-        <AudioPlayer midiNotes={midiNotes} individualNotes={midiNotes}/>
+        <AudioPlayer 
+          midiNotes={midiNotes} 
+          individualNotes={midiNotes}
+          frets={fretsToUse}
+          fingers={fingersToUse}
+        />
       </div>
     </>
   );
