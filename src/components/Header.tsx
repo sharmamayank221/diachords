@@ -64,30 +64,28 @@ export default function Header() {
       {/* Mobile Header */}
       <div className="md:hidden">
         {/* Top row: Logo and Nav Links */}
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-center gap-4 px-4 py-3">
           <Link href={"/chords/cmajor"}>
-            <Image src="/Logo.svg" alt="logo" width={32} height={32} />
+            <Image src="/Logo.svg" alt="logo" width={28} height={28} />
           </Link>
           
-          {/* Nav Links - Compact on mobile */}
-          <div className="flex items-center gap-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`font-Lora text-xs px-2 py-1 rounded whitespace-nowrap ${
-                  link.isActive 
-                    ? "text-[#1BD79E] bg-[#1BD79E]/10" 
-                    : "text-gray-300"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
+          {/* Nav Links */}
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`font-Lora text-sm px-2 py-1 rounded whitespace-nowrap ${
+                link.isActive 
+                  ? "text-[#1BD79E]" 
+                  : "text-gray-300"
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
         
-        {/* Search bar - Full width below */}
+        {/* Search bar below nav */}
         <div className="px-4 pb-3">
           <Searchbar />
         </div>
