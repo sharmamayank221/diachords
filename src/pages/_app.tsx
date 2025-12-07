@@ -28,19 +28,29 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       <PostHogProvider client={posthog}>
     <Provider store={store}>
       <Head>
-        <title className="capitalize">Chords of Guitar</title>
-        <meta property="og:title" content={"Chords of Guitar"} />
-        <meta
-          property="og:description"
-          content={
-            "Learn Guitar chords easily with the visual guitar chords learning method."
-          }
-        />
-        <meta property="og:site_name" content={"chordsofguitar"} />
-        <meta property="og:url" content={"www.chordsofguitar.com"} />
-        <meta property="og:description" content={"guitar chords"} />
-        <meta property="og:type" content={"website"} />
-        <meta property="og:image" content="/logo.svg"></meta>
+        <title>Diachords - Guitar Chords & Scales</title>
+        <meta name="description" content="Learn guitar chords, scales, and jam with AI backing tracks. The ultimate guitar learning companion." />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        
+        {/* PWA Meta Tags */}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#1BD79E" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Diachords" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content="Diachords - Guitar Chords & Scales" />
+        <meta property="og:description" content="Learn guitar chords, scales, and jam with AI backing tracks." />
+        <meta property="og:site_name" content="Diachords" />
+        <meta property="og:url" content="https://diachords.vercel.app" />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="/icons/icon-512x512.png" />
+        
+        {/* Favicon */}
+        <link rel="icon" href="/favicon.ico" />
       </Head>
       <Layout>
         <Component {...pageProps} />
