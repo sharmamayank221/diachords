@@ -28,7 +28,7 @@ interface ScaleNote {
 const STRING_HEIGHTS = ["1px", "2px", "3px", "3.5px", "4px", "5px"];
 
 export default function ScaleFretboard() {
-  const [selectedScale, setSelectedScale] = useState<string>("pentatonic_minor");
+  const [selectedScale, setSelectedScale] = useState<string>("major");
   const [selectedRoot, setSelectedRoot] = useState<number>(0); // C
   const [scaleNotes, setScaleNotes] = useState<ScaleNote[]>([]);
   const [playingNote, setPlayingNote] = useState<number | null>(null);
@@ -192,17 +192,20 @@ export default function ScaleFretboard() {
   return (
     <div className="min-h-screen bg-black text-white p-4 md:p-8">
       {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="font-Lora text-4xl md:text-5xl mb-2 bg-gradient-to-r from-[#1BD79E] to-[#38DBE5] bg-clip-text text-transparent">
+      <div className="text-center mb-4 md:mb-8">
+        <h1 className="font-Lora text-3xl md:text-5xl mb-2 bg-gradient-to-r from-[#1BD79E] to-[#38DBE5] bg-clip-text text-transparent">
           Scale Explorer
         </h1>
-        <p className="font-Lora text-gray-400 text-lg">
+        <p className="font-Lora text-gray-400 text-sm md:text-lg hidden md:block">
           Learn and practice guitar scales
         </p>
       </div>
 
+      {/* Main content - reversed order on mobile */}
+      <div className="flex flex-col-reverse md:flex-col">
+      
       {/* Controls */}
-      <div className="max-w-4xl mx-auto mb-8">
+      <div className="max-w-4xl mx-auto mb-8 mt-6 md:mt-0">
         <div className="bg-[#111] border border-[#222] rounded-2xl p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Root Note Selector */}
@@ -586,8 +589,10 @@ export default function ScaleFretboard() {
         </div>
       </div>
 
+      </div>{/* End of flex-col-reverse wrapper */}
+
       {/* Legend */}
-      <div className="max-w-4xl mx-auto mt-8">
+      <div className="max-w-4xl mx-auto mt-8 hidden md:block">
         <div className="bg-[#111] border border-[#222] rounded-2xl p-6">
           <h3 className="font-Lora text-xl text-[#1BD79E] mb-4">How to Use</h3>
           <ul className="font-Lora text-gray-400 text-sm space-y-2">
