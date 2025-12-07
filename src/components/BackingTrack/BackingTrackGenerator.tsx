@@ -45,6 +45,7 @@ export default function BackingTrackGenerator() {
   
   const backingTrackRef = useRef<BackingTrack | null>(null);
   const [currentBeat, setCurrentBeat] = useState(0);
+  const [currentChordIndex, setCurrentChordIndex] = useState<number>(-1);
   
   // Transpose chords to selected key
   const transposeChord = (chord: string, fromKey: string, toKey: string): string => {
@@ -106,6 +107,7 @@ export default function BackingTrackGenerator() {
       backingTrackRef.current = null;
       setIsPlaying(false);
       setCurrentBeat(0);
+      setCurrentChordIndex(-1);
     } else if (!isPlaying) {
       // Start
       const chords = getTransposedProgression();
@@ -115,6 +117,9 @@ export default function BackingTrackGenerator() {
         genre: selectedGenre,
         chordProgression: chords,
         measures: chords.length,
+        onChordChange: (chordIndex) => {
+          setCurrentChordIndex(chordIndex);
+        },
       });
       
       backingTrackRef.current = track;
@@ -324,7 +329,7 @@ export default function BackingTrackGenerator() {
               <div
                 key={idx}
                 className={`px-4 py-2 rounded-lg font-Lora text-lg transition-all duration-200 ${
-                  isPlaying && idx === Math.floor(currentBeat / (4 / chords.length)) % chords.length
+                  isPlaying && currentChordIndex === idx
                     ? "bg-[#1BD79E] text-black scale-110 shadow-lg shadow-[#1BD79E]/30"
                     : "bg-[#1a1a1a] text-white"
                 }`}

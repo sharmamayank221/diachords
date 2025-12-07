@@ -11,6 +11,7 @@ export interface TrackSettings {
   genre: Genre;
   chordProgression: string[]; // e.g., ["C", "Am", "F", "G"]
   measures: number;
+  onChordChange?: (chordIndex: number) => void; // Callback when chord changes
 }
 
 export interface BackingTrack {
@@ -106,6 +107,7 @@ let rhythmVolume: Tone.Volume | null = null;
 let drumSequence: Tone.Sequence | null = null;
 let bassSequence: Tone.Sequence | null = null;
 let rhythmSequence: Tone.Sequence | null = null;
+let chordTrackingPart: Tone.Part | null = null;
 
 async function initSynths() {
   if (kickSynth) return; // Already initialized
@@ -377,6 +379,7 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
   if (drumSequence) { drumSequence.stop(); drumSequence.dispose(); }
   if (bassSequence) { bassSequence.stop(); bassSequence.dispose(); }
   if (rhythmSequence) { rhythmSequence.stop(); rhythmSequence.dispose(); }
+  if (chordTrackingPart) { chordTrackingPart.stop(); chordTrackingPart.dispose(); }
   
   Tone.Transport.bpm.value = settings.bpm;
   Tone.Transport.stop();
@@ -392,6 +395,24 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
   bassSequence = createBassSequence(settings.genre, settings.chordProgression, settings.measures) as unknown as Tone.Sequence;
   rhythmSequence = createRhythmSequence(settings.genre, settings.chordProgression) as unknown as Tone.Sequence;
   
+  // Create chord tracking part - triggers callback at start of each measure
+  const chordEvents = settings.chordProgression.map((_, idx) => ({
+    time: `${idx}:0:0`,
+    chordIndex: idx
+  }));
+  
+  chordTrackingPart = new Tone.Part<{ time: string; chordIndex: number }>((time, event) => {
+    // Use Tone.Draw to sync with visual updates
+    Tone.Draw.schedule(() => {
+      if (settings.onChordChange) {
+        settings.onChordChange(event.chordIndex);
+      }
+    }, time);
+  }, chordEvents);
+  
+  chordTrackingPart.loop = true;
+  chordTrackingPart.loopEnd = `${settings.chordProgression.length}:0:0`;
+  
   let isPlaying = false;
   
   return {
@@ -401,9 +422,15 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
       if (isPlaying) return;
       isPlaying = true;
       
+      // Immediately trigger first chord
+      if (settings.onChordChange) {
+        settings.onChordChange(0);
+      }
+      
       drumSequence?.start(0);
       bassSequence?.start(0);
       rhythmSequence?.start(0);
+      chordTrackingPart?.start(0);
       Tone.Transport.start();
     },
     
@@ -415,6 +442,7 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
         drumSequence?.stop(0);
         bassSequence?.stop(0);
         rhythmSequence?.stop(0);
+        chordTrackingPart?.stop(0);
       } catch (e) {
         // Ignore stop errors - can happen with timing edge cases
         console.warn("Stop error:", e);
@@ -449,11 +477,13 @@ export function disposeBackingTrack() {
     drumSequence?.dispose();
     bassSequence?.dispose();
     rhythmSequence?.dispose();
+    chordTrackingPart?.dispose();
   } catch (e) {
     // Ignore cleanup errors
   }
   drumSequence = null;
   bassSequence = null;
   rhythmSequence = null;
+  chordTrackingPart = null;
 }
 
