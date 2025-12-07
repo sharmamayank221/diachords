@@ -87,9 +87,15 @@ function getChordRoot(chord: string): string {
 }
 
 // ============ SYNTH SETUP ============
+// Kick drum components
 let kickSynth: Tone.MembraneSynth | null = null;
-let snareSynth: Tone.NoiseSynth | null = null;
+let kickClick: Tone.Synth | null = null;
+// Snare drum components  
+let snareBody: Tone.MembraneSynth | null = null;
+let snareNoise: Tone.NoiseSynth | null = null;
+// Hi-hat
 let hihatSynth: Tone.MetalSynth | null = null;
+// Bass and rhythm
 let bassSynth: Tone.MonoSynth | null = null;
 let guitarSampler: Tone.Sampler | null = null;
 
@@ -105,33 +111,77 @@ async function initSynths() {
   if (kickSynth) return; // Already initialized
   
   // Volume nodes
-  drumVolume = new Tone.Volume(-6).toDestination();
+  drumVolume = new Tone.Volume(-3).toDestination();
   bassVolume = new Tone.Volume(-8).toDestination();
-  rhythmVolume = new Tone.Volume(-12).toDestination();
+  rhythmVolume = new Tone.Volume(-10).toDestination();
   
-  // Kick drum
+  // ========== ACOUSTIC KICK DRUM ==========
+  // Main kick body - deep, punchy
   kickSynth = new Tone.MembraneSynth({
-    pitchDecay: 0.05,
-    octaves: 6,
+    pitchDecay: 0.08,
+    octaves: 4,
     oscillator: { type: "sine" },
-    envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 },
+    envelope: { 
+      attack: 0.001, 
+      decay: 0.25, 
+      sustain: 0, 
+      release: 0.4 
+    },
   }).connect(drumVolume);
+  kickSynth.volume.value = -4;
   
-  // Snare
-  snareSynth = new Tone.NoiseSynth({
-    noise: { type: "white" },
-    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 },
+  // Kick attack click - adds definition
+  kickClick = new Tone.Synth({
+    oscillator: { type: "triangle" },
+    envelope: {
+      attack: 0.001,
+      decay: 0.02,
+      sustain: 0,
+      release: 0.02,
+    },
   }).connect(drumVolume);
+  kickClick.volume.value = -15;
   
-  // Hi-hat
+  // ========== ACOUSTIC SNARE DRUM ==========
+  // Snare body - tonal component
+  snareBody = new Tone.MembraneSynth({
+    pitchDecay: 0.01,
+    octaves: 2,
+    oscillator: { type: "triangle" },
+    envelope: {
+      attack: 0.001,
+      decay: 0.15,
+      sustain: 0,
+      release: 0.1,
+    },
+  }).connect(drumVolume);
+  snareBody.volume.value = -12;
+  
+  // Snare noise - snare wires/rattle
+  snareNoise = new Tone.NoiseSynth({
+    noise: { type: "pink" }, // Pink noise sounds more natural than white
+    envelope: { 
+      attack: 0.001, 
+      decay: 0.15, 
+      sustain: 0, 
+      release: 0.12 
+    },
+  }).connect(drumVolume);
+  snareNoise.volume.value = -8;
+  
+  // ========== ACOUSTIC HI-HAT ==========
   hihatSynth = new Tone.MetalSynth({
-    envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
-    harmonicity: 5.1,
-    modulationIndex: 32,
-    resonance: 4000,
-    octaves: 1.5,
+    envelope: { 
+      attack: 0.001, 
+      decay: 0.06, 
+      release: 0.02 
+    },
+    harmonicity: 3.5,
+    modulationIndex: 20,
+    resonance: 5000,
+    octaves: 1,
   }).connect(drumVolume);
-  hihatSynth.volume.value = -10;
+  hihatSynth.volume.value = -16;
   
   // Bass synth
   bassSynth = new Tone.MonoSynth({
@@ -185,12 +235,25 @@ function createDrumSequence(genre: Genre) {
       if (!drums) return;
       const parts = drums.split(",");
       parts.forEach((drum) => {
-        if (drum === "kick" && kickSynth) {
-          kickSynth.triggerAttackRelease("C1", "8n", time);
+        // Acoustic kick - body + click layer
+        if (drum === "kick") {
+          if (kickSynth) {
+            kickSynth.triggerAttackRelease("C1", "8n", time);
+          }
+          if (kickClick) {
+            kickClick.triggerAttackRelease("G4", "32n", time);
+          }
         }
-        if (drum === "snare" && snareSynth) {
-          snareSynth.triggerAttackRelease("8n", time);
+        // Acoustic snare - body + snare wires layer
+        if (drum === "snare") {
+          if (snareBody) {
+            snareBody.triggerAttackRelease("G3", "16n", time);
+          }
+          if (snareNoise) {
+            snareNoise.triggerAttackRelease("16n", time);
+          }
         }
+        // Hi-hat
         if (drum === "hihat" && hihatSynth) {
           hihatSynth.triggerAttackRelease("C6", "32n", time);
         }
