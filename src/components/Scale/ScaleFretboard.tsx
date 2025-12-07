@@ -28,7 +28,7 @@ interface ScaleNote {
 const STRING_HEIGHTS = ["1px", "2px", "3px", "3.5px", "4px", "5px"];
 
 export default function ScaleFretboard() {
-  const [selectedScale, setSelectedScale] = useState<string>("pentatonic_minor");
+  const [selectedScale, setSelectedScale] = useState<string>("major");
   const [selectedRoot, setSelectedRoot] = useState<number>(0); // C
   const [scaleNotes, setScaleNotes] = useState<ScaleNote[]>([]);
   const [playingNote, setPlayingNote] = useState<number | null>(null);
