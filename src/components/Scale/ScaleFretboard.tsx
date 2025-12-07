@@ -12,6 +12,7 @@ import {
 } from "@/data/scales";
 import Link from "next/link";
 import { initAudio, playNote, playChord, playProgressionWithDrums, ProgressionChord } from "@/utils/audioUtils";
+import ChordTooltip from "./ChordTooltip";
 
 interface ScaleNote {
   string: number;
@@ -458,29 +459,36 @@ export default function ScaleFretboard() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-gray-500 font-Lora text-xs">Chords:</span>
                       {progressionChords.map((chordInfo, idx) => (
-                        <Link
-                          key={idx}
-                          href={`/chords/${chordInfo.searchId}`}
-                          className="group flex items-center"
-                        >
-                          <span 
-                            className={`px-2 py-1 rounded-lg font-Lora text-sm transition-all duration-200 ${
-                              currentChordIndex === idx
-                                ? "bg-[#1BD79E] text-black scale-110 shadow-lg shadow-[#1BD79E]/30 border-2 border-white"
-                                : "bg-[#2a2a2a] text-white border border-[#333] group-hover:border-[#1BD79E] group-hover:text-[#1BD79E]"
-                            }`}
+                        <div key={idx} className="flex items-center">
+                          <ChordTooltip
+                            chordName={chordInfo.chord}
+                            searchId={chordInfo.searchId}
+                            isHighlighted={currentChordIndex === idx}
                           >
-                            {chordInfo.chord}
-                          </span>
+                            <Link
+                              href={`/chords/${chordInfo.searchId}`}
+                              className="group"
+                            >
+                              <span 
+                                className={`px-2 py-1 rounded-lg font-Lora text-sm transition-all duration-200 inline-block ${
+                                  currentChordIndex === idx
+                                    ? "bg-[#1BD79E] text-black scale-110 shadow-lg shadow-[#1BD79E]/30 border-2 border-white"
+                                    : "bg-[#2a2a2a] text-white border border-[#333] group-hover:border-[#1BD79E] group-hover:text-[#1BD79E]"
+                                }`}
+                              >
+                                {chordInfo.chord}
+                              </span>
+                            </Link>
+                          </ChordTooltip>
                           {idx < progressionChords.length - 1 && (
                             <span className="text-gray-600 mx-1">→</span>
                           )}
-                        </Link>
+                        </div>
                       ))}
                     </div>
 
                     <p className="mt-2 text-gray-600 text-xs font-Lora">
-                      Click chord to see diagram
+                      Hover for preview • Click for full view
                     </p>
                   </div>
                 )}
