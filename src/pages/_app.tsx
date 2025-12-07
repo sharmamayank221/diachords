@@ -51,6 +51,9 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
         
         {/* Favicon */}
         <link rel="icon" href="/favicon.ico" />
+        
+        {/* Google Search Console Verification */}
+        <meta name="google-site-verification" content="viU1cq9SDi_l7ZqBa93316kKaPmYOcC5v0B7CglNvrI" />
       </Head>
       <Layout>
         <Component {...pageProps} />
