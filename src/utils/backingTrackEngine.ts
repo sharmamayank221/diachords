@@ -91,7 +91,7 @@ let kickSynth: Tone.MembraneSynth | null = null;
 let snareSynth: Tone.NoiseSynth | null = null;
 let hihatSynth: Tone.MetalSynth | null = null;
 let bassSynth: Tone.MonoSynth | null = null;
-let rhythmSynth: Tone.PolySynth | null = null;
+let guitarSampler: Tone.Sampler | null = null;
 
 let drumVolume: Tone.Volume | null = null;
 let bassVolume: Tone.Volume | null = null;
@@ -140,10 +140,26 @@ async function initSynths() {
     filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.8, baseFrequency: 200, octaves: 2.5 },
   }).connect(bassVolume);
   
-  // Rhythm/pad synth
-  rhythmSynth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: "triangle" },
-    envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 0.8 },
+  // Guitar sampler for rhythm - using actual guitar samples
+  guitarSampler = new Tone.Sampler({
+    urls: {
+      A2: "A2.mp3",
+      A3: "A3.mp3",
+      A4: "A4.mp3",
+      C3: "C3.mp3",
+      C4: "C4.mp3",
+      C5: "C5.mp3",
+      D3: "D3.mp3",
+      D4: "D4.mp3",
+      D5: "D5.mp3",
+      E2: "E2.mp3",
+      E3: "E3.mp3",
+      E4: "E4.mp3",
+      G2: "G2.mp3",
+      G3: "G3.mp3",
+      G4: "G4.mp3",
+    },
+    baseUrl: "/guitar-acoustic/",
   }).connect(rhythmVolume);
   
   await Tone.loaded();
@@ -273,9 +289,12 @@ function createRhythmSequence(genre: Genre, chordProgression: string[]) {
   }));
   
   const part = new Tone.Part<{ time: string; chord: string }>((time, event) => {
-    if (rhythmSynth && event.chord) {
+    if (guitarSampler && event.chord) {
       const notes = chordNotes[event.chord] || chordNotes["C"];
-      rhythmSynth.triggerAttackRelease(notes, "8n", time);
+      // Play each note of the chord with slight strum delay for realistic guitar sound
+      notes.forEach((note, i) => {
+        guitarSampler!.triggerAttackRelease(note, "2n", time + i * 0.02);
+      });
     }
   }, partEvents);
   
