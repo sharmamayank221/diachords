@@ -25,11 +25,13 @@ export default function Header() {
   const isScalePage = router.pathname === "/scales";
   const isTunerPage = router.pathname === "/tuner";
   const isJamPage = router.pathname === "/jam";
+  const isMetronomePage = router.pathname === "/metronome";
 
   const navLinks = [
     { href: "/chords/cmajor", label: "Chords", isActive: isChordPage },
     { href: "/scales", label: "Scales", isActive: isScalePage },
     { href: "/tuner", label: "Tuner", isActive: isTunerPage },
+    { href: "/metronome", label: "Tempo", isActive: isMetronomePage },
     { href: "/jam", label: "Jam", isActive: isJamPage },
   ];
 
