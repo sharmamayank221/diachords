@@ -24,6 +24,7 @@ export default function Header() {
   const isChordPage = router.pathname.startsWith("/chords") || router.pathname === "/";
   const isScalePage = router.pathname === "/scales";
   const isTunerPage = router.pathname === "/tuner";
+  const isJamPage = router.pathname === "/jam";
 
   return (
     <div className="bg-black">
@@ -65,6 +66,16 @@ export default function Header() {
               }`}
             >
               Tuner
+            </Link>
+          </div>
+          <div className="flex items-center justify-center pr-2">
+            <Link
+              href={"/jam"}
+              className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
+                isJamPage ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
+              }`}
+            >
+              Jam
             </Link>
           </div>
           <GuitarHintsModal isOpen={isOpen} onClose={closeModal}>
