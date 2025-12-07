@@ -208,7 +208,127 @@ export default function Guitar({ data }: IGuitar) {
           })}
         </div>
 
-        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[50px] -top-[20px] z-[-1] hidden md:block"></div>
+        {/* Acoustic Guitar Body */}
+        <div className="absolute -right-[100px] -top-[80px] z-[-1] hidden md:block">
+          <svg 
+            width="550" 
+            height="500" 
+            viewBox="0 0 550 500" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Guitar Body Shape */}
+            <path 
+              d="M480 250C480 380 400 480 250 480C100 480 20 380 20 250C20 180 60 120 120 80C180 40 220 20 280 20C340 20 400 60 440 100C480 140 500 180 500 220C500 230 490 240 480 250Z" 
+              fill="#1a1a1a"
+              stroke="#333"
+              strokeWidth="3"
+            />
+            {/* Upper Bout */}
+            <ellipse 
+              cx="280" 
+              cy="120" 
+              rx="140" 
+              ry="80" 
+              fill="#1a1a1a"
+              stroke="#333"
+              strokeWidth="2"
+            />
+            {/* Lower Bout */}
+            <ellipse 
+              cx="260" 
+              cy="320" 
+              rx="180" 
+              ry="130" 
+              fill="#1a1a1a"
+              stroke="#333"
+              strokeWidth="2"
+            />
+            {/* Waist (indent) */}
+            <ellipse 
+              cx="270" 
+              cy="220" 
+              rx="100" 
+              ry="50" 
+              fill="#000"
+            />
+            {/* Sound Hole */}
+            <circle 
+              cx="270" 
+              cy="250" 
+              r="80" 
+              fill="#2D2D2D"
+            />
+            {/* Sound Hole Rosette Ring */}
+            <circle 
+              cx="270" 
+              cy="250" 
+              r="90" 
+              fill="none"
+              stroke="#3a3a3a"
+              strokeWidth="8"
+            />
+            <circle 
+              cx="270" 
+              cy="250" 
+              r="100" 
+              fill="none"
+              stroke="#2a2a2a"
+              strokeWidth="4"
+            />
+            {/* Decorative rosette pattern */}
+            <circle 
+              cx="270" 
+              cy="250" 
+              r="95" 
+              fill="none"
+              stroke="#1BD79E"
+              strokeWidth="1"
+              strokeDasharray="4 4"
+              opacity="0.3"
+            />
+            {/* Bridge */}
+            <rect 
+              x="200" 
+              y="350" 
+              width="140" 
+              height="15" 
+              rx="3" 
+              fill="#222"
+              stroke="#444"
+              strokeWidth="1"
+            />
+            {/* Saddle */}
+            <rect 
+              x="210" 
+              y="352" 
+              width="120" 
+              height="4" 
+              rx="2" 
+              fill="#ddd"
+            />
+            {/* Bridge Pins */}
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <circle 
+                key={i}
+                cx={225 + i * 20} 
+                cy="360" 
+                r="3" 
+                fill="#111"
+                stroke="#333"
+                strokeWidth="1"
+              />
+            ))}
+            {/* Pickguard */}
+            <path 
+              d="M160 200C140 220 130 260 140 300C150 340 180 360 200 350C220 340 230 300 220 260C210 220 180 180 160 200Z" 
+              fill="#111"
+              stroke="#222"
+              strokeWidth="1"
+              opacity="0.8"
+            />
+          </svg>
+        </div>
       </div>
 
       <div className="relative w-full h-full md:pt-14 flex items-center justify-center container mx-auto">
