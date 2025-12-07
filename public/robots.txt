@@ -1,0 +1,22 @@
+# Robots.txt for ChordsofGuitar
+# https://chordsofguitar.com
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://chordsofguitar.com/sitemap.xml
+
+# Disallow admin/api routes
+Disallow: /api/
+
+# Allow all crawlers to index main pages
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Crawl delay for respectful crawling
+Crawl-delay: 1
+
