@@ -15,7 +15,7 @@ function getAllChords(): Array<{ chord: A; fullName: string; searchName: string 
       const fullName = `${chord.key}${chord.suffix || ""}`;
       // Create a normalized search name (lowercase, no spaces)
       const searchName = fullName.toLowerCase().replace(/\s+/g, "");
-      allChords.push({ chord, fullName, searchName });
+      allChords.push({ chord: chord as A, fullName, searchName });
     }
   }
   
@@ -204,7 +204,7 @@ export default function Searchbar() {
         {searchChord && !hasResults && (
           <div className="absolute top-12 mx-auto mt-[22px] w-full rounded-[20px] border-none bg-[#2D2D2D] p-4 z-50">
             <span className="font-Lora text-gray-400">
-              No chords found for "{searchChord}"
+              No chords found for &quot;{searchChord}&quot;
             </span>
           </div>
         )}
