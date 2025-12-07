@@ -249,23 +249,29 @@ export default function BackingTrackGenerator() {
         <div className="mb-6">
           <label className="font-Lora text-gray-400 text-sm mb-3 block">Chord Progression</label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {PRESET_PROGRESSIONS.map((prog, idx) => (
-              <button
-                key={idx}
-                onClick={() => setSelectedPreset(idx)}
-                className={`p-3 rounded-lg text-left transition-all ${
-                  selectedPreset === idx
-                    ? "bg-[#1BD79E] text-black"
-                    : "bg-[#1a1a1a] text-white hover:bg-[#2a2a2a] border border-[#333]"
-                }`}
-              >
-                <div className="font-Lora text-sm font-semibold">{prog.name}</div>
-                <div className="text-xs opacity-70 mt-1">
-                  {prog.chords.slice(0, 4).join(" → ")}
-                  {prog.chords.length > 4 && "..."}
-                </div>
-              </button>
-            ))}
+            {PRESET_PROGRESSIONS.map((prog, idx) => {
+              // Transpose preview chords to selected key
+              const previewChords = prog.chords.slice(0, 4).map(chord => 
+                transposeChord(chord, "C", selectedKey)
+              );
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedPreset(idx)}
+                  className={`p-3 rounded-lg text-left transition-all ${
+                    selectedPreset === idx
+                      ? "bg-[#1BD79E] text-black"
+                      : "bg-[#1a1a1a] text-white hover:bg-[#2a2a2a] border border-[#333]"
+                  }`}
+                >
+                  <div className="font-Lora text-sm font-semibold">{prog.name}</div>
+                  <div className="text-xs opacity-70 mt-1">
+                    {previewChords.join(" → ")}
+                    {prog.chords.length > 4 && "..."}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
         
