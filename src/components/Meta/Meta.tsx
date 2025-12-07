@@ -84,7 +84,7 @@ const MetaTags: FC<{
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={fullDescription} />
       <meta property="og:image" content={imageUrl} />
-      <meta property="og:site_name" content="Diachords" />
+      <meta property="og:site_name" content="ChordsofGuitar" />
       
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />

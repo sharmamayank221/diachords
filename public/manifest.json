@@ -1,6 +1,6 @@
 {
-  "name": "Diachords - Guitar Chords & Scales",
-  "short_name": "Diachords",
+  "name": "ChordsofGuitar - Guitar Chords & Scales",
+  "short_name": "ChordsofGuitar",
   "description": "Learn guitar chords, scales, and jam with AI backing tracks. The ultimate guitar learning companion.",
   "start_url": "/",
   "display": "standalone",

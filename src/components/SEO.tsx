@@ -11,7 +11,7 @@ interface SEOProps {
   jsonLd?: object;
 }
 
-const SITE_NAME = "Diachords";
+const SITE_NAME = "ChordsofGuitar";
 const SITE_URL = "https://chordsofguitar.com";
 const DEFAULT_OG_IMAGE = "/icons/icon-512x512.png";
 
@@ -50,7 +50,7 @@ export default function SEO({
       <meta name="title" content={fullTitle} />
       <meta name="description" content={description} />
       <meta name="keywords" content={allKeywords} />
-      <meta name="author" content="Diachords" />
+      <meta name="author" content="ChordsofGuitar" />
       
       {/* Robots */}
       {noIndex ? (

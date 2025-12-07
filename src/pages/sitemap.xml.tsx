@@ -1,7 +1,7 @@
 import { GetServerSideProps } from "next";
 import getIDs from "@/helpers/getIDs";
 
-const SITE_URL = "https://diachords.vercel.app";
+const SITE_URL = "https://chordsofguitar.com";
 
 function generateSiteMap(chordIds: string[]) {
   const currentDate = new Date().toISOString().split("T")[0];
