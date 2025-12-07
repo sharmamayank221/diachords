@@ -11,6 +11,7 @@ function generateSiteMap(chordIds: string[]) {
     { url: "/", priority: "1.0", changefreq: "weekly" },
     { url: "/scales", priority: "0.9", changefreq: "weekly" },
     { url: "/tuner", priority: "0.9", changefreq: "monthly" },
+    { url: "/metronome", priority: "0.9", changefreq: "monthly" },
     { url: "/jam", priority: "0.9", changefreq: "weekly" },
   ];
 
