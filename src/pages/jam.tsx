@@ -1,6 +1,4 @@
 import Head from "next/head";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import BackingTrackGenerator from "@/components/BackingTrack/BackingTrackGenerator";
 
 export default function JamPage() {
@@ -15,11 +13,9 @@ export default function JamPage() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <Header />
       <main className="min-h-screen bg-gradient-to-b from-[#0a0a0a] to-[#111] py-8">
         <BackingTrackGenerator />
       </main>
-      <Footer />
     </>
   );
 }
