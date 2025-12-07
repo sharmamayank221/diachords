@@ -208,125 +208,92 @@ export default function Guitar({ data }: IGuitar) {
           })}
         </div>
 
-        {/* Acoustic Guitar Body */}
-        <div className="absolute -right-[100px] -top-[80px] z-[-1] hidden md:block">
+        {/* Acoustic Guitar Body - Simple elegant design */}
+        <div className="absolute -right-[200px] -top-[50px] z-[-1] hidden md:block">
           <svg 
-            width="550" 
-            height="500" 
-            viewBox="0 0 550 500" 
+            width="600" 
+            height="450" 
+            viewBox="0 0 600 450" 
             fill="none" 
             xmlns="http://www.w3.org/2000/svg"
           >
-            {/* Guitar Body Shape */}
+            {/* Main Body Shape - Figure 8 acoustic guitar */}
             <path 
-              d="M480 250C480 380 400 480 250 480C100 480 20 380 20 250C20 180 60 120 120 80C180 40 220 20 280 20C340 20 400 60 440 100C480 140 500 180 500 220C500 230 490 240 480 250Z" 
-              fill="#1a1a1a"
-              stroke="#333"
-              strokeWidth="3"
-            />
-            {/* Upper Bout */}
-            <ellipse 
-              cx="280" 
-              cy="120" 
-              rx="140" 
-              ry="80" 
-              fill="#1a1a1a"
-              stroke="#333"
+              d="M300 20 
+                 C420 20 500 80 500 160 
+                 C500 200 480 230 450 250 
+                 C480 270 500 300 500 350 
+                 C500 420 420 440 300 440 
+                 C180 440 100 420 100 350 
+                 C100 300 120 270 150 250 
+                 C120 230 100 200 100 160 
+                 C100 80 180 20 300 20 Z" 
+              fill="#181818"
+              stroke="#2a2a2a"
               strokeWidth="2"
             />
-            {/* Lower Bout */}
-            <ellipse 
-              cx="260" 
-              cy="320" 
-              rx="180" 
-              ry="130" 
-              fill="#1a1a1a"
-              stroke="#333"
-              strokeWidth="2"
-            />
-            {/* Waist (indent) */}
-            <ellipse 
-              cx="270" 
-              cy="220" 
-              rx="100" 
-              ry="50" 
-              fill="#000"
-            />
+            
             {/* Sound Hole */}
             <circle 
-              cx="270" 
-              cy="250" 
-              r="80" 
-              fill="#2D2D2D"
+              cx="300" 
+              cy="200" 
+              r="70" 
+              fill="#0a0a0a"
             />
-            {/* Sound Hole Rosette Ring */}
+            
+            {/* Rosette - outer ring */}
             <circle 
-              cx="270" 
-              cy="250" 
-              r="90" 
+              cx="300" 
+              cy="200" 
+              r="85" 
               fill="none"
-              stroke="#3a3a3a"
-              strokeWidth="8"
+              stroke="#333"
+              strokeWidth="6"
             />
+            
+            {/* Rosette - decorative ring */}
             <circle 
-              cx="270" 
-              cy="250" 
-              r="100" 
-              fill="none"
-              stroke="#2a2a2a"
-              strokeWidth="4"
-            />
-            {/* Decorative rosette pattern */}
-            <circle 
-              cx="270" 
-              cy="250" 
-              r="95" 
+              cx="300" 
+              cy="200" 
+              r="78" 
               fill="none"
               stroke="#1BD79E"
               strokeWidth="1"
-              strokeDasharray="4 4"
-              opacity="0.3"
+              opacity="0.4"
             />
+            
             {/* Bridge */}
             <rect 
-              x="200" 
-              y="350" 
+              x="230" 
+              y="320" 
               width="140" 
-              height="15" 
-              rx="3" 
-              fill="#222"
-              stroke="#444"
+              height="12" 
+              rx="2" 
+              fill="#1a1a1a"
+              stroke="#333"
               strokeWidth="1"
             />
+            
             {/* Saddle */}
             <rect 
-              x="210" 
-              y="352" 
+              x="240" 
+              y="318" 
               width="120" 
-              height="4" 
-              rx="2" 
-              fill="#ddd"
+              height="3" 
+              rx="1" 
+              fill="#ccc"
             />
-            {/* Bridge Pins */}
+            
+            {/* String anchors on bridge */}
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <circle 
                 key={i}
-                cx={225 + i * 20} 
-                cy="360" 
-                r="3" 
-                fill="#111"
-                stroke="#333"
-                strokeWidth="1"
+                cx={255 + i * 18} 
+                cy="328" 
+                r="2" 
+                fill="#222"
               />
             ))}
-            {/* Pickguard */}
-            <path 
-              d="M160 200C140 220 130 260 140 300C150 340 180 360 200 350C220 340 230 300 220 260C210 220 180 180 160 200Z" 
-              fill="#111"
-              stroke="#222"
-              strokeWidth="1"
-              opacity="0.8"
-            />
           </svg>
         </div>
       </div>
