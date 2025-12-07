@@ -26,144 +26,157 @@ export default function Header() {
   const isTunerPage = router.pathname === "/tuner";
   const isJamPage = router.pathname === "/jam";
 
+  const navLinks = [
+    { href: "/chords/cmajor", label: "Chords", isActive: isChordPage },
+    { href: "/scales", label: "Scales", isActive: isScalePage },
+    { href: "/tuner", label: "Tuner", isActive: isTunerPage },
+    { href: "/jam", label: "Jam", isActive: isJamPage },
+  ];
+
   return (
     <div className="bg-black">
-      <div className="">
+      {/* Desktop Header */}
+      <div className="hidden md:block">
         <div className="pb-5 flex justify-center items-center w-full pt-5">
           <div className="w-[10%] flex items-center justify-center pr-2">
             <Link href={"/chords/cmajor"}>
               <Image src="/Logo.svg" alt="logo" width={41} height={41} />
             </Link>
           </div>
-          <div className="w-[60%]">
+          <div className="w-[50%]">
             <Searchbar />
           </div>
-          <div className="flex items-center justify-center pr-2">
-            <Link
-              href={"/chords/cmajor"}
-              className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
-                isChordPage ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
-              }`}
-            >
-              Chords
-            </Link>
-          </div>
-          <div className="flex items-center justify-center pr-2">
-            <Link
-              href={"/scales"}
-              className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
-                isScalePage ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
-              }`}
-            >
-              Scales
-            </Link>
-          </div>
-          <div className="flex items-center justify-center pr-2">
-            <Link
-              href={"/tuner"}
-              className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
-                isTunerPage ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
-              }`}
-            >
-              Tuner
-            </Link>
-          </div>
-          <div className="flex items-center justify-center pr-2">
-            <Link
-              href={"/jam"}
-              className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
-                isJamPage ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
-              }`}
-            >
-              Jam
-            </Link>
-          </div>
-          <GuitarHintsModal isOpen={isOpen} onClose={closeModal}>
-            {" "}
-            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-              <Dialog.Title
-                as="h3"
-                className="text-2xl font-medium leading-6 text-gray-900 text-center font-Lora"
+          {navLinks.map((link) => (
+            <div key={link.href} className="flex items-center justify-center pr-2">
+              <Link
+                href={link.href}
+                className={`rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 ${
+                  link.isActive ? "text-[#1BD79E]" : "text-white hover:text-gray-300"
+                }`}
               >
-                Here is how you navigate the guitar
-              </Dialog.Title>
-              <div className="mt-2">
-                <span className="mr-4 font-Lora text-xl text-black  block border-b-2 border-[#E5EFE1] pb-2 mt-2">
-                  Fingers and Strings{" "}
-                </span>
-                <div className="flex items-center justify-start px-3 py-2">
-                  <div
-                    className={`mr-3 h-[27px] w-[27px] rounded-full bg-[#1BD79E] flex items-center justify-center font-Lora`}
-                  >
-                    1
-                  </div>
-                  <span className="font-Lora text-xl text-black">
-                    Pressed fingers
-                  </span>
-                </div>
-                <span className="font-Lora text-sm text-black">
-                  In this case you can use the index finger of your left hand to
-                  press the on the guitar
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-start px-3 py-2">
-                <Image
-                  src="/hand.png"
-                  alt="finger-numbers"
-                  width={135}
-                  height={180}
-                />
-                <span className="mr-4 font-Lora text-lg text-black">
-                  Left hand
-                </span>
-              </div>
-              <div className="mt-2">
-                <div className="flex items-center justify-start px-3 py-2">
-                  <div
-                    className={`mr-3 h-[27px] w-[27px] rounded-full bg-[#1BD79E] flex items-center justify-center font-Lora`}
-                  >
-                    0
-                  </div>
-                  <span className="font-Lora text-xl text-black">
-                    Open String
-                  </span>
-                </div>
-                <span className="font-Lora text-sm text-black">
-                  In this case 0 is open string
-                </span>
-              </div>
-              <span className="mr-4 font-Lora text-xl text-black  block border-b-2 border-[#E5EFE1] pb-2 mt-2">
-                Tuning{" "}
-              </span>
-              <span className="mr-4 font-Lora text-lg text-black w-[25%]">
-                Standard tuning: E2,A2,D3,G3,B3,E4
-              </span>
-              <span className="mr-4 font-Lora text-xl text-black  block border-b-2 border-[#E5EFE1] pb-2 mt-2">
-                String Colors{" "}
-              </span>
-              <span className="mr-4 font-Lora text-lg text-black ">
-                <div>
-                  <span className="text-[#38DBE5]">6th </span>
-                  <span className="text-[#C65151]">5th </span>
-                  <span className="text-[#C2D934]">4th </span>
-                  <span className="text-[#F642EF]">3rd </span>
-                  <span className="text-[#EA9E2D]">2nd </span>
-                  <span className="text-[#9c70e7]">1st </span>
-                </div>
-              </span>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  className="inline-flex justify-center rounded-md border border-transparent bg-[#1bd79f85] px-4 py-2 text-sm font-medium text-black hover:bg-[#1BD79E] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 font-Lora"
-                  onClick={closeModal}
-                >
-                  Got it, thanks!
-                </button>
-              </div>
-            </Dialog.Panel>
-          </GuitarHintsModal>
+                {link.label}
+              </Link>
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* Mobile Header */}
+      <div className="md:hidden">
+        {/* Top row: Logo and Nav Links */}
+        <div className="flex items-center justify-between px-4 py-3">
+          <Link href={"/chords/cmajor"}>
+            <Image src="/Logo.svg" alt="logo" width={32} height={32} />
+          </Link>
+          
+          {/* Nav Links - Compact on mobile */}
+          <div className="flex items-center gap-2">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`font-Lora text-xs px-2 py-1 rounded whitespace-nowrap ${
+                  link.isActive 
+                    ? "text-[#1BD79E] bg-[#1BD79E]/10" 
+                    : "text-gray-300"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+        
+        {/* Search bar - Full width below */}
+        <div className="px-4 pb-3">
+          <Searchbar />
+        </div>
+      </div>
+
+      <GuitarHintsModal isOpen={isOpen} onClose={closeModal}>
+        {" "}
+        <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+          <Dialog.Title
+            as="h3"
+            className="text-2xl font-medium leading-6 text-gray-900 text-center font-Lora"
+          >
+            Here is how you navigate the guitar
+          </Dialog.Title>
+          <div className="mt-2">
+            <span className="mr-4 font-Lora text-xl text-black  block border-b-2 border-[#E5EFE1] pb-2 mt-2">
+              Fingers and Strings{" "}
+            </span>
+            <div className="flex items-center justify-start px-3 py-2">
+              <div
+                className={`mr-3 h-[27px] w-[27px] rounded-full bg-[#1BD79E] flex items-center justify-center font-Lora`}
+              >
+                1
+              </div>
+              <span className="font-Lora text-xl text-black">
+                Pressed fingers
+              </span>
+            </div>
+            <span className="font-Lora text-sm text-black">
+              In this case you can use the index finger of your left hand to
+              press the on the guitar
+            </span>
+          </div>
+          <div className="mt-1 flex items-center justify-start px-3 py-2">
+            <Image
+              src="/hand.png"
+              alt="finger-numbers"
+              width={135}
+              height={180}
+            />
+            <span className="mr-4 font-Lora text-lg text-black">
+              Left hand
+            </span>
+          </div>
+          <div className="mt-2">
+            <div className="flex items-center justify-start px-3 py-2">
+              <div
+                className={`mr-3 h-[27px] w-[27px] rounded-full bg-[#1BD79E] flex items-center justify-center font-Lora`}
+              >
+                0
+              </div>
+              <span className="font-Lora text-xl text-black">
+                Open String
+              </span>
+            </div>
+            <span className="font-Lora text-sm text-black">
+              In this case 0 is open string
+            </span>
+          </div>
+          <span className="mr-4 font-Lora text-xl text-black  block border-b-2 border-[#E5EFE1] pb-2 mt-2">
+            Tuning{" "}
+          </span>
+          <span className="mr-4 font-Lora text-lg text-black w-[25%]">
+            Standard tuning: E2,A2,D3,G3,B3,E4
+          </span>
+          <span className="mr-4 font-Lora text-xl text-black  block border-b-2 border-[#E5EFE1] pb-2 mt-2">
+            String Colors{" "}
+          </span>
+          <span className="mr-4 font-Lora text-lg text-black ">
+            <div>
+              <span className="text-[#38DBE5]">6th </span>
+              <span className="text-[#C65151]">5th </span>
+              <span className="text-[#C2D934]">4th </span>
+              <span className="text-[#F642EF]">3rd </span>
+              <span className="text-[#EA9E2D]">2nd </span>
+              <span className="text-[#9c70e7]">1st </span>
+            </div>
+          </span>
+          <div className="mt-4">
+            <button
+              type="button"
+              className="inline-flex justify-center rounded-md border border-transparent bg-[#1bd79f85] px-4 py-2 text-sm font-medium text-black hover:bg-[#1BD79E] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 font-Lora"
+              onClick={closeModal}
+            >
+              Got it, thanks!
+            </button>
+          </div>
+        </Dialog.Panel>
+      </GuitarHintsModal>
     </div>
   );
 }
