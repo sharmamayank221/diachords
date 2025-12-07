@@ -28,7 +28,7 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       <PostHogProvider client={posthog}>
     <Provider store={store}>
       <Head>
-        <title>Diachords - Guitar Chords & Scales</title>
+        <title>ChordsofGuitar.com - Guitar Chords & Scales</title>
         <meta name="description" content="Learn guitar chords, scales, and jam with AI backing tracks. The ultimate guitar learning companion." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         
@@ -38,14 +38,14 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Diachords" />
+        <meta name="apple-mobile-web-app-title" content="ChordsofGuitar.com" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
         
         {/* Open Graph */}
-        <meta property="og:title" content="Diachords - Guitar Chords & Scales" />
+        <meta property="og:title" content="ChordsofGuitar.com - Guitar Chords & Scales" />
         <meta property="og:description" content="Learn guitar chords, scales, and jam with AI backing tracks." />
-        <meta property="og:site_name" content="Diachords" />
-        <meta property="og:url" content="https://diachords.vercel.app" />
+        <meta property="og:site_name" content="ChordsofGuitar.com" />
+        <meta property="og:url" content="https://chordsofguitar.com" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="/icons/icon-512x512.png" />
         
