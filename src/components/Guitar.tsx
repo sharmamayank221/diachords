@@ -208,92 +208,159 @@ export default function Guitar({ data }: IGuitar) {
           })}
         </div>
 
-        {/* Acoustic Guitar Body - Simple elegant design */}
-        <div className="absolute -right-[200px] -top-[50px] z-[-1] hidden md:block">
+        {/* Acoustic Guitar Body - Horizontal orientation matching fretboard */}
+        <div className="absolute -right-[280px] -top-[100px] z-[-1] hidden md:block">
           <svg 
-            width="600" 
-            height="450" 
-            viewBox="0 0 600 450" 
+            width="700" 
+            height="550" 
+            viewBox="0 0 700 550" 
             fill="none" 
             xmlns="http://www.w3.org/2000/svg"
           >
-            {/* Main Body Shape - Figure 8 acoustic guitar */}
+            {/* Main Body Shape - Acoustic guitar body (horizontal, neck enters from left) */}
+            {/* Upper bout */}
+            <ellipse 
+              cx="400" 
+              cy="150" 
+              rx="200" 
+              ry="120" 
+              fill="#1a1a1a"
+            />
+            {/* Lower bout (larger) */}
+            <ellipse 
+              cx="380" 
+              cy="400" 
+              rx="250" 
+              ry="140" 
+              fill="#1a1a1a"
+            />
+            {/* Waist connector */}
+            <rect
+              x="180"
+              y="150"
+              width="250"
+              height="250"
+              fill="#1a1a1a"
+            />
+            {/* Cutaway curve (left side where neck meets body) */}
             <path 
-              d="M300 20 
-                 C420 20 500 80 500 160 
-                 C500 200 480 230 450 250 
-                 C480 270 500 300 500 350 
-                 C500 420 420 440 300 440 
-                 C180 440 100 420 100 350 
-                 C100 300 120 270 150 250 
-                 C120 230 100 200 100 160 
-                 C100 80 180 20 300 20 Z" 
-              fill="#181818"
-              stroke="#2a2a2a"
+              d="M180 150 
+                 Q120 200 140 275 
+                 Q160 350 180 400"
+              fill="#1a1a1a"
+              stroke="#1a1a1a"
+              strokeWidth="40"
+            />
+            {/* Waist indents */}
+            <ellipse 
+              cx="130" 
+              cy="220" 
+              rx="60" 
+              ry="40" 
+              fill="#000"
+            />
+            <ellipse 
+              cx="630" 
+              cy="280" 
+              rx="50" 
+              ry="60" 
+              fill="#000"
+            />
+            
+            {/* Body outline/edge */}
+            <path 
+              d="M180 50
+                 C320 30 550 50 580 150
+                 C620 220 620 200 600 280
+                 C620 360 600 480 450 520
+                 C300 550 180 530 130 450
+                 C80 370 90 320 120 280
+                 C90 220 100 140 180 50Z"
+              fill="none"
+              stroke="#333"
               strokeWidth="2"
             />
             
             {/* Sound Hole */}
             <circle 
-              cx="300" 
-              cy="200" 
-              r="70" 
+              cx="350" 
+              cy="230" 
+              r="75" 
               fill="#0a0a0a"
             />
             
-            {/* Rosette - outer ring */}
+            {/* Rosette rings */}
             <circle 
-              cx="300" 
-              cy="200" 
-              r="85" 
+              cx="350" 
+              cy="230" 
+              r="90" 
               fill="none"
-              stroke="#333"
-              strokeWidth="6"
+              stroke="#2a2a2a"
+              strokeWidth="8"
             />
-            
-            {/* Rosette - decorative ring */}
             <circle 
-              cx="300" 
-              cy="200" 
-              r="78" 
+              cx="350" 
+              cy="230" 
+              r="82" 
               fill="none"
               stroke="#1BD79E"
-              strokeWidth="1"
-              opacity="0.4"
+              strokeWidth="1.5"
+              opacity="0.5"
+            />
+            <circle 
+              cx="350" 
+              cy="230" 
+              r="100" 
+              fill="none"
+              stroke="#222"
+              strokeWidth="3"
             />
             
             {/* Bridge */}
             <rect 
-              x="230" 
-              y="320" 
-              width="140" 
-              height="12" 
-              rx="2" 
-              fill="#1a1a1a"
+              x="280" 
+              y="380" 
+              width="150" 
+              height="16" 
+              rx="3" 
+              fill="#111"
               stroke="#333"
               strokeWidth="1"
             />
             
             {/* Saddle */}
             <rect 
-              x="240" 
-              y="318" 
-              width="120" 
-              height="3" 
-              rx="1" 
-              fill="#ccc"
+              x="290" 
+              y="378" 
+              width="130" 
+              height="4" 
+              rx="2" 
+              fill="#ddd"
             />
             
-            {/* String anchors on bridge */}
+            {/* Bridge pins */}
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <circle 
                 key={i}
-                cx={255 + i * 18} 
-                cy="328" 
-                r="2" 
-                fill="#222"
+                cx={300 + i * 20} 
+                cy="392" 
+                r="3" 
+                fill="#0a0a0a"
+                stroke="#333"
+                strokeWidth="1"
               />
             ))}
+            
+            {/* Pickguard */}
+            <path 
+              d="M230 180 
+                 C200 200 190 260 200 300 
+                 C210 340 250 360 280 350 
+                 C300 340 310 300 300 260 
+                 C290 220 260 160 230 180Z"
+              fill="#111"
+              opacity="0.6"
+            />
           </svg>
         </div>
       </div>
