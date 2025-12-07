@@ -96,12 +96,17 @@ export default function BackingTrackGenerator() {
   }, []);
   
   const handlePlay = async () => {
-    if (isPlaying) {
+    if (isPlaying && backingTrackRef.current) {
       // Stop
-      backingTrackRef.current?.stop();
+      try {
+        backingTrackRef.current.stop();
+      } catch (e) {
+        console.warn("Stop error handled:", e);
+      }
+      backingTrackRef.current = null;
       setIsPlaying(false);
       setCurrentBeat(0);
-    } else {
+    } else if (!isPlaying) {
       // Start
       const chords = getTransposedProgression();
       const track = await createBackingTrack({

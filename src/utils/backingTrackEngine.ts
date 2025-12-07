@@ -327,16 +327,16 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
     
     stop: () => {
       isPlaying = false;
-      Tone.Transport.stop();
-      // Reset position safely
       try {
-        Tone.Transport.position = "0:0:0";
+        Tone.Transport.stop();
+        Tone.Transport.cancel(); // Cancel all scheduled events
+        drumSequence?.stop(0);
+        bassSequence?.stop(0);
+        rhythmSequence?.stop(0);
       } catch (e) {
-        // Ignore position reset errors
+        // Ignore stop errors - can happen with timing edge cases
+        console.warn("Stop error:", e);
       }
-      drumSequence?.stop();
-      bassSequence?.stop();
-      rhythmSequence?.stop();
     },
     
     setBpm: (bpm: number) => {
@@ -361,10 +361,15 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
 
 // Cleanup function
 export function disposeBackingTrack() {
-  Tone.Transport.stop();
-  drumSequence?.dispose();
-  bassSequence?.dispose();
-  rhythmSequence?.dispose();
+  try {
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    drumSequence?.dispose();
+    bassSequence?.dispose();
+    rhythmSequence?.dispose();
+  } catch (e) {
+    // Ignore cleanup errors
+  }
   drumSequence = null;
   bassSequence = null;
   rhythmSequence = null;
