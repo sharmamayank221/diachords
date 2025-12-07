@@ -30,8 +30,6 @@ export default function BackingTrackGenerator() {
   const [bpm, setBpm] = useState(100);
   const [isPlaying, setIsPlaying] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState(0);
-  const [customChords, setCustomChords] = useState<string[]>(["C", "G", "Am", "F"]);
-  const [useCustom, setUseCustom] = useState(false);
   
   // Volume states (0-100)
   const [drumVolume, setDrumVolume] = useState(80);
@@ -74,7 +72,7 @@ export default function BackingTrackGenerator() {
   };
   
   const getTransposedProgression = (): string[] => {
-    const baseChords = useCustom ? customChords : PRESET_PROGRESSIONS[selectedPreset].chords;
+    const baseChords = PRESET_PROGRESSIONS[selectedPreset].chords;
     return baseChords.map(chord => transposeChord(chord, "C", selectedKey));
   };
   
@@ -249,77 +247,26 @@ export default function BackingTrackGenerator() {
         
         {/* Chord Progression */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <label className="font-Lora text-gray-400 text-sm">Chord Progression</label>
-            <button
-              onClick={() => setUseCustom(!useCustom)}
-              className={`px-3 py-1 rounded-full font-Lora text-xs ${
-                useCustom
-                  ? "bg-[#1BD79E] text-black"
-                  : "bg-[#2a2a2a] text-gray-400 hover:text-white"
-              }`}
-            >
-              {useCustom ? "Using Custom" : "Use Custom"}
-            </button>
+          <label className="font-Lora text-gray-400 text-sm mb-3 block">Chord Progression</label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {PRESET_PROGRESSIONS.map((prog, idx) => (
+              <button
+                key={idx}
+                onClick={() => setSelectedPreset(idx)}
+                className={`p-3 rounded-lg text-left transition-all ${
+                  selectedPreset === idx
+                    ? "bg-[#1BD79E] text-black"
+                    : "bg-[#1a1a1a] text-white hover:bg-[#2a2a2a] border border-[#333]"
+                }`}
+              >
+                <div className="font-Lora text-sm font-semibold">{prog.name}</div>
+                <div className="text-xs opacity-70 mt-1">
+                  {prog.chords.slice(0, 4).join(" → ")}
+                  {prog.chords.length > 4 && "..."}
+                </div>
+              </button>
+            ))}
           </div>
-          
-          {!useCustom ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {PRESET_PROGRESSIONS.map((prog, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedPreset(idx)}
-                  className={`p-3 rounded-lg text-left transition-all ${
-                    selectedPreset === idx
-                      ? "bg-[#1BD79E] text-black"
-                      : "bg-[#1a1a1a] text-white hover:bg-[#2a2a2a] border border-[#333]"
-                  }`}
-                >
-                  <div className="font-Lora text-sm font-semibold">{prog.name}</div>
-                  <div className="text-xs opacity-70 mt-1">
-                    {prog.chords.slice(0, 4).join(" → ")}
-                    {prog.chords.length > 4 && "..."}
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-[#1a1a1a] rounded-lg p-4">
-              <div className="flex flex-wrap gap-2 mb-3">
-                {customChords.map((chord, idx) => (
-                  <div key={idx} className="flex items-center gap-1">
-                    <input
-                      type="text"
-                      value={chord}
-                      onChange={(e) => {
-                        const newChords = [...customChords];
-                        newChords[idx] = e.target.value;
-                        setCustomChords(newChords);
-                      }}
-                      className="w-16 bg-[#2a2a2a] text-white border border-[#444] rounded px-2 py-1 font-Lora text-center"
-                    />
-                    {customChords.length > 2 && (
-                      <button
-                        onClick={() => setCustomChords(customChords.filter((_, i) => i !== idx))}
-                        className="text-red-500 hover:text-red-400"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  onClick={() => setCustomChords([...customChords, "C"])}
-                  className="px-3 py-1 bg-[#2a2a2a] text-[#1BD79E] rounded hover:bg-[#333]"
-                >
-                  + Add
-                </button>
-              </div>
-              <p className="text-gray-500 text-xs font-Lora">
-                Enter chords like: C, Am, F, G, Dm7, etc.
-              </p>
-            </div>
-          )}
         </div>
         
         {/* Current Progression Display */}
