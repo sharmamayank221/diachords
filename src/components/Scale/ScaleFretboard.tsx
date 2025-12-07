@@ -11,7 +11,7 @@ import {
   ChordProgression,
 } from "@/data/scales";
 import Link from "next/link";
-import { initAudio, playNote, playChord } from "@/utils/audioUtils";
+import { initAudio, playNote, playChord, playProgressionWithDrums, ProgressionChord } from "@/utils/audioUtils";
 
 interface ScaleNote {
   string: number;
@@ -36,6 +36,9 @@ export default function ScaleFretboard() {
   const [selectedProgression, setSelectedProgression] = useState<number>(0);
   const [isPlayingProgression, setIsPlayingProgression] = useState<boolean>(false);
   const [currentChordIndex, setCurrentChordIndex] = useState<number | null>(null);
+  const [currentBeat, setCurrentBeat] = useState<number>(0);
+  const [bpm, setBpm] = useState<number>(90);
+  const [stopProgression, setStopProgression] = useState<(() => void) | null>(null);
 
   const FRETS = Array.from({ length: 13 }, (_, i) => i); // 0-12 frets
   const scale = SCALES[selectedScale];
@@ -111,26 +114,58 @@ export default function ScaleFretboard() {
     setIsPlaying(false);
   };
 
-  // Play the chord progression
+  // Play the chord progression with drums in 4/4 time
   const playProgression = async () => {
     if (isPlayingProgression || progressionChords.length === 0) return;
-    setIsPlayingProgression(true);
-
-    for (let i = 0; i < progressionChords.length; i++) {
-      const chordInfo = progressionChords[i];
-      setCurrentChordIndex(i);
-      
-      // Play the chord
-      if (chordInfo.midiNotes && chordInfo.midiNotes.length > 0) {
-        playChord(chordInfo.midiNotes);
-      }
-      
-      // Wait before playing next chord (800ms per chord)
-      await new Promise((resolve) => setTimeout(resolve, 800));
+    
+    // If already playing, stop it
+    if (stopProgression) {
+      stopProgression();
+      setStopProgression(null);
+      setIsPlayingProgression(false);
+      setCurrentChordIndex(null);
+      setCurrentBeat(0);
+      return;
     }
+    
+    setIsPlayingProgression(true);
+    setCurrentBeat(0);
 
-    setCurrentChordIndex(null);
-    setIsPlayingProgression(false);
+    // Convert to the format expected by playProgressionWithDrums
+    const chordsForPlayer: ProgressionChord[] = progressionChords.map(c => ({
+      midiNotes: c.midiNotes,
+      name: c.chord
+    }));
+
+    const stop = await playProgressionWithDrums(
+      chordsForPlayer,
+      bpm,
+      // On beat callback - update UI
+      (chordIndex, beat) => {
+        setCurrentChordIndex(chordIndex);
+        setCurrentBeat(beat);
+      },
+      // On complete callback
+      () => {
+        setIsPlayingProgression(false);
+        setCurrentChordIndex(null);
+        setCurrentBeat(0);
+        setStopProgression(null);
+      }
+    );
+
+    setStopProgression(() => stop);
+  };
+
+  // Stop progression when component unmounts or scale changes
+  const handleStopProgression = () => {
+    if (stopProgression) {
+      stopProgression();
+      setStopProgression(null);
+      setIsPlayingProgression(false);
+      setCurrentChordIndex(null);
+      setCurrentBeat(0);
+    }
   };
 
   // Get note at specific position
@@ -337,46 +372,74 @@ export default function ScaleFretboard() {
                 {/* Progression Display */}
                 {currentProgression && (
                   <div>
-                    {/* Play Button and Pattern */}
-                    <div className="flex items-center gap-3 mb-3">
+                    {/* Controls Row - Play, Stop, BPM */}
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
                       <button
                         onClick={playProgression}
-                        disabled={isPlayingProgression}
                         className={`px-3 py-1.5 rounded-full font-Lora font-semibold text-xs transition-all flex items-center gap-2 ${
                           isPlayingProgression
-                            ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                            ? "bg-red-500 text-white hover:bg-red-600"
                             : "bg-[#38DBE5] text-black hover:bg-[#2bc8d5] hover:scale-105"
                         }`}
                       >
                         {isPlayingProgression ? (
-                          <>
-                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
-                            Playing...
-                          </>
+                          <>■ Stop</>
                         ) : (
                           <>▶ Play</>
                         )}
                       </button>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-gray-500 font-Lora text-xs">Pattern:</span>
-                        <div className="flex gap-1">
-                          {currentProgression.numerals.map((numeral, idx) => (
-                            <span key={idx} className="flex items-center">
-                              <span 
-                                className={`font-Lora text-sm transition-all duration-200 ${
-                                  currentChordIndex === idx 
-                                    ? "text-[#1BD79E] scale-110 font-bold" 
-                                    : "text-[#38DBE5]"
-                                }`}
-                              >
-                                {numeral}
-                              </span>
-                              {idx < currentProgression.numerals.length - 1 && (
-                                <span className="text-gray-600 mx-1">→</span>
-                              )}
-                            </span>
+                      
+                      {/* BPM Control */}
+                      <div className="flex items-center gap-1 bg-[#2a2a2a] rounded-full px-2 py-1">
+                        <span className="text-gray-500 font-Lora text-xs">BPM:</span>
+                        <input
+                          type="number"
+                          min="60"
+                          max="140"
+                          value={bpm}
+                          onChange={(e) => setBpm(Math.max(60, Math.min(140, parseInt(e.target.value) || 90)))}
+                          disabled={isPlayingProgression}
+                          className="w-10 bg-transparent text-white font-Lora text-xs text-center focus:outline-none disabled:opacity-50"
+                        />
+                      </div>
+
+                      {/* Beat Indicator - 4 dots for 4/4 time */}
+                      {isPlayingProgression && (
+                        <div className="flex items-center gap-1 ml-2">
+                          {[0, 1, 2, 3].map((beat) => (
+                            <div
+                              key={beat}
+                              className={`w-2 h-2 rounded-full transition-all duration-100 ${
+                                currentBeat === beat
+                                  ? "bg-[#1BD79E] scale-125"
+                                  : "bg-gray-600"
+                              }`}
+                            />
                           ))}
                         </div>
+                      )}
+                    </div>
+
+                    {/* Pattern Display */}
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-gray-500 font-Lora text-xs">Pattern:</span>
+                      <div className="flex gap-1">
+                        {currentProgression.numerals.map((numeral, idx) => (
+                          <span key={idx} className="flex items-center">
+                            <span 
+                              className={`font-Lora text-sm transition-all duration-200 px-1.5 py-0.5 rounded ${
+                                currentChordIndex === idx 
+                                  ? "bg-[#1BD79E] text-black scale-110 font-bold" 
+                                  : "text-[#38DBE5]"
+                              }`}
+                            >
+                              {numeral}
+                            </span>
+                            {idx < currentProgression.numerals.length - 1 && (
+                              <span className="text-gray-600 mx-1">→</span>
+                            )}
+                          </span>
+                        ))}
                       </div>
                     </div>
 
