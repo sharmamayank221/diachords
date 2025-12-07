@@ -38,6 +38,7 @@ export default function ScaleFretboard() {
   const [currentChordIndex, setCurrentChordIndex] = useState<number | null>(null);
   const [currentBeat, setCurrentBeat] = useState<number>(0);
   const [bpm, setBpm] = useState<number>(90);
+  const [loopCount, setLoopCount] = useState<number>(1);
   const [stopProgression, setStopProgression] = useState<(() => void) | null>(null);
 
   const FRETS = Array.from({ length: 13 }, (_, i) => i); // 0-12 frets
@@ -116,8 +117,6 @@ export default function ScaleFretboard() {
 
   // Play the chord progression with drums in 4/4 time
   const playProgression = async () => {
-    if (isPlayingProgression || progressionChords.length === 0) return;
-    
     // If already playing, stop it
     if (stopProgression) {
       stopProgression();
@@ -125,11 +124,15 @@ export default function ScaleFretboard() {
       setIsPlayingProgression(false);
       setCurrentChordIndex(null);
       setCurrentBeat(0);
+      setLoopCount(1);
       return;
     }
     
+    if (progressionChords.length === 0) return;
+    
     setIsPlayingProgression(true);
     setCurrentBeat(0);
+    setLoopCount(1);
 
     // Convert to the format expected by playProgressionWithDrums
     const chordsForPlayer: ProgressionChord[] = progressionChords.map(c => ({
@@ -141,15 +144,17 @@ export default function ScaleFretboard() {
       chordsForPlayer,
       bpm,
       // On beat callback - update UI
-      (chordIndex, beat) => {
+      (chordIndex, beat, loop) => {
         setCurrentChordIndex(chordIndex);
         setCurrentBeat(beat);
+        setLoopCount(loop);
       },
       // On complete callback
       () => {
         setIsPlayingProgression(false);
         setCurrentChordIndex(null);
         setCurrentBeat(0);
+        setLoopCount(1);
         setStopProgression(null);
       }
     );
@@ -165,6 +170,7 @@ export default function ScaleFretboard() {
       setIsPlayingProgression(false);
       setCurrentChordIndex(null);
       setCurrentBeat(0);
+      setLoopCount(1);
     }
   };
 
@@ -403,19 +409,24 @@ export default function ScaleFretboard() {
                         />
                       </div>
 
-                      {/* Beat Indicator - 4 dots for 4/4 time */}
+                      {/* Beat Indicator - 4 dots for 4/4 time + Loop Counter */}
                       {isPlayingProgression && (
-                        <div className="flex items-center gap-1 ml-2">
-                          {[0, 1, 2, 3].map((beat) => (
-                            <div
-                              key={beat}
-                              className={`w-2 h-2 rounded-full transition-all duration-100 ${
-                                currentBeat === beat
-                                  ? "bg-[#1BD79E] scale-125"
-                                  : "bg-gray-600"
-                              }`}
-                            />
-                          ))}
+                        <div className="flex items-center gap-2 ml-2">
+                          <div className="flex items-center gap-1">
+                            {[0, 1, 2, 3].map((beat) => (
+                              <div
+                                key={beat}
+                                className={`w-2 h-2 rounded-full transition-all duration-100 ${
+                                  currentBeat === beat
+                                    ? "bg-[#1BD79E] scale-125"
+                                    : "bg-gray-600"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-gray-500 font-Lora text-xs">
+                            Loop {loopCount}
+                          </span>
                         </div>
                       )}
                     </div>

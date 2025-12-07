@@ -149,7 +149,7 @@ export interface ProgressionChord {
 export async function playProgressionWithDrums(
   chords: ProgressionChord[],
   bpm: number = 90,
-  onBeatCallback?: (chordIndex: number, beat: number) => void,
+  onBeatCallback?: (chordIndex: number, beat: number, loopCount: number) => void,
   onComplete?: () => void
 ): Promise<() => void> {
   await initAudio();
@@ -158,25 +158,33 @@ export async function playProgressionWithDrums(
   Tone.Transport.bpm.value = bpm;
   
   const beatsPerChord = 4; // 4/4 time - each chord gets 4 beats (1 measure)
+  const totalBeatsInProgression = chords.length * beatsPerChord;
   let currentChordIndex = 0;
   let currentBeat = 0;
+  let loopCount = 1;
   let isPlaying = true;
   
-  // Schedule the drum pattern and chords
+  // Schedule the drum pattern and chords - loops continuously until stopped
   const loopId = Tone.Transport.scheduleRepeat((time) => {
     if (!isPlaying) return;
     
-    const beatInMeasure = currentBeat % beatsPerChord;
-    const chordIndex = Math.floor(currentBeat / beatsPerChord) % chords.length;
+    const beatInProgression = currentBeat % totalBeatsInProgression;
+    const beatInMeasure = beatInProgression % beatsPerChord;
+    const chordIndex = Math.floor(beatInProgression / beatsPerChord);
+    
+    // Track loop count - increment when we start a new loop
+    if (beatInProgression === 0 && currentBeat > 0) {
+      loopCount++;
+    }
     
     // Update chord index when changing chords
-    if (beatInMeasure === 0 && chordIndex !== currentChordIndex) {
+    if (chordIndex !== currentChordIndex) {
       currentChordIndex = chordIndex;
     }
     
     // Callback for UI updates
     if (onBeatCallback) {
-      onBeatCallback(currentChordIndex, beatInMeasure);
+      onBeatCallback(currentChordIndex, beatInMeasure, loopCount);
     }
     
     // Play chord on beat 1 of each measure
@@ -191,11 +199,6 @@ export async function playProgressionWithDrums(
     }
     
     // Drum pattern: Kick on 1 and 3, Snare on 2 and 4, Hi-hat on all beats
-    // Beat 1: Kick + Hi-hat
-    // Beat 2: Snare + Hi-hat
-    // Beat 3: Kick + Hi-hat
-    // Beat 4: Snare + Hi-hat
-    
     if (hihatSynth) {
       hihatSynth.triggerAttackRelease("C6", "32n", time);
     }
@@ -215,16 +218,7 @@ export async function playProgressionWithDrums(
     }
     
     currentBeat++;
-    
-    // Check if we've completed all chords
-    if (currentBeat >= chords.length * beatsPerChord) {
-      // Stop after one full progression
-      Tone.Transport.stop();
-      isPlaying = false;
-      if (onComplete) {
-        onComplete();
-      }
-    }
+    // Loop continues indefinitely until stopped
   }, "4n"); // Quarter note interval for 4/4 time
   
   Tone.Transport.start();
@@ -235,5 +229,8 @@ export async function playProgressionWithDrums(
     Tone.Transport.stop();
     Tone.Transport.clear(loopId);
     Tone.Transport.position = 0;
+    if (onComplete) {
+      onComplete();
+    }
   };
 }
