@@ -31,7 +31,7 @@ function useGetStringNumAndFretNum(
                 fingerNumber: finger[idx],
                 baseFret: baseFret,
               },
-            ] || []
+            ]
         );
       });
     }

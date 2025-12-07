@@ -43,3 +43,65 @@ html {
     background-color: #1BD79E;
     border-radius: 10px;
 }
+
+/* Tuner Animations */
+@keyframes tuner-pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.5);
+        opacity: 0.5;
+    }
+}
+
+@keyframes tuner-ring {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        transform: scale(1.4);
+        opacity: 0;
+    }
+}
+
+.tuner-listening-animation {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tuner-listening-animation::before,
+.tuner-listening-animation::after {
+    content: '';
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border: 2px solid #1BD79E;
+    border-radius: 50%;
+    animation: tuner-ring 1.5s ease-out infinite;
+}
+
+.tuner-listening-animation::after {
+    animation-delay: 0.5s;
+}
+
+/* Tuner gauge animation */
+@keyframes gauge-glow {
+    0%, 100% {
+        filter: drop-shadow(0 0 5px currentColor);
+    }
+    50% {
+        filter: drop-shadow(0 0 15px currentColor);
+    }
+}
+
+.tuner-gauge-active {
+    animation: gauge-glow 1s ease-in-out infinite;
+}
