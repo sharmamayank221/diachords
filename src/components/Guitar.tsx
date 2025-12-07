@@ -208,6 +208,7 @@ export default function Guitar({ data }: IGuitar) {
           })}
         </div>
 
+        {/* Sound Hole */}
         <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[50px] -top-[20px] z-[-1] hidden md:block"></div>
       </div>
 
