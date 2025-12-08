@@ -28,23 +28,38 @@ const CHORD_TYPES = [
   { name: "Dominant 7th", intervals: [0, 4, 7, 10], symbol: "7" },
 ];
 
+// Scale types
+const SCALE_TYPES = [
+  { name: "Major", intervals: [0, 2, 4, 5, 7, 9, 11, 12], short: "Maj", mood: "Happy, bright" },
+  { name: "Natural Minor", intervals: [0, 2, 3, 5, 7, 8, 10, 12], short: "Min", mood: "Sad, dark" },
+  { name: "Minor Pentatonic", intervals: [0, 3, 5, 7, 10, 12], short: "m Pent", mood: "Bluesy, rock" },
+  { name: "Major Pentatonic", intervals: [0, 2, 4, 7, 9, 12], short: "M Pent", mood: "Country, folk" },
+  { name: "Blues", intervals: [0, 3, 5, 6, 7, 10, 12], short: "Blues", mood: "Soulful, gritty" },
+  { name: "Dorian", intervals: [0, 2, 3, 5, 7, 9, 10, 12], short: "Dor", mood: "Jazzy minor" },
+  { name: "Mixolydian", intervals: [0, 2, 4, 5, 7, 9, 10, 12], short: "Mix", mood: "Bluesy major" },
+  { name: "Harmonic Minor", intervals: [0, 2, 3, 5, 7, 8, 11, 12], short: "H Min", mood: "Exotic, tense" },
+];
+
 // Difficulty levels
 const DIFFICULTY_LEVELS = {
   beginner: {
     intervals: [2, 4, 5, 7], // M2, M3, P4, P5
     chords: [0, 1], // Major, Minor
+    scales: [0, 1], // Major, Natural Minor
   },
   intermediate: {
     intervals: [1, 2, 3, 4, 5, 7, 12], // m2, M2, m3, M3, P4, P5, P8
     chords: [0, 1, 2, 3], // Major, Minor, Dim, Aug
+    scales: [0, 1, 2, 3, 4], // Major, Minor, Pentatonics, Blues
   },
   advanced: {
     intervals: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], // All
     chords: [0, 1, 2, 3, 4, 5, 6], // All
+    scales: [0, 1, 2, 3, 4, 5, 6, 7], // All
   },
 };
 
-type Mode = "intervals" | "chords";
+type Mode = "intervals" | "chords" | "scales";
 type Difficulty = "beginner" | "intermediate" | "advanced";
 
 export default function EarTraining() {
@@ -101,6 +116,12 @@ export default function EarTraining() {
     return level.chords.map((idx) => CHORD_TYPES[idx]);
   }, [difficulty]);
 
+  // Get available scale options
+  const getScaleOptions = useCallback(() => {
+    const level = DIFFICULTY_LEVELS[difficulty];
+    return level.scales.map((idx) => SCALE_TYPES[idx]);
+  }, [difficulty]);
+
   // Generate new question
   const generateQuestion = useCallback(() => {
     // Random root note between C3 and G4 (48-67)
@@ -111,8 +132,12 @@ export default function EarTraining() {
       const options = getIntervalOptions();
       const randomIndex = Math.floor(Math.random() * options.length);
       setCurrentQuestion(options[randomIndex].semitones);
-    } else {
+    } else if (mode === "chords") {
       const options = getChordOptions();
+      const randomIndex = Math.floor(Math.random() * options.length);
+      setCurrentQuestion(randomIndex);
+    } else {
+      const options = getScaleOptions();
       const randomIndex = Math.floor(Math.random() * options.length);
       setCurrentQuestion(randomIndex);
     }
@@ -120,7 +145,7 @@ export default function EarTraining() {
     setSelectedAnswer(null);
     setIsCorrect(null);
     setShowAnswer(false);
-  }, [getIntervalOptions, getChordOptions, mode]);
+  }, [getIntervalOptions, getChordOptions, getScaleOptions, mode]);
 
   // Play interval
   const playInterval = async () => {
@@ -160,12 +185,35 @@ export default function EarTraining() {
     setTimeout(() => setIsPlaying(false), 1500);
   };
 
+  // Play scale
+  const playScale = async () => {
+    if (!sampler || currentQuestion === null || isPlaying) return;
+    
+    await Tone.start();
+    setIsPlaying(true);
+
+    const scale = SCALE_TYPES[currentQuestion];
+    const now = Tone.now();
+    const noteLength = 0.3; // Time between notes
+
+    // Play scale ascending
+    scale.intervals.forEach((interval, idx) => {
+      const freq = Tone.Frequency(rootNote + interval, "midi").toFrequency();
+      sampler.triggerAttackRelease(freq, "8n", now + idx * noteLength);
+    });
+
+    const totalTime = scale.intervals.length * noteLength * 1000 + 500;
+    setTimeout(() => setIsPlaying(false), totalTime);
+  };
+
   // Play current question
   const playQuestion = () => {
     if (mode === "intervals") {
       playInterval();
-    } else {
+    } else if (mode === "chords") {
       playChord();
+    } else {
+      playScale();
     }
   };
 
@@ -180,6 +228,7 @@ export default function EarTraining() {
       const options = getIntervalOptions();
       correct = options[answerIndex].semitones === currentQuestion;
     } else {
+      // Both chords and scales use index-based checking
       correct = answerIndex === currentQuestion;
     }
 
@@ -240,13 +289,13 @@ export default function EarTraining() {
 
       <div className="max-w-2xl mx-auto">
         {/* Mode Selection */}
-        <div className="flex justify-center gap-4 mb-6">
+        <div className="flex justify-center gap-2 md:gap-4 mb-6 flex-wrap">
           <button
             onClick={() => {
               setMode("intervals");
               setCurrentQuestion(null);
             }}
-            className={`px-6 py-3 rounded-xl font-Lora text-lg transition-all ${
+            className={`px-4 md:px-6 py-3 rounded-xl font-Lora text-base md:text-lg transition-all ${
               mode === "intervals"
                 ? "bg-[#1BD79E] text-black"
                 : "bg-[#1a1a1a] text-gray-400 hover:bg-[#2a2a2a] border border-[#333]"
@@ -259,13 +308,26 @@ export default function EarTraining() {
               setMode("chords");
               setCurrentQuestion(null);
             }}
-            className={`px-6 py-3 rounded-xl font-Lora text-lg transition-all ${
+            className={`px-4 md:px-6 py-3 rounded-xl font-Lora text-base md:text-lg transition-all ${
               mode === "chords"
                 ? "bg-[#1BD79E] text-black"
                 : "bg-[#1a1a1a] text-gray-400 hover:bg-[#2a2a2a] border border-[#333]"
             }`}
           >
             🎹 Chords
+          </button>
+          <button
+            onClick={() => {
+              setMode("scales");
+              setCurrentQuestion(null);
+            }}
+            className={`px-4 md:px-6 py-3 rounded-xl font-Lora text-base md:text-lg transition-all ${
+              mode === "scales"
+                ? "bg-[#1BD79E] text-black"
+                : "bg-[#1a1a1a] text-gray-400 hover:bg-[#2a2a2a] border border-[#333]"
+            }`}
+          >
+            🎼 Scales
           </button>
         </div>
 
@@ -314,17 +376,23 @@ export default function EarTraining() {
           <div className="bg-[#111] border border-[#222] rounded-2xl p-8 text-center">
             <div className="text-6xl mb-4">🎧</div>
             <h2 className="font-Lora text-2xl text-white mb-4">
-              {mode === "intervals" ? "Interval Training" : "Chord Recognition"}
+              {mode === "intervals" ? "Interval Training" : mode === "chords" ? "Chord Recognition" : "Scale Recognition"}
             </h2>
             <p className="font-Lora text-gray-400 mb-6">
               {mode === "intervals"
                 ? "Listen to two notes and identify the interval between them."
-                : "Listen to a chord and identify its type."}
+                : mode === "chords"
+                ? "Listen to a chord and identify its type."
+                : "Listen to a scale and identify which type it is."}
             </p>
             <p className="font-Lora text-gray-500 text-sm mb-6">
               Difficulty: <span className="text-[#38DBE5] capitalize">{difficulty}</span>
               {" • "}
-              {mode === "intervals" ? getIntervalOptions().length : getChordOptions().length} options
+              {mode === "intervals" 
+                ? getIntervalOptions().length 
+                : mode === "chords" 
+                ? getChordOptions().length 
+                : getScaleOptions().length} options
             </p>
             <button
               onClick={startTraining}
@@ -356,65 +424,90 @@ export default function EarTraining() {
 
             {/* Answer Options */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-              {mode === "intervals" ? (
-                getIntervalOptions().map((option, idx) => {
-                  const isSelected = selectedAnswer === idx;
-                  const isCorrectAnswer = option.semitones === currentQuestion;
-                  
-                  let buttonClass = "bg-[#1a1a1a] text-white border border-[#333] hover:bg-[#2a2a2a]";
-                  
-                  if (showAnswer) {
-                    if (isCorrectAnswer) {
-                      buttonClass = "bg-[#1BD79E] text-black border-[#1BD79E]";
-                    } else if (isSelected && !isCorrect) {
-                      buttonClass = "bg-red-500 text-white border-red-500";
-                    }
-                  } else if (isSelected) {
-                    buttonClass = "bg-[#38DBE5] text-black border-[#38DBE5]";
+              {mode === "intervals" && getIntervalOptions().map((option, idx) => {
+                const isSelected = selectedAnswer === idx;
+                const isCorrectAnswer = option.semitones === currentQuestion;
+                
+                let buttonClass = "bg-[#1a1a1a] text-white border border-[#333] hover:bg-[#2a2a2a]";
+                
+                if (showAnswer) {
+                  if (isCorrectAnswer) {
+                    buttonClass = "bg-[#1BD79E] text-black border-[#1BD79E]";
+                  } else if (isSelected && !isCorrect) {
+                    buttonClass = "bg-red-500 text-white border-red-500";
                   }
+                } else if (isSelected) {
+                  buttonClass = "bg-[#38DBE5] text-black border-[#38DBE5]";
+                }
 
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => checkAnswer(idx)}
-                      disabled={showAnswer}
-                      className={`p-4 rounded-xl font-Lora transition-all ${buttonClass}`}
-                    >
-                      <div className="text-lg font-semibold">{option.short}</div>
-                      <div className="text-xs opacity-70">{option.name}</div>
-                    </button>
-                  );
-                })
-              ) : (
-                getChordOptions().map((option, idx) => {
-                  const isSelected = selectedAnswer === idx;
-                  const isCorrectAnswer = idx === currentQuestion;
-                  
-                  let buttonClass = "bg-[#1a1a1a] text-white border border-[#333] hover:bg-[#2a2a2a]";
-                  
-                  if (showAnswer) {
-                    if (isCorrectAnswer) {
-                      buttonClass = "bg-[#1BD79E] text-black border-[#1BD79E]";
-                    } else if (isSelected && !isCorrect) {
-                      buttonClass = "bg-red-500 text-white border-red-500";
-                    }
-                  } else if (isSelected) {
-                    buttonClass = "bg-[#38DBE5] text-black border-[#38DBE5]";
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => checkAnswer(idx)}
+                    disabled={showAnswer}
+                    className={`p-4 rounded-xl font-Lora transition-all ${buttonClass}`}
+                  >
+                    <div className="text-lg font-semibold">{option.short}</div>
+                    <div className="text-xs opacity-70">{option.name}</div>
+                  </button>
+                );
+              })}
+              {mode === "chords" && getChordOptions().map((option, idx) => {
+                const isSelected = selectedAnswer === idx;
+                const isCorrectAnswer = idx === currentQuestion;
+                
+                let buttonClass = "bg-[#1a1a1a] text-white border border-[#333] hover:bg-[#2a2a2a]";
+                
+                if (showAnswer) {
+                  if (isCorrectAnswer) {
+                    buttonClass = "bg-[#1BD79E] text-black border-[#1BD79E]";
+                  } else if (isSelected && !isCorrect) {
+                    buttonClass = "bg-red-500 text-white border-red-500";
                   }
+                } else if (isSelected) {
+                  buttonClass = "bg-[#38DBE5] text-black border-[#38DBE5]";
+                }
 
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => checkAnswer(idx)}
-                      disabled={showAnswer}
-                      className={`p-4 rounded-xl font-Lora transition-all ${buttonClass}`}
-                    >
-                      <div className="text-lg font-semibold">{option.name}</div>
-                      <div className="text-xs opacity-70">{option.symbol || "maj"}</div>
-                    </button>
-                  );
-                })
-              )}
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => checkAnswer(idx)}
+                    disabled={showAnswer}
+                    className={`p-4 rounded-xl font-Lora transition-all ${buttonClass}`}
+                  >
+                    <div className="text-lg font-semibold">{option.name}</div>
+                    <div className="text-xs opacity-70">{option.symbol || "maj"}</div>
+                  </button>
+                );
+              })}
+              {mode === "scales" && getScaleOptions().map((option, idx) => {
+                const isSelected = selectedAnswer === idx;
+                const isCorrectAnswer = idx === currentQuestion;
+                
+                let buttonClass = "bg-[#1a1a1a] text-white border border-[#333] hover:bg-[#2a2a2a]";
+                
+                if (showAnswer) {
+                  if (isCorrectAnswer) {
+                    buttonClass = "bg-[#1BD79E] text-black border-[#1BD79E]";
+                  } else if (isSelected && !isCorrect) {
+                    buttonClass = "bg-red-500 text-white border-red-500";
+                  }
+                } else if (isSelected) {
+                  buttonClass = "bg-[#38DBE5] text-black border-[#38DBE5]";
+                }
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => checkAnswer(idx)}
+                    disabled={showAnswer}
+                    className={`p-4 rounded-xl font-Lora transition-all ${buttonClass}`}
+                  >
+                    <div className="text-lg font-semibold">{option.short}</div>
+                    <div className="text-xs opacity-70">{option.mood}</div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Result & Next */}
@@ -436,8 +529,10 @@ export default function EarTraining() {
 
         {/* Tips Section */}
         <div className="mt-8 bg-[#111] border border-[#222] rounded-2xl p-6">
-          <h3 className="font-Lora text-[#1BD79E] text-lg mb-4">💡 Tips for {mode === "intervals" ? "Intervals" : "Chords"}</h3>
-          {mode === "intervals" ? (
+          <h3 className="font-Lora text-[#1BD79E] text-lg mb-4">
+            💡 Tips for {mode === "intervals" ? "Intervals" : mode === "chords" ? "Chords" : "Scales"}
+          </h3>
+          {mode === "intervals" && (
             <ul className="font-Lora text-gray-400 text-sm space-y-2">
               <li>• <span className="text-white">Minor 2nd</span> - Jaws theme (tense, close)</li>
               <li>• <span className="text-white">Major 3rd</span> - Oh When The Saints</li>
@@ -445,13 +540,24 @@ export default function EarTraining() {
               <li>• <span className="text-white">Perfect 5th</span> - Star Wars theme</li>
               <li>• <span className="text-white">Octave</span> - Over the Rainbow intro</li>
             </ul>
-          ) : (
+          )}
+          {mode === "chords" && (
             <ul className="font-Lora text-gray-400 text-sm space-y-2">
               <li>• <span className="text-white">Major</span> - Happy, bright, stable</li>
               <li>• <span className="text-white">Minor</span> - Sad, dark, melancholic</li>
               <li>• <span className="text-white">Diminished</span> - Tense, unstable, scary</li>
               <li>• <span className="text-white">Augmented</span> - Dreamy, mysterious</li>
               <li>• <span className="text-white">7th chords</span> - Jazzy, rich, complex</li>
+            </ul>
+          )}
+          {mode === "scales" && (
+            <ul className="font-Lora text-gray-400 text-sm space-y-2">
+              <li>• <span className="text-white">Major</span> - Happy, uplifting (Do Re Mi)</li>
+              <li>• <span className="text-white">Natural Minor</span> - Sad, emotional</li>
+              <li>• <span className="text-white">Minor Pentatonic</span> - Blues/rock soloing</li>
+              <li>• <span className="text-white">Blues</span> - Has the blue note (b5)</li>
+              <li>• <span className="text-white">Dorian</span> - Minor but brighter (raised 6th)</li>
+              <li>• <span className="text-white">Mixolydian</span> - Major but bluesy (flat 7th)</li>
             </ul>
           )}
         </div>
