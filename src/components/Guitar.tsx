@@ -1,5 +1,6 @@
 import Fret from "./Fret";
 import React from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Switch from "react-switch";
 import { A } from "@/types/chord.types";
@@ -7,6 +8,9 @@ import AudioPlayer from "./Player/AudioPlayer";
 import HandDiagram from "./HandDiagram/HandDiagram";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 import { initAudio, playNote } from "@/utils/audioUtils";
+
+// Dynamic import for AR Overlay (uses camera)
+const AROverlay = dynamic(() => import("./AROverlay/AROverlay"), { ssr: false });
 
 interface IPositionsToBePlaced {
   stringNumber: number;
@@ -27,6 +31,7 @@ export default function Guitar({ data }: IGuitar) {
   const [position, setPosition] = React.useState(0);
   const [capo, setCapo] = React.useState(false);
   const [capoFret, setCapoFret] = React.useState<number | null>(null);
+  const [showAROverlay, setShowAROverlay] = React.useState(false);
 
   const [PreviousButtonDisabled, setPreviousButtonDisabled] = React.useState<boolean>(false);
   const [NextButtonDisabled, setNextButtonDisabled] = React.useState<boolean>(false);
@@ -236,6 +241,31 @@ export default function Guitar({ data }: IGuitar) {
             />
           </div>
         </div>
+      )}
+
+      {/* AR Camera Button */}
+      <div className="mt-6 flex justify-center">
+        <button
+          onClick={() => setShowAROverlay(true)}
+          className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-[#1BD79E] to-[#38DBE5] text-black rounded-xl font-Lora font-semibold hover:scale-105 transition-transform shadow-lg"
+        >
+          <span className="text-2xl">📷</span>
+          <div className="text-left">
+            <div className="text-sm font-bold">AR Camera</div>
+            <div className="text-xs opacity-80">See on your guitar</div>
+          </div>
+        </button>
+      </div>
+
+      {/* AR Overlay Modal */}
+      {showAROverlay && fingersToUse && fretsToUse && (
+        <AROverlay
+          chordName={`${data?.key || ""}${data?.suffix || ""}`}
+          fingers={fingersToUse}
+          frets={fretsToUse}
+          baseFret={base?.[0]?.baseFret || 1}
+          onClose={() => setShowAROverlay(false)}
+        />
       )}
     </>
   );
