@@ -27,9 +27,11 @@ export default function AROverlay({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [opacity, setOpacity] = useState(0.7);
+  const [opacity, setOpacity] = useState(0.75);
   const [scale, setScale] = useState(1);
   const [offsetY, setOffsetY] = useState(0);
+  const [offsetX, setOffsetX] = useState(0);
+  const [isVertical, setIsVertical] = useState(true); // Default to vertical for portrait
 
   // Start camera
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function AROverlay({
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: "environment", // Use back camera
+            facingMode: "environment",
             width: { ideal: 1920 },
             height: { ideal: 1080 },
           },
@@ -55,7 +57,6 @@ export default function AROverlay({
 
     startCamera();
 
-    // Cleanup
     return () => {
       if (videoRef.current?.srcObject) {
         const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
@@ -64,14 +65,13 @@ export default function AROverlay({
     };
   }, []);
 
-  // Calculate fret positions to display (show 5 frets)
+  // Calculate fret positions
   const startFret = Math.max(0, baseFret - 1);
   const displayFrets = [0, 1, 2, 3, 4].map((i) => startFret + i);
 
-  // Get finger positions for the overlay
+  // Get finger positions
   const getFingerPositions = () => {
     const positions: { string: number; fret: number; finger: number }[] = [];
-    
     frets.forEach((fret, stringIndex) => {
       if (fret > 0 && fingers[stringIndex] > 0) {
         positions.push({
@@ -81,20 +81,205 @@ export default function AROverlay({
         });
       }
     });
-    
     return positions;
   };
 
   const fingerPositions = getFingerPositions();
 
+  // Vertical Fretboard (for portrait mode - guitar standing)
+  const VerticalFretboard = () => (
+    <div className="relative">
+      {/* Nut */}
+      {startFret === 0 && (
+        <div className="absolute top-0 left-0 right-0 h-2 bg-white/90 rounded-t-sm" />
+      )}
+
+      {/* Frets container - vertical */}
+      <div className="flex flex-col">
+        {displayFrets.map((fretNum) => (
+          <div
+            key={fretNum}
+            className="relative"
+            style={{ width: "180px", height: "50px" }}
+          >
+            {/* Fret number - on the left */}
+            <div className="absolute -left-10 top-1/2 -translate-y-1/2 text-white font-Lora text-xs font-bold">
+              {fretNum === 0 ? "0" : fretNum}
+            </div>
+
+            {/* Fret wire - horizontal */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/60" />
+
+            {/* Fret background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-900/20 to-amber-800/20 border-b border-white/20" />
+
+            {/* Strings - vertical lines */}
+            {[0, 1, 2, 3, 4, 5].map((stringIdx) => {
+              const stringThickness = [3.5, 3, 2.5, 2, 1.5, 1][stringIdx];
+              const xPos = 15 + stringIdx * 28;
+              
+              return (
+                <div
+                  key={stringIdx}
+                  className="absolute top-0 bottom-0"
+                  style={{
+                    left: `${xPos}px`,
+                    width: `${stringThickness}px`,
+                    backgroundColor: STRING_COLORS[stringIdx],
+                    opacity: 0.9,
+                  }}
+                />
+              );
+            })}
+
+            {/* Finger positions */}
+            {fingerPositions
+              .filter((pos) => pos.fret === fretNum)
+              .map((pos) => {
+                const xPos = 15 + pos.string * 28;
+                return (
+                  <div
+                    key={`${pos.string}-${pos.fret}`}
+                    className="absolute top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#1BD79E] flex items-center justify-center shadow-lg shadow-[#1BD79E]/50 animate-pulse"
+                    style={{ left: `${xPos - 12}px` }}
+                  >
+                    <span className="text-black font-Lora font-bold text-sm">
+                      {pos.finger}
+                    </span>
+                  </div>
+                );
+              })}
+
+            {/* Fret markers */}
+            {[3, 5, 7, 9, 12].includes(fretNum) && (
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white/40" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Open/Muted indicators - at top */}
+      <div className="absolute -top-6 left-0 flex" style={{ width: "180px" }}>
+        {frets.map((fret, idx) => {
+          const xPos = 15 + idx * 28 - 6;
+          return (
+            <div
+              key={idx}
+              className="absolute text-white font-Lora font-bold text-sm"
+              style={{ left: `${xPos}px` }}
+            >
+              {fret === 0 ? "○" : fret === -1 ? "✕" : ""}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* String labels at bottom */}
+      <div className="absolute -bottom-6 left-0 flex" style={{ width: "180px" }}>
+        {["E", "A", "D", "G", "B", "e"].map((note, idx) => {
+          const xPos = 15 + idx * 28 - 4;
+          return (
+            <div
+              key={idx}
+              className="absolute text-xs font-Lora"
+              style={{ left: `${xPos}px`, color: STRING_COLORS[idx] }}
+            >
+              {note}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // Horizontal Fretboard (for landscape mode)
+  const HorizontalFretboard = () => (
+    <div className="relative">
+      {startFret === 0 && (
+        <div className="absolute left-0 top-0 bottom-0 w-2 bg-white/90 rounded-l-sm" />
+      )}
+
+      <div className="flex">
+        {displayFrets.map((fretNum) => (
+          <div
+            key={fretNum}
+            className="relative"
+            style={{ width: "55px", height: "160px" }}
+          >
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-white font-Lora text-xs font-bold">
+              {fretNum === 0 ? "0" : fretNum}
+            </div>
+
+            <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/60" />
+            <div className="absolute inset-0 bg-gradient-to-b from-amber-900/20 to-amber-800/20 border-r border-white/20" />
+
+            {[0, 1, 2, 3, 4, 5].map((stringIdx) => {
+              const stringThickness = [1, 1.5, 2, 2.5, 3, 3.5][stringIdx];
+              const yPos = 12 + stringIdx * 27;
+              
+              return (
+                <div
+                  key={stringIdx}
+                  className="absolute left-0 right-0"
+                  style={{
+                    top: `${yPos}px`,
+                    height: `${stringThickness}px`,
+                    backgroundColor: STRING_COLORS[stringIdx],
+                    opacity: 0.9,
+                  }}
+                />
+              );
+            })}
+
+            {fingerPositions
+              .filter((pos) => pos.fret === fretNum)
+              .map((pos) => {
+                const yPos = 12 + pos.string * 27;
+                return (
+                  <div
+                    key={`${pos.string}-${pos.fret}`}
+                    className="absolute left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-[#1BD79E] flex items-center justify-center shadow-lg shadow-[#1BD79E]/50 animate-pulse"
+                    style={{ top: `${yPos - 11}px` }}
+                  >
+                    <span className="text-black font-Lora font-bold text-xs">
+                      {pos.finger}
+                    </span>
+                  </div>
+                );
+              })}
+
+            {[3, 5, 7, 9, 12].includes(fretNum) && (
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white/40" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="absolute -left-6 top-0 flex flex-col" style={{ height: "160px" }}>
+        {frets.map((fret, idx) => {
+          const yPos = 12 + idx * 27 - 8;
+          return (
+            <div
+              key={idx}
+              className="absolute text-white font-Lora font-bold text-sm"
+              style={{ top: `${yPos}px` }}
+            >
+              {fret === 0 ? "○" : fret === -1 ? "✕" : ""}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4">
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4 safe-area-top">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-white font-Lora text-2xl font-bold">{chordName}</h2>
-            <p className="text-gray-400 text-sm font-Lora">Align your guitar with the overlay</p>
+            <h2 className="text-white font-Lora text-xl font-bold">{chordName}</h2>
+            <p className="text-gray-400 text-xs font-Lora">Align overlay with your guitar</p>
           </div>
           <button
             onClick={onClose}
@@ -132,166 +317,111 @@ export default function AROverlay({
 
             {/* Fretboard Overlay */}
             <div
-              className="absolute left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-200"
+              className="absolute pointer-events-none transition-all duration-200"
               style={{
+                left: `calc(50% + ${offsetX}px)`,
                 top: `calc(50% + ${offsetY}px)`,
-                transform: `translateX(-50%) translateY(-50%) scale(${scale})`,
+                transform: `translate(-50%, -50%) scale(${scale})`,
                 opacity: opacity,
               }}
             >
-              {/* Fretboard Container */}
-              <div className="relative">
-                {/* Nut (if showing open position) */}
-                {startFret === 0 && (
-                  <div className="absolute left-0 top-0 bottom-0 w-3 bg-white/90 rounded-l-sm" />
-                )}
-
-                {/* Frets */}
-                <div className="flex">
-                  {displayFrets.map((fretNum, fretIdx) => (
-                    <div
-                      key={fretNum}
-                      className="relative"
-                      style={{ width: "70px", height: "200px" }}
-                    >
-                      {/* Fret number */}
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-white font-Lora text-sm font-bold">
-                        {fretNum === 0 ? "Open" : fretNum}
-                      </div>
-
-                      {/* Fret wire */}
-                      <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/60" />
-
-                      {/* Fret background */}
-                      <div className="absolute inset-0 bg-gradient-to-b from-amber-900/30 to-amber-800/30 border-r border-white/20" />
-
-                      {/* Strings */}
-                      {[0, 1, 2, 3, 4, 5].map((stringIdx) => {
-                        const stringThickness = [1, 1.5, 2, 2.5, 3, 3.5][stringIdx];
-                        const yPos = 15 + stringIdx * 34;
-                        
-                        return (
-                          <div
-                            key={stringIdx}
-                            className="absolute left-0 right-0"
-                            style={{
-                              top: `${yPos}px`,
-                              height: `${stringThickness}px`,
-                              backgroundColor: STRING_COLORS[stringIdx],
-                              opacity: 0.8,
-                            }}
-                          />
-                        );
-                      })}
-
-                      {/* Finger positions on this fret */}
-                      {fingerPositions
-                        .filter((pos) => pos.fret === fretNum)
-                        .map((pos) => {
-                          const yPos = 15 + pos.string * 34;
-                          return (
-                            <div
-                              key={`${pos.string}-${pos.fret}`}
-                              className="absolute left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-[#1BD79E] flex items-center justify-center shadow-lg shadow-[#1BD79E]/50 animate-pulse"
-                              style={{ top: `${yPos - 16}px` }}
-                            >
-                              <span className="text-black font-Lora font-bold text-lg">
-                                {pos.finger}
-                              </span>
-                            </div>
-                          );
-                        })}
-
-                      {/* Fret markers */}
-                      {[3, 5, 7, 9, 12].includes(fretNum) && (
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white/40" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Open/Muted string indicators */}
-                <div className="absolute -left-10 top-0 flex flex-col" style={{ height: "200px" }}>
-                  {frets.map((fret, idx) => {
-                    const yPos = 15 + idx * 34 - 10;
-                    return (
-                      <div
-                        key={idx}
-                        className="absolute text-white font-Lora font-bold text-lg"
-                        style={{ top: `${yPos}px` }}
-                      >
-                        {fret === 0 ? "○" : fret === -1 ? "✕" : ""}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {isVertical ? <VerticalFretboard /> : <HorizontalFretboard />}
             </div>
           </>
         )}
       </div>
 
       {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6">
-        {/* Opacity Control */}
-        <div className="mb-4">
-          <label className="text-gray-400 text-xs font-Lora block mb-2">
-            Overlay Opacity
-          </label>
-          <input
-            type="range"
-            min="0.2"
-            max="1"
-            step="0.1"
-            value={opacity}
-            onChange={(e) => setOpacity(parseFloat(e.target.value))}
-            className="w-full accent-[#1BD79E]"
-          />
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 to-transparent p-4 pb-8 safe-area-bottom">
+        {/* Orientation Toggle */}
+        <div className="flex justify-center gap-2 mb-4">
+          <button
+            onClick={() => setIsVertical(true)}
+            className={`px-4 py-2 rounded-lg font-Lora text-sm transition-all ${
+              isVertical
+                ? "bg-[#1BD79E] text-black"
+                : "bg-white/10 text-white"
+            }`}
+          >
+            📱 Portrait
+          </button>
+          <button
+            onClick={() => setIsVertical(false)}
+            className={`px-4 py-2 rounded-lg font-Lora text-sm transition-all ${
+              !isVertical
+                ? "bg-[#1BD79E] text-black"
+                : "bg-white/10 text-white"
+            }`}
+          >
+            📱 Landscape
+          </button>
         </div>
 
-        {/* Scale Control */}
-        <div className="mb-4">
-          <label className="text-gray-400 text-xs font-Lora block mb-2">
-            Size
-          </label>
-          <input
-            type="range"
-            min="0.5"
-            max="2"
-            step="0.1"
-            value={scale}
-            onChange={(e) => setScale(parseFloat(e.target.value))}
-            className="w-full accent-[#1BD79E]"
-          />
+        {/* Sliders */}
+        <div className="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label className="text-gray-400 text-[10px] font-Lora block mb-1">Opacity</label>
+            <input
+              type="range"
+              min="0.3"
+              max="1"
+              step="0.05"
+              value={opacity}
+              onChange={(e) => setOpacity(parseFloat(e.target.value))}
+              className="w-full accent-[#1BD79E] h-1"
+            />
+          </div>
+          <div>
+            <label className="text-gray-400 text-[10px] font-Lora block mb-1">Size</label>
+            <input
+              type="range"
+              min="0.5"
+              max="2.5"
+              step="0.1"
+              value={scale}
+              onChange={(e) => setScale(parseFloat(e.target.value))}
+              className="w-full accent-[#1BD79E] h-1"
+            />
+          </div>
         </div>
 
-        {/* Position Control */}
-        <div className="mb-4">
-          <label className="text-gray-400 text-xs font-Lora block mb-2">
-            Vertical Position
-          </label>
-          <input
-            type="range"
-            min="-200"
-            max="200"
-            step="10"
-            value={offsetY}
-            onChange={(e) => setOffsetY(parseInt(e.target.value))}
-            className="w-full accent-[#1BD79E]"
-          />
+        <div className="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label className="text-gray-400 text-[10px] font-Lora block mb-1">↔ Horizontal</label>
+            <input
+              type="range"
+              min="-150"
+              max="150"
+              step="5"
+              value={offsetX}
+              onChange={(e) => setOffsetX(parseInt(e.target.value))}
+              className="w-full accent-[#38DBE5] h-1"
+            />
+          </div>
+          <div>
+            <label className="text-gray-400 text-[10px] font-Lora block mb-1">↕ Vertical</label>
+            <input
+              type="range"
+              min="-200"
+              max="200"
+              step="5"
+              value={offsetY}
+              onChange={(e) => setOffsetY(parseInt(e.target.value))}
+              className="w-full accent-[#38DBE5] h-1"
+            />
+          </div>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center justify-center gap-4 text-sm font-Lora">
-          <span className="text-white flex items-center gap-1">
-            <span className="w-6 h-6 rounded-full bg-[#1BD79E] flex items-center justify-center text-black text-xs font-bold">1</span>
-            = Finger number
+        <div className="flex items-center justify-center gap-4 text-[10px] font-Lora text-gray-400">
+          <span className="flex items-center gap-1">
+            <span className="w-4 h-4 rounded-full bg-[#1BD79E] flex items-center justify-center text-black text-[8px] font-bold">1</span>
+            Finger
           </span>
-          <span className="text-white">○ = Open</span>
-          <span className="text-white">✕ = Muted</span>
+          <span>○ Open</span>
+          <span>✕ Muted</span>
         </div>
       </div>
     </div>
   );
 }
-
