@@ -210,13 +210,19 @@ export default function ChordRecognition() {
   const stopListening = useCallback(() => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
     }
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
     }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      audioContextRef.current.close().catch(() => {
+        // Ignore errors if already closed
+      });
+      audioContextRef.current = null;
     }
+    analyserRef.current = null;
     setIsListening(false);
     setDetectedNotes([]);
     setMatchedChords([]);
@@ -280,12 +286,13 @@ export default function ChordRecognition() {
 
   // Start analyzing when listening starts
   useEffect(() => {
-    if (isListening) {
+    if (isListening && audioContextRef.current && analyserRef.current) {
       analyze();
     }
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
       }
     };
   }, [isListening, analyze]);
@@ -293,9 +300,15 @@ export default function ChordRecognition() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopListening();
+      // Only cleanup if we're still listening
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {});
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
-  }, [stopListening]);
+  }, []);
 
   // Clear old notes periodically
   useEffect(() => {
