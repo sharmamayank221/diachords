@@ -12,7 +12,9 @@ import {
 } from "@/data/scales";
 import Link from "next/link";
 import { initAudio, playNote, playChord, playProgressionWithDrums, ProgressionChord } from "@/utils/audioUtils";
+
 import ChordTooltip from "./ChordTooltip";
+import { usePitchDetection } from "@/hooks/usePitchDetection";
 
 interface ScaleNote {
   string: number;
@@ -27,6 +29,58 @@ interface ScaleNote {
 // String thickness (similar to chord fretboard)
 const STRING_HEIGHTS = ["1px", "2px", "3px", "3.5px", "4px", "5px"];
 
+// Memoized Note Component to prevent unnecessary re-renders
+const FretboardNote = React.memo(({ 
+  note, 
+  isNotePlaying, 
+  isDetected, 
+  showIntervals, 
+  onClick 
+}: { 
+  note: ScaleNote; 
+  isNotePlaying: boolean; 
+  isDetected: boolean;
+  showIntervals: boolean;
+  onClick: (note: ScaleNote) => void;
+}) => {
+  return (
+    <button
+      onClick={() => onClick(note)}
+      className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full transition-all duration-150 cursor-pointer hover:scale-125 hover:shadow-lg active:scale-95 focus:outline-none focus:ring-2 focus:ring-white ${
+        note.isRoot
+          ? "bg-[#1BD79E]"
+          : "bg-[#2D2D2D] border-2 border-[#1BD79E]"
+      } ${
+        isNotePlaying
+          ? "scale-125 ring-4 ring-white ring-opacity-50"
+          : ""
+      } ${
+        isDetected
+          ? "ring-4 ring-[#38DBE5] ring-opacity-80 scale-125 z-10"
+          : ""
+      }`}
+      style={{
+        ...(isNotePlaying
+          ? { boxShadow: "0 0 20px #1BD79E, 0 0 40px #1BD79E" }
+          : {}),
+        ...(isDetected
+          ? { boxShadow: "0 0 20px #38DBE5, 0 0 40px #38DBE5" }
+          : {})
+      }}
+      aria-label={`Play ${note.note} on string ${note.string}`}
+    >
+      <span
+        className={`flex items-center justify-center font-Lora text-xs md:text-sm font-bold ${
+          note.isRoot ? "text-black" : "text-white"
+        }`}
+      >
+        {showIntervals ? getIntervalName(note.interval) : note.note}
+      </span>
+    </button>
+  );
+});
+FretboardNote.displayName = "FretboardNote";
+
 export default function ScaleFretboard() {
   const [selectedScale, setSelectedScale] = useState<string>("major");
   const [selectedRoot, setSelectedRoot] = useState<number>(0); // C
@@ -40,7 +94,10 @@ export default function ScaleFretboard() {
   const [currentBeat, setCurrentBeat] = useState<number>(0);
   const [bpm, setBpm] = useState<number>(90);
   const [loopCount, setLoopCount] = useState<number>(1);
+
   const [stopProgression, setStopProgression] = useState<(() => void) | null>(null);
+
+  const { isListening, startListening, stopListening, detectedMidi } = usePitchDetection();
 
   const FRETS = Array.from({ length: 13 }, (_, i) => i); // 0-12 frets
   const scale = SCALES[selectedScale];
@@ -305,6 +362,24 @@ export default function ScaleFretboard() {
                     ) : (
                       <>▶ Play Scale</>
                     )}
+
+                  </button>
+                  <button
+                    onClick={isListening ? stopListening : startListening}
+                    className={`px-4 py-2 rounded-full font-Lora font-semibold text-sm transition-all flex items-center gap-2 ${
+                      isListening
+                        ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
+                        : "bg-[#38DBE5] text-black hover:bg-[#2bc8d5] hover:scale-105"
+                    }`}
+                  >
+                    {isListening ? (
+                      <>
+                        <span className="w-2 h-2 bg-white rounded-full animate-ping" />
+                        Listening...
+                      </>
+                    ) : (
+                      <>🎤 Start Practice</>
+                    )}
                   </button>
                 </div>
 
@@ -520,7 +595,7 @@ export default function ScaleFretboard() {
                 {/* Strings */}
                 {[1, 2, 3, 4, 5, 6].map((stringNum) => {
                   const note = getNoteAtPosition(stringNum, fretNum);
-                  const isNotePlaying = note && playingNote === note.midiNote;
+                  const isNotePlaying = note && (playingNote === note.midiNote || detectedMidi === note.midiNote);
 
                   return (
                     <div
@@ -533,32 +608,13 @@ export default function ScaleFretboard() {
                     >
                       {/* Note on string */}
                       {note && (
-                        <button
-                          onClick={() => handleNoteClick(note)}
-                          className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full transition-all duration-150 cursor-pointer hover:scale-125 hover:shadow-lg active:scale-95 focus:outline-none focus:ring-2 focus:ring-white ${
-                            note.isRoot
-                              ? "bg-[#1BD79E]"
-                              : "bg-[#2D2D2D] border-2 border-[#1BD79E]"
-                          } ${
-                            isNotePlaying
-                              ? "scale-125 ring-4 ring-white ring-opacity-50"
-                              : ""
-                          }`}
-                          style={
-                            isNotePlaying
-                              ? { boxShadow: "0 0 20px #1BD79E, 0 0 40px #1BD79E" }
-                              : {}
-                          }
-                          aria-label={`Play ${note.note} on string ${stringNum}`}
-                        >
-                          <span
-                            className={`flex items-center justify-center font-Lora text-xs md:text-sm font-bold ${
-                              note.isRoot ? "text-black" : "text-white"
-                            }`}
-                          >
-                            {showIntervals ? getIntervalName(note.interval) : note.note}
-                          </span>
-                        </button>
+                        <FretboardNote
+                          note={note}
+                          isNotePlaying={playingNote === note.midiNote}
+                          isDetected={detectedMidi === note.midiNote}
+                          showIntervals={showIntervals}
+                          onClick={handleNoteClick}
+                        />
                       )}
 
                       {/* String number on open position */}
