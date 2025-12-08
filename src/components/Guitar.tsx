@@ -4,6 +4,7 @@ import Image from "next/image";
 import Switch from "react-switch";
 import { A } from "@/types/chord.types";
 import AudioPlayer from "./Player/AudioPlayer";
+import HandDiagram from "./HandDiagram/HandDiagram";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 import { initAudio, playNote } from "@/utils/audioUtils";
 
@@ -215,6 +216,7 @@ export default function Guitar({ data }: IGuitar) {
       <div className="relative w-full h-full md:pt-14 flex items-center justify-center container mx-auto">
       </div>
       
+      {/* Audio Player */}
       <div className="mt-4 flex justify-center">
         <AudioPlayer 
           midiNotes={midiNotes} 
@@ -223,6 +225,18 @@ export default function Guitar({ data }: IGuitar) {
           fingers={fingersToUse}
         />
       </div>
+      
+      {/* Hand Diagram - shows which fingers to use */}
+      {fingersToUse && fretsToUse && (
+        <div className="mt-6 flex justify-center px-4">
+          <div className="w-full max-w-md">
+            <HandDiagram 
+              fingers={fingersToUse} 
+              frets={fretsToUse} 
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
