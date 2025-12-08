@@ -237,6 +237,7 @@ export default function Guitar({ data }: IGuitar) {
           </div>
         </div>
       )}
+
     </>
   );
 }
