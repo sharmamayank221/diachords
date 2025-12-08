@@ -10,6 +10,7 @@ import GuitarHintsModal from "./Modal/GuitarHintsModal";
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const router = useRouter();
 
   function closeModal() {
@@ -42,7 +43,7 @@ export default function Header() {
   return (
     <div className="bg-black">
       {/* Desktop Header */}
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <div className="pb-5 flex justify-center items-center w-full pt-5">
           <div className="w-[10%] flex items-center justify-center pr-2">
             <Link href={"/chords/cmajor"}>
@@ -68,28 +69,51 @@ export default function Header() {
       </div>
 
       {/* Mobile Header */}
-      <div className="md:hidden">
-        {/* Top row: Logo and Nav Links */}
-        <div className="flex items-center justify-center gap-4 px-4 py-3">
+      <div className="lg:hidden relative">
+        {/* Top row: Logo and Hamburger */}
+        <div className="flex items-center justify-between px-4 py-3">
           <Link href={"/chords/cmajor"}>
             <Image src="/Logo.svg" alt="logo" width={28} height={28} />
           </Link>
           
-          {/* Nav Links */}
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`font-Lora text-sm px-2 py-1 rounded whitespace-nowrap ${
-                link.isActive 
-                  ? "text-[#1BD79E]" 
-                  : "text-gray-300"
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-white focus:outline-none p-2"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? (
+              // Close Icon (X)
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              // Hamburger Icon
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="absolute top-full left-0 w-full bg-black/95 backdrop-blur-sm border-t border-gray-800 z-50 flex flex-col px-4 pb-4 shadow-xl">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`font-Lora text-lg py-3 border-b border-gray-800 last:border-0 ${
+                  link.isActive 
+                    ? "text-[#1BD79E]" 
+                    : "text-white"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
         
         {/* Search bar below nav */}
         <div className="px-4 pb-3">
