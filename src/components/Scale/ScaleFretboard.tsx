@@ -97,7 +97,7 @@ export default function ScaleFretboard() {
 
   const [stopProgression, setStopProgression] = useState<(() => void) | null>(null);
 
-  const { isListening, startListening, stopListening, detectedMidi } = usePitchDetection();
+  const { isListening, startListening, stopListening, detectedMidi, detectedNote } = usePitchDetection();
 
   const FRETS = Array.from({ length: 13 }, (_, i) => i); // 0-12 frets
   const scale = SCALES[selectedScale];
@@ -336,7 +336,7 @@ export default function ScaleFretboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Left Side - Scale Info */}
               <div className="bg-[#1a1a1a] rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4">
                   <div>
                     <h2 className="font-Lora text-xl text-[#1BD79E]">
                       {rootNote.name.split("/")[0]} {scale.name}
@@ -345,42 +345,55 @@ export default function ScaleFretboard() {
                       {scale.description}
                     </p>
                   </div>
-                  <button
-                    onClick={playScaleAscending}
-                    disabled={isPlaying}
-                    className={`px-4 py-2 rounded-full font-Lora font-semibold text-sm transition-all flex items-center gap-2 ${
-                      isPlaying
-                        ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                        : "bg-[#1BD79E] text-black hover:bg-[#15c48e] hover:scale-105"
-                    }`}
-                  >
-                    {isPlaying ? (
-                      <>
-                        <span className="w-2 h-2 bg-black rounded-full animate-ping" />
-                        Playing...
-                      </>
-                    ) : (
-                      <>▶ Play Scale</>
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={playScaleAscending}
+                      disabled={isPlaying}
+                      className={`px-4 py-2 rounded-full font-Lora font-semibold text-sm transition-all flex items-center gap-2 ${
+                        isPlaying
+                          ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                          : "bg-[#1BD79E] text-black hover:bg-[#15c48e] hover:scale-105"
+                      }`}
+                    >
+                      {isPlaying ? (
+                        <>
+                          <span className="w-2 h-2 bg-black rounded-full animate-ping" />
+                          Playing...
+                        </>
+                      ) : (
+                        <>▶ Play Scale</>
+                      )}
+                    </button>
+                    <button
+                      onClick={isListening ? stopListening : startListening}
+                      className={`px-4 py-2 rounded-full font-Lora font-semibold text-sm transition-all flex items-center gap-2 ${
+                        isListening
+                          ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
+                          : "bg-[#38DBE5] text-black hover:bg-[#2bc8d5] hover:scale-105"
+                      }`}
+                    >
+                      {isListening ? (
+                        <>
+                          <span className="w-2 h-2 bg-white rounded-full animate-ping" />
+                          Listening...
+                        </>
+                      ) : (
+                        <>🎤 Start Practice</>
+                      )}
+                    </button>
+                    
+                    {/* Detected Note Display */}
+                    {isListening && detectedNote && (
+                      <div className={`px-4 py-2 rounded-full font-Lora font-bold text-sm transition-all border ${
+                        scaleNotes.some(n => n.note === detectedNote)
+                          ? "bg-[#1BD79E]/20 text-[#1BD79E] border-[#1BD79E]"
+                          : "bg-red-500/20 text-red-500 border-red-500"
+                      }`}>
+                        Detected: {detectedNote}
+                      </div>
                     )}
-
-                  </button>
-                  <button
-                    onClick={isListening ? stopListening : startListening}
-                    className={`px-4 py-2 rounded-full font-Lora font-semibold text-sm transition-all flex items-center gap-2 ${
-                      isListening
-                        ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
-                        : "bg-[#38DBE5] text-black hover:bg-[#2bc8d5] hover:scale-105"
-                    }`}
-                  >
-                    {isListening ? (
-                      <>
-                        <span className="w-2 h-2 bg-white rounded-full animate-ping" />
-                        Listening...
-                      </>
-                    ) : (
-                      <>🎤 Start Practice</>
-                    )}
-                  </button>
+                  </div>
                 </div>
 
                 {/* Scale Formula */}
@@ -595,7 +608,9 @@ export default function ScaleFretboard() {
                 {/* Strings */}
                 {[1, 2, 3, 4, 5, 6].map((stringNum) => {
                   const note = getNoteAtPosition(stringNum, fretNum);
-                  const isNotePlaying = note && (playingNote === note.midiNote || detectedMidi === note.midiNote);
+                  const openStringMidi = GUITAR_STRINGS.find(s => s.string === stringNum)?.openNote || 0;
+                  const currentMidi = openStringMidi + fretNum;
+                  const isWrongNote = detectedMidi === currentMidi && !note;
 
                   return (
                     <div
@@ -606,6 +621,18 @@ export default function ScaleFretboard() {
                         height: STRING_HEIGHTS[stringNum - 1],
                       }}
                     >
+                      {/* Wrong Note Indicator */}
+                      {isWrongNote && (
+                        <div 
+                          className="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full bg-red-500/50 border-2 border-red-500 animate-pulse z-20 flex items-center justify-center"
+                          style={{ boxShadow: "0 0 20px red" }}
+                        >
+                          <span className="text-white font-Lora text-xs font-bold">
+                            {detectedNote}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Note on string */}
                       {note && (
                         <FretboardNote
