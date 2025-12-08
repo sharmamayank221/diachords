@@ -26,12 +26,14 @@ export default function Header() {
   const isTunerPage = router.pathname === "/tuner";
   const isJamPage = router.pathname === "/jam";
   const isMetronomePage = router.pathname === "/metronome";
+  const isEarTrainingPage = router.pathname === "/ear-training";
 
   const navLinks = [
     { href: "/chords/cmajor", label: "Chords", isActive: isChordPage },
     { href: "/scales", label: "Scales", isActive: isScalePage },
     { href: "/tuner", label: "Tuner", isActive: isTunerPage },
     { href: "/metronome", label: "Tempo", isActive: isMetronomePage },
+    { href: "/ear-training", label: "Ear", isActive: isEarTrainingPage },
     { href: "/jam", label: "Jam", isActive: isJamPage },
   ];
 
