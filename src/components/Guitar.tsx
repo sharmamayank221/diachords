@@ -216,25 +216,27 @@ export default function Guitar({ data }: IGuitar) {
       <div className="relative w-full h-full md:pt-14 flex items-center justify-center container mx-auto">
       </div>
       
-      {/* Audio Player and Hand Diagram */}
-      <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-6">
+      {/* Audio Player */}
+      <div className="mt-4 flex justify-center">
         <AudioPlayer 
           midiNotes={midiNotes} 
           individualNotes={midiNotes}
           frets={fretsToUse}
           fingers={fingersToUse}
         />
-        
-        {/* Hand Diagram - shows which fingers to use */}
-        {fingersToUse && fretsToUse && (
-          <div className="w-full max-w-[220px]">
+      </div>
+      
+      {/* Hand Diagram - shows which fingers to use */}
+      {fingersToUse && fretsToUse && (
+        <div className="mt-6 flex justify-center px-4">
+          <div className="w-full max-w-md">
             <HandDiagram 
               fingers={fingersToUse} 
               frets={fretsToUse} 
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
