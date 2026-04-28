@@ -47,6 +47,7 @@ export const usePitchDetection = () => {
       console.error("Error accessing microphone:", error);
       setIsListening(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stopListening = useCallback(() => {
