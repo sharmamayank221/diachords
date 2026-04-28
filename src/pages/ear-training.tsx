@@ -1,13 +1,14 @@
+import React from "react";
 import dynamic from "next/dynamic";
 import SEO, { createWebPageSchema, createHowToSchema } from "@/components/SEO";
+import AppShell from "@/components/Navigation/AppShell";
 
-// Dynamic import to avoid SSR issues with Tone.js
 const EarTraining = dynamic(
   () => import("@/components/EarTraining/EarTraining"),
   { ssr: false }
 );
 
-export default function EarTrainingPage() {
+function EarTrainingPage() {
   const jsonLd = [
     createWebPageSchema(
       "Free Ear Training for Guitar",
@@ -51,4 +52,9 @@ export default function EarTrainingPage() {
     </>
   );
 }
+
+EarTrainingPage.getLayout = (page: React.ReactElement) => (
+  <AppShell mobileTitle="Ear Training">{page}</AppShell>
+);
+export default EarTrainingPage;
 

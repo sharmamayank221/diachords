@@ -1,5 +1,7 @@
+import React from "react";
 import dynamic from "next/dynamic";
 import SEO, { createWebPageSchema, createHowToSchema } from "@/components/SEO";
+import AppShell from "@/components/Navigation/AppShell";
 
 // Dynamic import to avoid SSR issues with Tone.js
 const Metronome = dynamic(
@@ -7,7 +9,7 @@ const Metronome = dynamic(
   { ssr: false }
 );
 
-export default function MetronomePage() {
+function MetronomePage() {
   const jsonLd = [
     createWebPageSchema(
       "Free Online Metronome",
@@ -49,4 +51,9 @@ export default function MetronomePage() {
     </>
   );
 }
+
+MetronomePage.getLayout = (page: React.ReactElement) => (
+  <AppShell mobileTitle="Metronome">{page}</AppShell>
+);
+export default MetronomePage;
 

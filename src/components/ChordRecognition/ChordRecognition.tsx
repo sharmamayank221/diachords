@@ -1,227 +1,208 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import Link from "next/link";
 
-// All chromatic notes
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+// ── Detection logic (unchanged) ───────────────────────────────────────────────
 
-// Chord definitions with their intervals from root
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
 const CHORD_TYPES: Record<string, { intervals: number[]; name: string }> = {
   major: { intervals: [0, 4, 7], name: "Major" },
   minor: { intervals: [0, 3, 7], name: "Minor" },
-  "7": { intervals: [0, 4, 7, 10], name: "7" },
-  maj7: { intervals: [0, 4, 7, 11], name: "Maj7" },
-  m7: { intervals: [0, 3, 7, 10], name: "m7" },
-  dim: { intervals: [0, 3, 6], name: "dim" },
-  aug: { intervals: [0, 4, 8], name: "aug" },
-  sus2: { intervals: [0, 2, 7], name: "sus2" },
-  sus4: { intervals: [0, 5, 7], name: "sus4" },
-  add9: { intervals: [0, 4, 7, 14], name: "add9" },
-  "6": { intervals: [0, 4, 7, 9], name: "6" },
-  m6: { intervals: [0, 3, 7, 9], name: "m6" },
-  "9": { intervals: [0, 4, 7, 10, 14], name: "9" },
-  m9: { intervals: [0, 3, 7, 10, 14], name: "m9" },
-  "5": { intervals: [0, 7], name: "5 (Power)" },
+  "7":   { intervals: [0, 4, 7, 10], name: "7" },
+  maj7:  { intervals: [0, 4, 7, 11], name: "Maj7" },
+  m7:    { intervals: [0, 3, 7, 10], name: "m7" },
+  dim:   { intervals: [0, 3, 6], name: "dim" },
+  aug:   { intervals: [0, 4, 8], name: "aug" },
+  sus2:  { intervals: [0, 2, 7], name: "sus2" },
+  sus4:  { intervals: [0, 5, 7], name: "sus4" },
+  add9:  { intervals: [0, 4, 7, 14], name: "add9" },
+  "6":   { intervals: [0, 4, 7, 9], name: "6" },
+  m6:    { intervals: [0, 3, 7, 9], name: "m6" },
+  "9":   { intervals: [0, 4, 7, 10, 14], name: "9" },
+  m9:    { intervals: [0, 3, 7, 10, 14], name: "m9" },
+  "5":   { intervals: [0, 7], name: "5 (Power)" },
 };
 
-// Common guitar chord voicings for better detection
 const COMMON_GUITAR_CHORDS: Record<string, { notes: string[]; display: string }> = {
-  // Major chords
-  "C_major": { notes: ["C", "E", "G"], display: "C" },
-  "D_major": { notes: ["D", "F#", "A"], display: "D" },
-  "E_major": { notes: ["E", "G#", "B"], display: "E" },
-  "F_major": { notes: ["F", "A", "C"], display: "F" },
-  "G_major": { notes: ["G", "B", "D"], display: "G" },
-  "A_major": { notes: ["A", "C#", "E"], display: "A" },
-  "B_major": { notes: ["B", "D#", "F#"], display: "B" },
-  // Minor chords
-  "C_minor": { notes: ["C", "D#", "G"], display: "Cm" },
-  "D_minor": { notes: ["D", "F", "A"], display: "Dm" },
-  "E_minor": { notes: ["E", "G", "B"], display: "Em" },
-  "F_minor": { notes: ["F", "G#", "C"], display: "Fm" },
-  "G_minor": { notes: ["G", "A#", "D"], display: "Gm" },
-  "A_minor": { notes: ["A", "C", "E"], display: "Am" },
-  "B_minor": { notes: ["B", "D", "F#"], display: "Bm" },
-  // 7th chords
-  "G_7": { notes: ["G", "B", "D", "F"], display: "G7" },
-  "C_7": { notes: ["C", "E", "G", "A#"], display: "C7" },
-  "D_7": { notes: ["D", "F#", "A", "C"], display: "D7" },
-  "E_7": { notes: ["E", "G#", "B", "D"], display: "E7" },
-  "A_7": { notes: ["A", "C#", "E", "G"], display: "A7" },
-  "B_7": { notes: ["B", "D#", "F#", "A"], display: "B7" },
+  C_major: { notes: ["C","E","G"], display: "C" },
+  D_major: { notes: ["D","F#","A"], display: "D" },
+  E_major: { notes: ["E","G#","B"], display: "E" },
+  F_major: { notes: ["F","A","C"], display: "F" },
+  G_major: { notes: ["G","B","D"], display: "G" },
+  A_major: { notes: ["A","C#","E"], display: "A" },
+  B_major: { notes: ["B","D#","F#"], display: "B" },
+  C_minor: { notes: ["C","D#","G"], display: "Cm" },
+  D_minor: { notes: ["D","F","A"], display: "Dm" },
+  E_minor: { notes: ["E","G","B"], display: "Em" },
+  F_minor: { notes: ["F","G#","C"], display: "Fm" },
+  G_minor: { notes: ["G","A#","D"], display: "Gm" },
+  A_minor: { notes: ["A","C","E"], display: "Am" },
+  B_minor: { notes: ["B","D","F#"], display: "Bm" },
+  G_7:  { notes: ["G","B","D","F"],  display: "G7" },
+  C_7:  { notes: ["C","E","G","A#"], display: "C7" },
+  D_7:  { notes: ["D","F#","A","C"], display: "D7" },
+  E_7:  { notes: ["E","G#","B","D"], display: "E7" },
+  A_7:  { notes: ["A","C#","E","G"], display: "A7" },
+  B_7:  { notes: ["B","D#","F#","A"],display: "B7" },
 };
 
-interface DetectedNote {
-  note: string;
-  frequency: number;
-  confidence: number;
-  timestamp: number;
-}
+interface DetectedNote { note: string; frequency: number; confidence: number; timestamp: number; }
+interface ChordMatch   { chord: string; confidence: number; notes: string[]; }
 
-interface ChordMatch {
-  chord: string;
-  confidence: number;
-  notes: string[];
-}
-
-// Pitch detection using autocorrelation
 function autoCorrelate(buffer: Float32Array, sampleRate: number): number | null {
   const SIZE = buffer.length;
-  const MAX_SAMPLES = Math.floor(SIZE / 2);
-  let bestOffset = -1;
-  let bestCorrelation = 0;
-  let rms = 0;
-
-  for (let i = 0; i < SIZE; i++) {
-    const val = buffer[i];
-    rms += val * val;
-  }
+  const MAX = Math.floor(SIZE / 2);
+  let bestOffset = -1, bestCorr = 0, lastCorr = 1, rms = 0;
+  for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i];
   rms = Math.sqrt(rms / SIZE);
-
   if (rms < 0.01) return null;
-
-  let lastCorrelation = 1;
-
-  for (let offset = 0; offset < MAX_SAMPLES; offset++) {
-    let correlation = 0;
-
-    for (let i = 0; i < MAX_SAMPLES; i++) {
-      correlation += Math.abs(buffer[i] - buffer[i + offset]);
-    }
-
-    correlation = 1 - correlation / MAX_SAMPLES;
-
-    if (correlation > 0.9 && correlation > lastCorrelation) {
-      if (correlation > bestCorrelation) {
-        bestCorrelation = correlation;
-        bestOffset = offset;
-      }
-    }
-
-    lastCorrelation = correlation;
+  for (let offset = 0; offset < MAX; offset++) {
+    let corr = 0;
+    for (let i = 0; i < MAX; i++) corr += Math.abs(buffer[i] - buffer[i + offset]);
+    corr = 1 - corr / MAX;
+    if (corr > 0.9 && corr > lastCorr && corr > bestCorr) { bestCorr = corr; bestOffset = offset; }
+    lastCorr = corr;
   }
-
-  if (bestCorrelation > 0.01 && bestOffset > 0) {
-    return sampleRate / bestOffset;
-  }
-
-  return null;
+  return bestCorr > 0.01 && bestOffset > 0 ? sampleRate / bestOffset : null;
 }
 
-// Convert frequency to note name
 function frequencyToNote(frequency: number): { note: string; octave: number } {
-  const A4 = 440;
-  const semitones = 12 * Math.log2(frequency / A4);
-  const noteIndex = Math.round(semitones) + 9; // A is at index 9
+  const semitones = 12 * Math.log2(frequency / 440);
+  const noteIndex = Math.round(semitones) + 9;
   const octave = Math.floor((noteIndex + 3) / 12) + 4;
-  const note = NOTE_NAMES[((noteIndex % 12) + 12) % 12];
-  return { note, octave };
+  return { note: NOTE_NAMES[((noteIndex % 12) + 12) % 12], octave };
 }
 
-// Get note index (0-11) from note name
-function getNoteIndex(note: string): number {
-  return NOTE_NAMES.indexOf(note);
-}
-
-// Match detected notes to chords
 function matchChord(detectedNotes: string[]): ChordMatch[] {
+  const unique = Array.from(new Set(detectedNotes));
+  if (unique.length < 2) return [];
   const matches: ChordMatch[] = [];
-  const uniqueNotes = Array.from(new Set(detectedNotes));
-
-  if (uniqueNotes.length < 2) return [];
-
-  // First check against common guitar chord voicings
-  for (const [key, { notes, display }] of Object.entries(COMMON_GUITAR_CHORDS)) {
-    const matchedNotes = notes.filter(n => uniqueNotes.includes(n));
-    const confidence = matchedNotes.length / notes.length;
-    
-    if (confidence >= 0.66) { // At least 2/3 notes match
-      matches.push({
-        chord: display,
-        confidence: confidence,
-        notes: matchedNotes,
-      });
-    }
+  for (const [, { notes, display }] of Object.entries(COMMON_GUITAR_CHORDS)) {
+    const matched = notes.filter(n => unique.includes(n));
+    const conf = matched.length / notes.length;
+    if (conf >= 0.66) matches.push({ chord: display, confidence: conf, notes: matched });
   }
-
-  // If no common chord matched, try generic chord detection
   if (matches.length === 0) {
-    for (const root of uniqueNotes) {
-      const rootIndex = getNoteIndex(root);
-      
-      for (const [type, { intervals, name }] of Object.entries(CHORD_TYPES)) {
-        const expectedNotes = intervals.map(i => NOTE_NAMES[(rootIndex + i) % 12]);
-        const matchedNotes = expectedNotes.filter(n => uniqueNotes.includes(n));
-        const confidence = matchedNotes.length / expectedNotes.length;
-        
-        if (confidence >= 0.66) {
-          matches.push({
-            chord: `${root}${name === "Major" ? "" : name}`,
-            confidence: confidence,
-            notes: matchedNotes,
-          });
-        }
+    for (const root of unique) {
+      const ri = NOTE_NAMES.indexOf(root);
+      for (const [, { intervals, name }] of Object.entries(CHORD_TYPES)) {
+        const expected = intervals.map(i => NOTE_NAMES[(ri + i) % 12]);
+        const matched  = expected.filter(n => unique.includes(n));
+        const conf = matched.length / expected.length;
+        if (conf >= 0.66) matches.push({ chord: `${root}${name === "Major" ? "" : name}`, confidence: conf, notes: matched });
       }
     }
   }
-
-  // Sort by confidence
   return matches.sort((a, b) => b.confidence - a.confidence).slice(0, 3);
 }
 
+// ── Common chord suggestions ──────────────────────────────────────────────────
+
+const SUGGESTIONS = [
+  { label: "C",  type: "major" }, { label: "G",  type: "major" }, { label: "D",  type: "major" },
+  { label: "A",  type: "major" }, { label: "E",  type: "major" }, { label: "F",  type: "major" },
+  { label: "Am", type: "minor" }, { label: "Em", type: "minor" }, { label: "Dm", type: "minor" },
+  { label: "G7", type: "7th"  }, { label: "C7", type: "7th"   }, { label: "E7", type: "7th"   },
+];
+
+const TYPE_COLOR: Record<string, string> = { major: "#aeffd4", minor: "#82e9ff", "7th": "#f59e0b" };
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+function MicIcon({ active, size = 20 }: { active: boolean; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={active ? "#10feb0" : "#adaaaa"} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="2" width="6" height="12" rx="3"/>
+      <path d="M5 10s0 7 7 7 7-7 7-7"/><line x1="12" y1="17" x2="12" y2="22"/>
+    </svg>
+  );
+}
+
+// ── Waveform bars animation ───────────────────────────────────────────────────
+
+function WaveformBars({ active, volume }: { active: boolean; volume: number }) {
+  const bars = Array.from({ length: 20 });
+  return (
+    <div className="flex items-end justify-center gap-[3px] h-12">
+      {bars.map((_, i) => {
+        const base = 0.15 + 0.15 * Math.sin((i / bars.length) * Math.PI);
+        const height = active ? `${Math.max(8, (base + volume * 0.6) * 48)}px` : "4px";
+        return (
+          <div key={i} className="rounded-full transition-all duration-75"
+            style={{
+              width: 3,
+              height,
+              background: active
+                ? `rgba(174,255,212,${0.4 + volume * 0.6})`
+                : "rgba(72,72,71,0.3)",
+              transitionDelay: `${i * 20}ms`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Confidence ring ───────────────────────────────────────────────────────────
+
+function ConfidenceRing({ confidence }: { confidence: number }) {
+  const r = 42, circ = 2 * Math.PI * r;
+  const offset = circ - (circ * confidence);
+  return (
+    <svg width="100" height="100" viewBox="0 0 100 100" className="absolute -inset-4">
+      <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(72,72,71,0.2)" strokeWidth="3"/>
+      <circle cx="50" cy="50" r={r} fill="none" stroke="#10feb0" strokeWidth="3"
+        strokeDasharray={circ} strokeDashoffset={offset}
+        strokeLinecap="round" transform="rotate(-90 50 50)"
+        style={{ transition: "stroke-dashoffset 0.4s ease", filter: "drop-shadow(0 0 6px rgba(16,254,176,0.5))" }}/>
+    </svg>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function ChordRecognition() {
-  const [isListening, setIsListening] = useState(false);
+  const [isListening, setIsListening]     = useState(false);
   const [detectedNotes, setDetectedNotes] = useState<DetectedNote[]>([]);
   const [matchedChords, setMatchedChords] = useState<ChordMatch[]>([]);
-  const [currentNote, setCurrentNote] = useState<string | null>(null);
-  const [volume, setVolume] = useState(0);
-  const [sensitivity, setSensitivity] = useState(0.02);
-  
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const animationRef = useRef<number | null>(null);
+  const [currentNote, setCurrentNote]     = useState<string | null>(null);
+  const [volume, setVolume]               = useState(0);
+  const [sensitivity, setSensitivity]     = useState(0.02);
+  const [history, setHistory]             = useState<string[]>([]);
+
+  const audioCtxRef    = useRef<AudioContext | null>(null);
+  const analyserRef    = useRef<AnalyserNode | null>(null);
+  const streamRef      = useRef<MediaStream | null>(null);
+  const animRef        = useRef<number | null>(null);
   const noteHistoryRef = useRef<DetectedNote[]>([]);
 
   const startListening = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        } 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
-      
-      mediaStreamRef.current = stream;
-      audioContextRef.current = new AudioContext();
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      
-      const source = audioContextRef.current.createMediaStreamSource(stream);
+      streamRef.current    = stream;
+      audioCtxRef.current  = new AudioContext();
+      analyserRef.current  = audioCtxRef.current.createAnalyser();
       analyserRef.current.fftSize = 4096;
       analyserRef.current.smoothingTimeConstant = 0.8;
-      source.connect(analyserRef.current);
-      
+      audioCtxRef.current.createMediaStreamSource(stream).connect(analyserRef.current);
       setIsListening(true);
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
-      alert("Could not access microphone. Please ensure microphone permissions are granted.");
+    } catch {
+      alert("Could not access microphone. Please check permissions.");
     }
   }, []);
 
   const stopListening = useCallback(() => {
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
+    if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = null; }
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+      audioCtxRef.current.close().catch(() => {});
     }
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-      audioContextRef.current.close().catch(() => {
-        // Ignore errors if already closed
-      });
-      audioContextRef.current = null;
-    }
+    audioCtxRef.current = null;
     analyserRef.current = null;
     setIsListening(false);
     setDetectedNotes([]);
@@ -232,305 +213,348 @@ export default function ChordRecognition() {
   }, []);
 
   const analyze = useCallback(() => {
-    if (!analyserRef.current || !audioContextRef.current) return;
-
-    const bufferLength = analyserRef.current.fftSize;
-    const buffer = new Float32Array(bufferLength);
-    analyserRef.current.getFloatTimeDomainData(buffer);
-
-    // Calculate volume (RMS)
+    if (!analyserRef.current || !audioCtxRef.current || audioCtxRef.current.state === "closed") return;
+    const buf = new Float32Array(analyserRef.current.fftSize);
+    analyserRef.current.getFloatTimeDomainData(buf);
     let rms = 0;
-    for (let i = 0; i < buffer.length; i++) {
-      rms += buffer[i] * buffer[i];
-    }
-    rms = Math.sqrt(rms / buffer.length);
+    for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / buf.length);
     setVolume(Math.min(rms * 10, 1));
-
-    // Only process if volume is above threshold
     if (rms > sensitivity) {
-      const frequency = autoCorrelate(buffer, audioContextRef.current.sampleRate);
-      
-      if (frequency && frequency > 60 && frequency < 1200) {
-        const { note, octave } = frequencyToNote(frequency);
+      const freq = autoCorrelate(buf, audioCtxRef.current.sampleRate);
+      if (freq && freq > 60 && freq < 1200) {
+        const { note, octave } = frequencyToNote(freq);
         const now = Date.now();
-        
         setCurrentNote(`${note}${octave}`);
-        
-        // Add to note history
-        const newNote: DetectedNote = {
-          note,
-          frequency,
-          confidence: rms,
-          timestamp: now,
-        };
-        
-        noteHistoryRef.current.push(newNote);
-        
-        // Keep only recent notes (last 1.5 seconds)
-        noteHistoryRef.current = noteHistoryRef.current.filter(
-          n => now - n.timestamp < 1500
-        );
-        
-        // Update state with unique notes
+        noteHistoryRef.current.push({ note, frequency: freq, confidence: rms, timestamp: now });
+        noteHistoryRef.current = noteHistoryRef.current.filter(n => now - n.timestamp < 1500);
         setDetectedNotes([...noteHistoryRef.current]);
-        
-        // Try to match chords with all detected notes
-        const uniqueNoteNames = Array.from(new Set(noteHistoryRef.current.map(n => n.note)));
-        const matches = matchChord(uniqueNoteNames);
+        const unique = Array.from(new Set(noteHistoryRef.current.map(n => n.note)));
+        const matches = matchChord(unique);
         setMatchedChords(matches);
+        if (matches[0]) {
+          setHistory(prev => {
+            const next = [matches[0].chord, ...prev.filter(c => c !== matches[0].chord)].slice(0, 6);
+            return next;
+          });
+        }
       }
     }
-
-    animationRef.current = requestAnimationFrame(analyze);
+    animRef.current = requestAnimationFrame(analyze);
   }, [sensitivity]);
 
-  // Start analyzing when listening starts
   useEffect(() => {
-    if (isListening && audioContextRef.current && analyserRef.current) {
-      analyze();
-    }
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
-      }
-    };
+    if (isListening && audioCtxRef.current && analyserRef.current) analyze();
+    return () => { if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = null; } };
   }, [isListening, analyze]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // Only cleanup if we're still listening
-      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-        audioContextRef.current.close().catch(() => {});
-      }
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  // Clear old notes periodically
   useEffect(() => {
     if (!isListening) return;
-    
-    const interval = setInterval(() => {
+    const id = setInterval(() => {
       const now = Date.now();
-      noteHistoryRef.current = noteHistoryRef.current.filter(
-        n => now - n.timestamp < 1500
-      );
+      noteHistoryRef.current = noteHistoryRef.current.filter(n => now - n.timestamp < 1500);
       setDetectedNotes([...noteHistoryRef.current]);
-      
-      if (noteHistoryRef.current.length >= 2) {
-        const uniqueNoteNames = Array.from(new Set(noteHistoryRef.current.map(n => n.note)));
-        const matches = matchChord(uniqueNoteNames);
-        setMatchedChords(matches);
-      } else {
-        setMatchedChords([]);
-      }
+      const unique = Array.from(new Set(noteHistoryRef.current.map(n => n.note)));
+      setMatchedChords(unique.length >= 2 ? matchChord(unique) : []);
     }, 500);
-
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, [isListening]);
 
-  const uniqueRecentNotes = Array.from(new Set(detectedNotes.map(n => n.note)));
+  useEffect(() => () => {
+    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") audioCtxRef.current.close().catch(() => {});
+    streamRef.current?.getTracks().forEach(t => t.stop());
+  }, []);
 
-  return (
-    <div className="min-h-screen bg-black text-white p-4 md:p-8">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-Lora font-bold mb-2">
-            🎸 Chord Recognition
-          </h1>
-          <p className="text-gray-400 font-Lora">
-            Play a chord and I&apos;ll tell you what it is
-          </p>
-        </div>
+  const uniqueNotes  = Array.from(new Set(detectedNotes.map(n => n.note)));
+  const topChord     = matchedChords[0] ?? null;
+  const topConf      = topChord ? topChord.confidence : 0;
+  const isDetected   = !!topChord;
 
-        {/* Main Display */}
-        <div className="bg-[#0a0a0a] rounded-3xl p-6 md:p-8 border border-[#222] mb-6">
-          {/* Detected Chord */}
-          <div className="text-center mb-8">
-            <div className="text-gray-500 text-sm font-Lora mb-2 uppercase tracking-wider">
-              Detected Chord
-            </div>
-            <div className="relative">
-              {matchedChords.length > 0 ? (
-                <div className="space-y-4">
-                  <div 
-                    className="text-6xl md:text-8xl font-bold font-Lora text-[#1BD79E] animate-pulse"
-                    style={{ 
-                      textShadow: "0 0 30px rgba(27, 215, 158, 0.5)",
-                    }}
-                  >
-                    {matchedChords[0].chord}
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    Confidence: {Math.round(matchedChords[0].confidence * 100)}%
-                  </div>
-                  
-                  {/* Alternative matches */}
-                  {matchedChords.length > 1 && (
-                    <div className="mt-4 pt-4 border-t border-[#333]">
-                      <div className="text-xs text-gray-500 mb-2">Other possibilities:</div>
-                      <div className="flex justify-center gap-3 flex-wrap">
-                        {matchedChords.slice(1).map((match, i) => (
-                          <span 
-                            key={i}
-                            className="px-3 py-1 bg-[#1a1a1a] rounded-full text-gray-400 text-sm"
-                          >
-                            {match.chord} ({Math.round(match.confidence * 100)}%)
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-4xl md:text-6xl font-bold font-Lora text-gray-600">
-                  {isListening ? "Play a chord..." : "---"}
-                </div>
-              )}
-            </div>
-          </div>
+  // ── SHARED SECTIONS ──────────────────────────────────────────────────────────
 
-          {/* Current Note */}
-          <div className="text-center mb-6">
-            <div className="text-gray-500 text-xs font-Lora mb-1 uppercase tracking-wider">
-              Current Note
-            </div>
-            <div className="text-2xl font-bold font-Lora text-[#38DBE5]">
-              {currentNote || "---"}
-            </div>
-          </div>
-
-          {/* Volume Meter */}
-          <div className="mb-6">
-            <div className="text-gray-500 text-xs font-Lora mb-2 uppercase tracking-wider text-center">
-              Input Level
-            </div>
-            <div className="h-3 bg-[#1a1a1a] rounded-full overflow-hidden">
-              <div 
-                className="h-full transition-all duration-75 rounded-full"
-                style={{ 
-                  width: `${volume * 100}%`,
-                  backgroundColor: volume > 0.7 ? '#C65151' : volume > 0.4 ? '#EA9E2D' : '#1BD79E',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Detected Notes */}
-          <div className="mb-6">
-            <div className="text-gray-500 text-xs font-Lora mb-2 uppercase tracking-wider text-center">
-              Notes Detected ({uniqueRecentNotes.length})
-            </div>
-            <div className="flex justify-center gap-2 flex-wrap min-h-[40px]">
-              {uniqueRecentNotes.length > 0 ? (
-                uniqueRecentNotes.map((note, i) => (
-                  <span 
-                    key={`${note}-${i}`}
-                    className="px-4 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg font-Lora font-bold text-white"
-                  >
-                    {note}
-                  </span>
-                ))
-              ) : (
-                <span className="text-gray-600 font-Lora">No notes detected</span>
-              )}
-            </div>
-          </div>
-
-          {/* Sensitivity Control */}
-          <div className="mb-6">
-            <div className="text-gray-500 text-xs font-Lora mb-2 uppercase tracking-wider text-center">
-              Sensitivity
-            </div>
-            <input
-              type="range"
-              min="0.005"
-              max="0.05"
-              step="0.005"
-              value={sensitivity}
-              onChange={(e) => setSensitivity(parseFloat(e.target.value))}
-              className="w-full h-2 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer slider-thumb"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>More sensitive</span>
-              <span>Less sensitive</span>
-            </div>
-          </div>
-
-          {/* Start/Stop Button */}
-          <button
-            onClick={isListening ? stopListening : startListening}
-            className={`w-full py-4 rounded-2xl font-Lora font-bold text-xl transition-all transform hover:scale-[1.02] ${
-              isListening
-                ? "bg-gradient-to-r from-[#C65151] to-[#a03f3f] text-white"
-                : "bg-gradient-to-r from-[#1BD79E] to-[#15a87a] text-black"
-            }`}
+  const ChordDisplay = (
+    <div className="flex flex-col items-center gap-3">
+      <p className="font-Inter text-[11px] text-[#adaaaa] tracking-[2px] uppercase">
+        {isListening ? (isDetected ? "DETECTED CHORD" : "LISTENING...") : "CHORD DETECTION"}
+      </p>
+      <div className="relative flex items-center justify-center w-[108px] h-[108px]">
+        {isDetected && <ConfidenceRing confidence={topConf} />}
+        <div className="w-24 h-24 rounded-full flex items-center justify-center"
+          style={{ background: isDetected ? "rgba(16,254,176,0.06)" : "rgba(72,72,71,0.1)" }}>
+          <span
+            className="font-Space-Grotesk font-bold leading-none transition-all duration-300"
+            style={{
+              fontSize: isDetected ? (topChord!.chord.length > 3 ? 28 : 36) : 28,
+              color: isDetected ? "#00eea5" : "#333",
+              filter: isDetected ? "drop-shadow(0 0 16px rgba(0,238,165,0.5))" : "none",
+            }}
           >
-            {isListening ? "🛑 Stop Listening" : "🎤 Start Listening"}
-          </button>
-        </div>
-
-        {/* Tips */}
-        <div className="bg-[#0a0a0a] rounded-2xl p-5 border border-[#222]">
-          <h3 className="font-Lora font-bold text-lg mb-3 text-[#38DBE5]">💡 Tips for best results:</h3>
-          <ul className="space-y-2 text-gray-400 font-Lora text-sm">
-            <li>• Strum all strings clearly and let them ring</li>
-            <li>• Hold the chord for 1-2 seconds</li>
-            <li>• Play in a quiet environment</li>
-            <li>• Make sure your guitar is in tune</li>
-            <li>• Adjust sensitivity if detection is too fast/slow</li>
-          </ul>
-        </div>
-
-        {/* Common Chords Reference */}
-        <div className="mt-6 bg-[#0a0a0a] rounded-2xl p-5 border border-[#222]">
-          <h3 className="font-Lora font-bold text-lg mb-4 text-center">🎵 Try These Chords</h3>
-          <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
-            {["C", "D", "E", "F", "G", "A", "B"].map(note => (
-              <div key={note} className="text-center">
-                <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#333]">
-                  <div className="font-Lora font-bold text-[#1BD79E]">{note}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-4 md:grid-cols-7 gap-2 mt-2">
-            {["Am", "Dm", "Em", "Fm", "Gm", "Bm", "G7"].map(chord => (
-              <div key={chord} className="text-center">
-                <div className="bg-[#1a1a1a] rounded-lg p-3 border border-[#333]">
-                  <div className="font-Lora font-bold text-[#EA9E2D]">{chord}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+            {isDetected ? topChord!.chord : isListening ? "?" : "—"}
+          </span>
         </div>
       </div>
-
-      {/* Styling for range slider */}
-      <style jsx>{`
-        .slider-thumb::-webkit-slider-thumb {
-          appearance: none;
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #1BD79E;
-          cursor: pointer;
-        }
-        .slider-thumb::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #1BD79E;
-          cursor: pointer;
-          border: none;
-        }
-      `}</style>
+      {isDetected && (
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#10feb0] animate-pulse" />
+          <span className="font-Inter text-[12px] text-[#10feb0]">
+            {Math.round(topConf * 100)}% confidence
+          </span>
+        </div>
+      )}
+      {!isDetected && isListening && (
+        <span className="font-Inter text-[12px] text-[#adaaaa]">Play a chord to detect it</span>
+      )}
     </div>
   );
-}
 
+  const AlternativeMatches = matchedChords.length > 1 ? (
+    <div className="flex flex-col gap-2">
+      <p className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px]">Other Possibilities</p>
+      <div className="flex gap-2 flex-wrap">
+        {matchedChords.slice(1).map((m, i) => (
+          <div key={i} className="bg-[#20201f] border border-white/5 rounded-full px-3 py-1.5 flex items-center gap-2">
+            <span className="font-Space-Grotesk font-bold text-[14px] text-[#82e9ff]">{m.chord}</span>
+            <span className="font-Inter text-[10px] text-[#adaaaa]">{Math.round(m.confidence * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  const NotePills = (
+    <div className="flex flex-col gap-2">
+      <p className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px]">
+        Notes Detected {uniqueNotes.length > 0 && `(${uniqueNotes.length})`}
+      </p>
+      <div className="flex gap-2 flex-wrap min-h-[36px]">
+        {uniqueNotes.length > 0 ? uniqueNotes.map((note, i) => (
+          <span key={i} className="font-Space-Grotesk font-bold text-[14px] text-white bg-[#1a1a1a] border border-[#aeffd4]/20 rounded-lg px-3 py-1.5">
+            {note}
+          </span>
+        )) : (
+          <span className="font-Manrope text-[13px] text-[#555]">
+            {isListening ? "Waiting for input..." : "Start listening to detect notes"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  const VolumeBar = (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <p className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px]">Input Level</p>
+        {currentNote && (
+          <span className="font-Space-Grotesk font-bold text-[14px] text-[#82e9ff]">{currentNote}</span>
+        )}
+      </div>
+      <div className="h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-75"
+          style={{
+            width: `${volume * 100}%`,
+            background: volume > 0.7 ? "#ef4444" : volume > 0.4 ? "#f59e0b" : "#10feb0",
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  const SensitivityControl = (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <p className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px]">Sensitivity</p>
+        <span className="font-Inter text-[11px] text-[#adaaaa]">
+          {sensitivity <= 0.01 ? "Very High" : sensitivity <= 0.02 ? "High" : sensitivity <= 0.03 ? "Medium" : "Low"}
+        </span>
+      </div>
+      <input type="range" min="0.005" max="0.05" step="0.005" value={sensitivity}
+        onChange={e => setSensitivity(parseFloat(e.target.value))}
+        className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+        style={{ background: `linear-gradient(to right, #10feb0 0%, #10feb0 ${((sensitivity - 0.005) / 0.045) * 100}%, #262626 ${((sensitivity - 0.005) / 0.045) * 100}%, #262626 100%)` }}
+      />
+      <div className="flex justify-between font-Inter text-[10px] text-[#555]">
+        <span>More sensitive</span>
+        <span>Less sensitive</span>
+      </div>
+    </div>
+  );
+
+  const StartStopButton = ({ fullWidth = false }: { fullWidth?: boolean }) => (
+    <button
+      onClick={isListening ? stopListening : startListening}
+      className={`flex items-center justify-center gap-3 py-4 rounded-full font-Space-Grotesk font-bold text-[16px] transition-all ${fullWidth ? "w-full" : "px-8"}`}
+      style={{
+        background: isListening ? "rgba(239,68,68,0.12)" : "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)",
+        color: isListening ? "#ef4444" : "#005c3d",
+        border: isListening ? "1px solid rgba(239,68,68,0.3)" : "none",
+      }}
+    >
+      <MicIcon active={isListening} />
+      {isListening ? "Stop Listening" : "Start Listening"}
+    </button>
+  );
+
+  // ── MOBILE ────────────────────────────────────────────────────────────────────
+
+  const MobileView = (
+    <div className="max-w-[430px] mx-auto px-6 py-6 flex flex-col gap-6">
+        {/* Main detection card */}
+        <div className="bg-[#131313] rounded-2xl p-6 flex flex-col items-center gap-6">
+          {ChordDisplay}
+          <WaveformBars active={isListening} volume={volume} />
+          {VolumeBar}
+          {NotePills}
+          {AlternativeMatches}
+        </div>
+
+        {SensitivityControl}
+        <StartStopButton fullWidth />
+
+        {/* Session history */}
+        {history.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <p className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px]">Session History</p>
+            <div className="flex gap-2 flex-wrap">
+              {history.map((c, i) => (
+                <Link key={i} href={`/chords/${c.toLowerCase().replace("#", "sharp")}major`}>
+                  <span className="font-Space-Grotesk font-bold text-[14px] text-[#aeffd4] bg-[#1a1a1a] border border-[#aeffd4]/15 rounded-xl px-3 py-2 cursor-pointer hover:border-[#aeffd4]/40 transition-colors">
+                    {c}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tips */}
+        <div className="bg-[#131313] rounded-2xl p-5 flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-0.5 bg-[#aeffd4]" />
+            <p className="font-Space-Grotesk font-bold text-white text-[14px]">Tips for best results</p>
+          </div>
+          {["Strum all strings clearly and let them ring", "Hold the chord for 1–2 seconds", "Play in a quiet environment", "Make sure your guitar is in tune", "Adjust sensitivity if detection feels off"].map((tip, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <div className="w-1 h-1 rounded-full bg-[#aeffd4] mt-1.5 shrink-0" />
+              <p className="font-Manrope text-[#adaaaa] text-[13px] leading-relaxed">{tip}</p>
+            </div>
+          ))}
+        </div>
+    </div>
+  );
+
+  // ── DESKTOP ───────────────────────────────────────────────────────────────────
+
+  const DesktopView = (
+    <div className="px-8 pt-6 pb-16">
+      {/* Hero */}
+      <div className="flex items-end justify-between mb-8">
+        <div>
+          <h2 className="font-Space-Grotesk font-bold text-[64px] leading-none tracking-[-2px] text-white">Chord Detect</h2>
+          <p className="font-Inter text-[#adaaaa] text-[13px] tracking-[1.4px] uppercase mt-2">REAL-TIME CHORD RECOGNITION</p>
+        </div>
+        <StartStopButton />
+      </div>
+
+          {/* Two-column grid */}
+          <div className="grid grid-cols-12 gap-8">
+
+            {/* Left column — main detection */}
+            <div className="col-span-7 flex flex-col gap-6">
+
+              {/* Big detection card */}
+              <div className="bg-[#131313] rounded-2xl p-8 flex flex-col gap-8">
+                {/* Chord display + waveform side by side */}
+                <div className="flex items-center gap-8">
+                  {ChordDisplay}
+                  <div className="flex-1">
+                    <WaveformBars active={isListening} volume={volume} />
+                  </div>
+                </div>
+                {VolumeBar}
+                {NotePills}
+                {AlternativeMatches && (
+                  <div className="pt-4 border-t border-white/5">{AlternativeMatches}</div>
+                )}
+              </div>
+
+              {/* Sensitivity */}
+              <div className="bg-[#131313] rounded-2xl p-6">{SensitivityControl}</div>
+
+              {/* Session history */}
+              {history.length > 0 && (
+                <div className="bg-[#131313] rounded-2xl p-6 flex flex-col gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-0.5 bg-[#aeffd4]" />
+                    <h3 className="font-Space-Grotesk font-bold text-white text-[16px]">Session History</h3>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {history.map((c, i) => (
+                      <Link key={i} href={`/chords/${c.toLowerCase().replace("#","sharp")}major`}>
+                        <span className="font-Space-Grotesk font-bold text-[14px] text-[#aeffd4] bg-[#1a1a1a] border border-[#aeffd4]/15 rounded-xl px-4 py-2 cursor-pointer hover:border-[#aeffd4]/40 transition-colors">
+                          {c}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right column — info panels */}
+            <div className="col-span-5 flex flex-col gap-6">
+
+              {/* Try these chords */}
+              <div className="bg-[#131313] rounded-2xl p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-0.5 bg-[#aeffd4]" />
+                  <h3 className="font-Space-Grotesk font-bold text-white text-[16px]">Try These Chords</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {SUGGESTIONS.map((s, i) => (
+                    <div key={i} className="bg-[#1a1a1a] border border-white/5 rounded-xl px-3 py-3 flex flex-col items-center gap-1">
+                      <span className="font-Space-Grotesk font-bold text-[18px]" style={{ color: TYPE_COLOR[s.type] }}>{s.label}</span>
+                      <span className="font-Inter text-[10px] text-[#555] uppercase tracking-wide">{s.type}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-[#131313] rounded-2xl p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-0.5 bg-[#aeffd4]" />
+                  <h3 className="font-Space-Grotesk font-bold text-white text-[16px]">Tips for Best Results</h3>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {["Strum all strings clearly and let them ring", "Hold the chord for 1–2 seconds", "Play in a quiet environment", "Ensure your guitar is in tune first", "Lower sensitivity if getting false detections"].map((tip, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#aeffd4] mt-1.5 shrink-0" />
+                      <p className="font-Manrope text-[#adaaaa] text-[13px] leading-relaxed">{tip}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* How it works glassmorphism */}
+              <div className="rounded-2xl p-6 border border-white/5 flex flex-col gap-3"
+                style={{ background: "rgba(38,38,38,0.4)", backdropFilter: "blur(20px)" }}>
+                <div className="flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#82e9ff" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="3"/></svg>
+                  <span className="font-Space-Grotesk font-bold text-[#82e9ff] text-[13px] tracking-wider">HOW IT WORKS</span>
+                </div>
+                <p className="font-Manrope text-[#adaaaa] text-[13px] leading-relaxed">
+                  Your microphone captures the audio. We use pitch detection to identify individual notes, then match them against known chord patterns — all in real time, in your browser.
+                </p>
+              </div>
+            </div>
+          </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="lg:hidden">{MobileView}</div>
+      <div className="hidden lg:block">{DesktopView}</div>
+    </>
+  );
+}
