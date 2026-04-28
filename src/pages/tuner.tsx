@@ -1,7 +1,9 @@
+import React from "react";
 import SEO, { createWebPageSchema, createHowToSchema } from "@/components/SEO";
 import Tuner from "@/components/Tuner/Tuner";
+import AppShell from "@/components/Navigation/AppShell";
 
-export default function TunerPage() {
+function TunerPage() {
   const jsonLd = [
     createWebPageSchema(
       "Free Online Guitar Tuner",
@@ -43,3 +45,8 @@ export default function TunerPage() {
     </>
   );
 }
+
+TunerPage.getLayout = (page: React.ReactElement) => (
+  <AppShell mobileTitle="Guitar Tuner">{page}</AppShell>
+);
+export default TunerPage;

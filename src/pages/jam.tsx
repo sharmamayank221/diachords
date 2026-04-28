@@ -1,7 +1,9 @@
+import React from "react";
 import SEO, { createWebPageSchema } from "@/components/SEO";
 import BackingTrackGenerator from "@/components/BackingTrack/BackingTrackGenerator";
+import AppShell from "@/components/Navigation/AppShell";
 
-export default function JamPage() {
+function JamPage() {
   const jsonLd = createWebPageSchema(
     "AI Backing Track Generator",
     "Generate custom backing tracks to practice guitar",
@@ -26,9 +28,14 @@ export default function JamPage() {
         ]}
         jsonLd={jsonLd}
       />
-      <main className="min-h-screen bg-gradient-to-b from-[#0a0a0a] to-[#111] py-8">
+      <main className="bg-gradient-to-b from-[#0a0a0a] to-[#111] py-8">
         <BackingTrackGenerator />
       </main>
     </>
   );
 }
+
+JamPage.getLayout = (page: React.ReactElement) => (
+  <AppShell mobileTitle="Jam Session">{page}</AppShell>
+);
+export default JamPage;

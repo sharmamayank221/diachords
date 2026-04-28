@@ -1,13 +1,14 @@
+import React from "react";
 import dynamic from "next/dynamic";
 import SEO, { createWebPageSchema, createHowToSchema } from "@/components/SEO";
+import AppShell from "@/components/Navigation/AppShell";
 
-// Dynamic import to avoid SSR issues with audio
 const ScaleFretboard = dynamic(
   () => import("@/components/Scale/ScaleFretboard"),
   { ssr: false }
 );
 
-export default function ScalesPage() {
+function ScalesPage() {
   const jsonLd = [
     createWebPageSchema(
       "Guitar Scale Explorer",
@@ -49,3 +50,8 @@ export default function ScalesPage() {
     </>
   );
 }
+
+ScalesPage.getLayout = (page: React.ReactElement) => (
+  <AppShell mobileTitle="Scale Explorer">{page}</AppShell>
+);
+export default ScalesPage;
