@@ -477,7 +477,7 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
                 {/* Quote callout */}
                 <div className="bg-black border-l-2 border-[rgba(174,255,212,0.4)] rounded-xl pl-4 pr-4 pt-5 pb-4">
                   <p className="font-Manrope text-[#adaaaa] text-[12px] leading-relaxed">
-                    "Keep your thumb behind the neck for better reach and avoid muting adjacent strings."
+                    &quot;Keep your thumb behind the neck for better reach and avoid muting adjacent strings.&quot;
                   </p>
                 </div>
               </div>
