@@ -5,6 +5,10 @@ import dynamic from "next/dynamic";
 import { A, Position } from "@/types/chord.types";
 import { initAudio, playNote } from "@/utils/audioUtils";
 import TutorialSection from "@/components/ChordDetail/TutorialSection";
+import { useAuth } from "@/hooks/useAuth";
+import UserMenu from "@/components/Auth/UserMenu";
+import LoginModal from "@/components/Auth/LoginModal";
+import { useFavorites } from "@/hooks/useFavorites";
 
 const Guitar = dynamic(() => import("@/components/Guitar"), { ssr: false });
 
@@ -218,6 +222,10 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
   const [position, setPosition] = React.useState(0);
   const [midiNotes, setMidiNotes] = React.useState<number[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [loginOpen, setLoginOpen] = React.useState(false);
+  const { user, isLoading } = useAuth();
+  const chordId = (router.query.id as string) ?? "";
+  const { isFavorited, toggle: toggleFavorite, loading: favLoading } = useFavorites(chordId, chordData?.key ?? "", chordData?.suffix ?? "");
 
   const isChordPage = router.pathname.startsWith("/chords");
 
@@ -254,7 +262,7 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
   const genre = GENRE_TAGS[suffix] ?? "Guitar voicing";
 
   const navItems = [
-    { href: "/chords/cmajor", label: "Library",  icon: <LibraryIcon active={isChordPage} />,  active: isChordPage },
+    { href: "/chords/cmajor", label: "Chord Library",  icon: <LibraryIcon active={isChordPage} />,  active: isChordPage },
     { href: "/chord-recognition", label: "Practice", icon: <PracticeIcon active={false} />, active: false },
     { href: "/tuner",          label: "Tuner",    icon: <TunerIcon2 active={false} />,   active: false },
     { href: "/ear-training",   label: "Progress", icon: <ProgressIcon active={false} />, active: false },
@@ -365,17 +373,28 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="w-8 h-8 rounded-full border border-[rgba(174,255,212,0.2)] bg-[#20201f] overflow-hidden flex items-center justify-center">
-              <span className="font-Space-Grotesk font-bold text-[#14ffb1] text-xs">
-                {key[0]}
-              </span>
-            </div>
+          <div className="flex items-center gap-4">
+            {!isLoading && (
+              user ? (
+                <UserMenu />
+              ) : (
+                <button
+                  onClick={() => setLoginOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1BD79E]/10 border border-[#1BD79E]/30 hover:bg-[#1BD79E]/20 transition-all"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1BD79E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  <span className="font-Manrope text-[13px] text-[#1BD79E] font-medium">Sign in</span>
+                </button>
+              )
+            )}
           </div>
         </header>
+        {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
 
         {/* ── SCROLLABLE CONTENT ── */}
-        <main className="flex-1 px-8 pt-8 pb-24 max-w-[1200px] w-full">
+        <main className="flex-1 px-8 pt-8 pb-24 max-w-[1600px] w-full">
 
           {/* ── HERO HEADER ── */}
           <div className="flex items-end justify-between mb-8">
@@ -402,10 +421,26 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="#aeffd4"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                 <span className="font-Manrope font-bold text-[16px] text-[#aeffd4]">Strum Audio</span>
               </button>
-              <button className="flex items-center gap-2 px-6 py-3 rounded-full font-Manrope font-bold text-[16px] text-[#006644]"
-                style={{ background: "linear-gradient(167deg, #aeffd4 0%, #10feb0 100%)" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="#006644"><line x1="12" y1="5" x2="12" y2="19" strokeWidth="3" stroke="#006644" strokeLinecap="round" /><line x1="5" y1="12" x2="19" y2="12" strokeWidth="3" stroke="#006644" strokeLinecap="round" /></svg>
-                Add to Repertoire
+              <button
+                onClick={() => user ? toggleFavorite() : setLoginOpen(true)}
+                disabled={favLoading}
+                className="flex items-center gap-2 px-6 py-3 rounded-full font-Manrope font-bold text-[16px] transition-all disabled:opacity-50"
+                style={isFavorited
+                  ? { background: "#1a1a1a", border: "1px solid #1BD79E", color: "#1BD79E" }
+                  : { background: "linear-gradient(167deg, #aeffd4 0%, #10feb0 100%)", color: "#006644" }
+                }
+              >
+                {isFavorited ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#1BD79E"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    Saved
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006644" strokeWidth="2.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    Save Chord
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -453,29 +488,47 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
             {/* Right sidebar — col 9-12 */}
             <div className="col-span-4 flex flex-col gap-6">
 
-              {/* Fingering Guide */}
-              <div className="bg-[#20201f] rounded-2xl p-8 flex flex-col gap-6">
-                <h3 className="font-Space-Grotesk font-bold text-white text-[20px]">Fingering Guide</h3>
-                <div className="flex flex-col gap-6">
+              {/* Fingering Guide — merged */}
+              <div className="bg-[#20201f] rounded-2xl p-7 flex flex-col gap-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: "rgba(27,215,158,0.12)" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1BD79E" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v10M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+                      <path d="M6 14v0a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-2.5" />
+                    </svg>
+                  </div>
+                  <h3 className="font-Space-Grotesk font-bold text-white text-[18px]">Fingering Guide</h3>
+                </div>
+
+                <div className="flex flex-col gap-3">
                   {fingeringGuide.length > 0 ? fingeringGuide.map((fi) => (
-                    <div key={fi.finger} className="flex gap-4 items-start">
-                      <div className="bg-[#262626] rounded-lg flex items-center justify-center w-8 h-8 shrink-0">
-                        <span className="font-Space-Grotesk font-bold text-[#aeffd4] text-[16px]">{fi.finger}</span>
+                    <div key={fi.finger} className="flex gap-3 items-start bg-[#1a1a1a] rounded-xl px-4 py-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: "rgba(27,215,158,0.15)" }}>
+                        <span className="font-Space-Grotesk font-bold text-[14px]" style={{ color: "#1BD79E" }}>{fi.finger}</span>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <p className="font-Manrope font-bold text-white text-[14px]">{fi.name} Finger</p>
-                        <p className="font-Manrope text-[#adaaaa] text-[12px] leading-[1.625]">
-                          Press fret {fi.fret} on the {fi.string} string. Keep the joint arched for clarity.
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="font-Manrope font-bold text-white text-[14px]">{fi.name} Finger</p>
+                          <span className="font-Inter text-[11px] px-2 py-0.5 rounded-full"
+                            style={{ background: "#262626", color: "#71717a" }}>
+                            Fret {fi.fret} · {fi.string}
+                          </span>
+                        </div>
+                        <p className="font-Manrope text-[#adaaaa] text-[12px] leading-relaxed">
+                          Keep the joint arched for clarity and avoid muting adjacent strings.
                         </p>
                       </div>
                     </div>
                   )) : (
-                    <p className="font-Manrope text-[#adaaaa] text-[14px]">Open chord — no fingers required.</p>
+                    <p className="font-Manrope text-[#52525b] text-[14px]">Open chord — no fingers required.</p>
                   )}
                 </div>
 
                 {/* Quote callout */}
-                <div className="bg-black border-l-2 border-[rgba(174,255,212,0.4)] rounded-xl pl-4 pr-4 pt-5 pb-4">
+                <div className="rounded-xl px-4 py-3 border-l-2"
+                  style={{ background: "#0d0d0d", borderColor: "rgba(174,255,212,0.3)" }}>
                   <p className="font-Manrope text-[#adaaaa] text-[12px] leading-relaxed">
                     &quot;Keep your thumb behind the neck for better reach and avoid muting adjacent strings.&quot;
                   </p>
@@ -507,48 +560,8 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
               </div>
             </div>
 
-            {/* ── THEORY & SCALES (redesigned two-card layout) ── col 1-12 */}
-            <div className="col-span-12 grid grid-cols-2 gap-6 pt-4">
-
-              {/* ── LEFT: Fingering Guide card ── */}
-              <div className="bg-[#131313] rounded-2xl p-6 flex flex-col gap-5">
-                {/* Header */}
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#1BD79E]/10 flex items-center justify-center flex-shrink-0">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1BD79E" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v10M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-                      <path d="M6 14v0a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-2.5" />
-                    </svg>
-                  </div>
-                  <h3 className="font-Space-Grotesk font-bold text-white text-[18px]">Fingering Guide</h3>
-                </div>
-
-                {/* Finger list */}
-                <div className="flex flex-col gap-3">
-                  {fingeringGuide.length > 0 ? fingeringGuide.map((fi) => (
-                    <div key={fi.finger} className="flex items-center gap-4 bg-[#1a1a1a] rounded-xl px-4 py-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: "rgba(27,215,158,0.15)" }}>
-                        <span className="font-Space-Grotesk font-bold text-[14px]" style={{ color: "#1BD79E" }}>
-                          {fi.finger}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-Manrope font-semibold text-white text-[14px] leading-tight">
-                          {fi.name} Finger
-                        </p>
-                        <p className="font-Inter text-[12px] text-[#71717a] mt-0.5">
-                          {fi.fret}st Fret, {fi.string} String
-                        </p>
-                      </div>
-                    </div>
-                  )) : (
-                    <p className="font-Manrope text-[#52525b] text-[14px]">Open chord — no fingers required.</p>
-                  )}
-                </div>
-              </div>
-
-              {/* ── RIGHT: Theory & Scales card ── */}
+            {/* ── THEORY & SCALES — full width ── col 1-12 */}
+            <div className="col-span-12 pt-4">
               <div className="bg-[#131313] rounded-2xl p-6 flex flex-col gap-5">
                 {/* Header */}
                 <div className="flex items-center gap-3">
@@ -560,8 +573,8 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
                   <h3 className="font-Space-Grotesk font-bold text-white text-[18px]">Theory &amp; Scales</h3>
                 </div>
 
-                {/* Intervals + Formula row */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Three columns: Intervals · Formula · Suggested Scale */}
+                <div className="grid grid-cols-3 gap-4">
                   <div className="bg-[#1a1a1a] rounded-xl p-4 flex flex-col gap-2">
                     <span className="font-Inter text-[11px] text-[#52525b] uppercase tracking-[1.2px]">Intervals</span>
                     <span className="font-Space-Grotesk font-bold text-white text-[22px] leading-tight">
@@ -574,10 +587,9 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
                       {SCALE_FORMULAS[suffix] ?? "W – W – H – W – W – W – H"}
                     </span>
                   </div>
-                </div>
 
-                {/* Suggested Scale */}
-                <div className="bg-[#1a1a1a] rounded-xl px-5 py-4 flex items-center justify-between">
+                  {/* Suggested Scale — now third column */}
+                  <div className="bg-[#1a1a1a] rounded-xl px-5 py-4 flex items-center justify-between">
                   <div className="flex flex-col gap-1">
                     <span className="font-Inter text-[11px] text-[#52525b] uppercase tracking-[1.2px]">Suggested Scale</span>
                     <span className="font-Space-Grotesk font-bold text-[18px]" style={{ color: "#1BD79E" }}>
@@ -595,16 +607,16 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
                     </svg>
                   </a>
                 </div>
-              </div>
-
-            </div>
+                </div>{/* end grid-cols-3 */}
+              </div>{/* end Theory & Scales card */}
+            </div>{/* end col-span-12 */}
 
           </div>
         </main>
 
         {/* ── FOOTER ── */}
         <footer className="ml-0 border-t border-white/5 bg-black px-12 py-12">
-          <div className="flex items-center justify-between max-w-[1200px]">
+          <div className="flex items-center justify-between max-w-[1600px]">
             <div className="flex gap-12">
               <div className="flex flex-col gap-4">
                 <span className="font-Inter text-[12px] text-[#52525b] uppercase tracking-[1.2px]">QUICK LINKS</span>
