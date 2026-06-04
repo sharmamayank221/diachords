@@ -98,6 +98,7 @@ export default function Tuner() {
   const [autoTune, setAutoTune] = useState(true);
   const [playingRef, setPlayingRef] = useState<number | null>(null);
   const [stringTuneStatus, setStringTuneStatus] = useState<Record<number, "perfect" | "flat" | "sharp" | "idle">>({});
+  const [waveformBars, setWaveformBars] = useState<number[]>(Array(20).fill(0.1));
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -141,6 +142,11 @@ export default function Tuner() {
           setStringTuneStatus(prev => ({ ...prev, [cs.string]: status }));
           if (autoTune) setActiveStringIdx(GUITAR_STRINGS.findIndex(s => s.string === cs.string));
         }
+        // Waveform bars from frequency domain
+        const fftBuf = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(fftBuf);
+        const step = Math.floor(fftBuf.length / 20);
+        setWaveformBars(Array.from({ length: 20 }, (_, i) => fftBuf[i * step] / 255));
         rafRef.current = requestAnimationFrame(detect);
       };
       detect();
@@ -241,11 +247,17 @@ export default function Tuner() {
       {/* Center note display */}
       <div className="absolute inset-x-0 bottom-4 flex flex-col items-center">
         <span
-          className="font-Space-Grotesk font-bold leading-none tracking-tight transition-all duration-200"
+          className="font-Space-Grotesk font-bold leading-none tracking-tight transition-all duration-300"
           style={{
             fontSize: "clamp(48px, 12vw, 96px)",
-            color: isListening && detectedNote ? "#00eea5" : "#333",
-            filter: isListening && detectedNote ? "drop-shadow(0 0 20px rgba(0,238,165,0.4))" : "none",
+            color: status === "perfect" ? "#14FFB1"
+              : isListening && detectedNote ? "#00eea5"
+              : "#333",
+            filter: status === "perfect"
+              ? "drop-shadow(0 0 40px rgba(20,255,177,0.9)) drop-shadow(0 0 15px rgba(20,255,177,1))"
+              : isListening && detectedNote
+              ? "drop-shadow(0 0 20px rgba(0,238,165,0.4))"
+              : "none",
           }}
         >
           {noteName}
@@ -398,154 +410,230 @@ export default function Tuner() {
     </div>
   );
 
-  // ── DESKTOP LAYOUT ────────────────────────────────────────────────────────────
+  // ── DESKTOP LAYOUT (Stitch: Web Tuning Studio) ───────────────────────────────
   const DesktopLayout = (
-    <div className="px-8 pt-6 pb-16">
-      {/* Page title */}
-      <div className="flex items-end justify-between mb-8">
-        <div>
-          <h2 className="font-Space-Grotesk font-bold text-[64px] leading-none tracking-[-2px] text-white">Guitar Tuner</h2>
-          <p className="font-Inter text-[#adaaaa] text-[13px] tracking-[1.4px] uppercase mt-2">CHROMATIC PITCH DETECTION</p>
-        </div>
-        <button
-          onClick={isListening ? stopListening : startListening}
-          className="flex items-center gap-3 px-8 py-4 rounded-full font-Space-Grotesk font-bold text-[16px] transition-all"
-          style={{
-            background: isListening ? "rgba(239,68,68,0.15)" : "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)",
-            color: isListening ? "#ef4444" : "#005c3d",
-            border: isListening ? "1px solid rgba(239,68,68,0.3)" : "none",
-          }}
-        >
-          <MicIcon active={isListening} />
-          {isListening ? "Stop Tuning" : "Start Tuning"}
-        </button>
+    <div className="flex flex-col min-h-full">
+
+      {/* ── Tuner header tabs ── */}
+      <div className="flex items-center gap-8 px-12 pt-6 pb-0">
+        {TUNING_MODES.map((m, i) => (
+          <button key={i} onClick={() => setTuningMode(i)}
+            className="font-Manrope font-semibold text-[14px] pb-1 transition-colors"
+            style={i === tuningMode
+              ? { color: "#14FFB1", borderBottom: "2px solid #14FFB1" }
+              : { color: "rgba(255,255,255,0.4)" }
+            }>
+            {m.label}
+          </button>
+        ))}
       </div>
 
-          {/* Two-column layout */}
-          <div className="grid grid-cols-12 gap-8">
+      {/* ── Main tuner canvas ── */}
+      <section className="flex-1 flex flex-col items-center justify-center px-12 py-8 relative overflow-hidden">
+        {/* Background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
+          style={{ background: "rgba(20,255,177,0.04)", filter: "blur(80px)" }} />
 
-            {/* Left: Gauge + Strings + Mode */}
-            <div className="col-span-7 flex flex-col gap-6">
-              {/* Mode + Auto-tune */}
-              <div className="bg-[#131313] rounded-2xl px-6 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                  <div>
-                    <p className="font-Inter text-[11px] text-[#adaaaa] tracking-[2px] uppercase">MODE</p>
-                    <p className="font-Space-Grotesk font-bold text-white text-[20px]">{TUNING_MODES[tuningMode].label}</p>
-                  </div>
-                  {/* Tuning mode selector */}
-                  <div className="flex gap-2">
-                    {TUNING_MODES.map((m, i) => (
-                      <button key={i} onClick={() => setTuningMode(i)}
-                        className={`px-3 py-1 rounded-full text-[11px] font-Inter transition-all ${i === tuningMode ? "bg-[#aeffd4] text-[#005c3d] font-bold" : "bg-[#262626] text-[#adaaaa] hover:bg-[#333]"}`}>
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <button onClick={() => setAutoTune(!autoTune)}
-                  className="flex items-center gap-3 bg-[#20201f] rounded-full px-4 py-2">
-                  <span className="font-Inter font-semibold text-[12px] text-[#adaaaa]">AUTO-TUNE</span>
-                  <div className={`relative w-12 h-6 rounded-full transition-colors ${autoTune ? "bg-[#10feb0]" : "bg-[#333]"}`}>
-                    <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${autoTune ? "right-1 bg-[#005c3d]" : "left-1 bg-[#777]"}`} />
-                  </div>
-                </button>
-              </div>
+        <div className="relative w-full max-w-3xl flex flex-col items-center">
 
-              {/* Gauge + status */}
-              <div className="bg-[#131313] rounded-2xl p-8 flex flex-col items-center gap-4">
-                <div className="w-full max-w-[480px]">{Gauge}</div>
-                {StatusBadge}
-              </div>
+          {/* Needle area */}
+          <div className="relative w-full flex items-end justify-center" style={{ height: 360 }}>
+            {/* Semicircle arc */}
+            <div className="absolute bottom-0 w-full rounded-full pointer-events-none"
+              style={{
+                height: "100%",
+                border: "1px solid rgba(72,72,71,0.2)",
+                clipPath: "ellipse(100% 100% at 50% 100%)",
+              }} />
 
-              {/* String selectors */}
-              <div className="bg-[#131313] rounded-2xl px-6 py-6 flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <p className="font-Inter text-[12px] text-[#adaaaa] uppercase tracking-[1.2px]">STRING SELECTOR</p>
-                  <p className="font-Inter text-[12px] text-[#adaaaa]">Tap to play reference tone</p>
-                </div>
-                <StringButtons />
-              </div>
-
-              {/* Precision card */}
-              {PrecisionCard}
+            {/* Cents labels */}
+            <div className="absolute bottom-4 w-full flex justify-between px-12 font-Inter text-[10px] uppercase tracking-widest"
+              style={{ color: "#adaaaa" }}>
+              <span>-50 Cents</span>
+              <span style={{ color: "rgba(20,255,177,0.5)" }}>Perfect</span>
+              <span>+50 Cents</span>
             </div>
 
-            {/* Right: Info panels */}
-            <div className="col-span-5 flex flex-col gap-6">
+            {/* Note name + frequency */}
+            <div className="flex flex-col items-center z-10 mb-16">
+              <span className="font-Space-Grotesk font-black leading-none tracking-tighter transition-all duration-300"
+                style={{
+                  fontSize: "9rem",
+                  color: status === "perfect" ? "#14FFB1"
+                    : isListening && detectedNote ? "#ffffff"
+                    : "#222",
+                  filter: status === "perfect"
+                    ? "drop-shadow(0 0 60px rgba(20,255,177,0.8)) drop-shadow(0 0 20px rgba(20,255,177,0.9))"
+                    : isListening && detectedNote
+                    ? `drop-shadow(0 0 30px ${statusColor}50)`
+                    : "none",
+                }}>
+                {noteName}
+              </span>
+              <span className="font-Space-Grotesk font-medium tracking-[0.4em] -mt-2"
+                style={{ fontSize: "1.4rem", color: isListening && detectedNote ? "#14FFB1" : "#333" }}>
+                {detectedFreq ? `${detectedFreq.toFixed(2)}` : "—"}{" "}
+                <span className="font-Inter font-normal text-[14px] tracking-normal opacity-60">Hz</span>
+              </span>
+            </div>
 
-              {/* All strings status */}
-              <div className="bg-[#131313] rounded-2xl p-6 flex flex-col gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-0.5 bg-[#aeffd4]" />
-                  <h3 className="font-Space-Grotesk font-bold text-white text-[16px]">All Strings Status</h3>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {GUITAR_STRINGS.map((s, i) => {
-                    const st = stringTuneStatus[s.string];
-                    const isAct = i === activeStringIdx;
-                    return (
-                      <div key={i} className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all ${isAct ? "bg-[#1a1a1a]" : ""}`}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-[#262626] flex items-center justify-center">
-                            <span className="font-Space-Grotesk font-bold text-[14px]" style={{ color: st === "perfect" ? "#10feb0" : "#adaaaa" }}>{s.label}</span>
-                          </div>
-                          <div>
-                            <p className="font-Manrope font-medium text-white text-[13px]">String {7 - s.string} — {s.note}</p>
-                            <p className="font-Inter text-[11px] text-[#adaaaa]">{s.frequency} Hz</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {st ? (
-                            <>
-                              <div className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLOR[st] }} />
-                              <span className="font-Inter text-[11px] uppercase tracking-wide" style={{ color: STATUS_COLOR[st] }}>{st}</span>
-                            </>
-                          ) : (
-                            <span className="font-Inter text-[11px] text-[#555] uppercase">—</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* Glowing needle */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 origin-bottom transition-transform duration-75"
+              style={{ transform: `translateX(-50%) rotate(${needleAngle}deg)`, height: "100%", width: 2 }}>
+              <div className="w-full h-full"
+                style={{
+                  background: "linear-gradient(to top, transparent 0%, #14FFB1 100%)",
+                  boxShadow: isListening && detectedNote ? "0 0 20px rgba(20,255,177,0.6)" : "none",
+                  opacity: isListening && detectedNote ? 1 : 0.15,
+                }} />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full"
+                style={{ background: "#14FFB1", filter: "blur(4px)", opacity: isListening && detectedNote ? 1 : 0 }} />
+            </div>
 
-              {/* Tuning Tips */}
-              <div className="bg-[#131313] rounded-2xl p-6 flex flex-col gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-0.5 bg-[#aeffd4]" />
-                  <h3 className="font-Space-Grotesk font-bold text-white text-[16px]">Tuning Tips</h3>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {[
-                    "Pluck one string at a time and let it ring clearly",
-                    "Tune in a quiet environment for best accuracy",
-                    "Green = in tune (±5 cents). Red = flat. Orange = sharp",
-                    "Tune low E first, then work your way to high e",
-                    "Use Auto-Tune to detect the closest string automatically",
-                  ].map((tip, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#aeffd4] mt-1.5 shrink-0" />
-                      <p className="font-Manrope text-[#adaaaa] text-[13px] leading-relaxed">{tip}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Static center line */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 h-full w-px"
+              style={{ background: "rgba(255,255,255,0.07)" }} />
+          </div>
 
-              {/* Practice Tip glassmorphism */}
-              <div className="rounded-2xl p-6 border border-white/5 flex flex-col gap-3"
-                style={{ background: "rgba(38,38,38,0.4)", backdropFilter: "blur(20px)" }}>
-                <div className="flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#82e9ff" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="3"/></svg>
-                  <span className="font-Space-Grotesk font-bold text-[#82e9ff] text-[13px] tracking-wider">PRO TIP</span>
-                </div>
-                <p className="font-Manrope text-[#adaaaa] text-[13px] leading-relaxed">
-                  Tune before every practice session. Temperature and playing affect string tension — a quick re-tune keeps you sounding great.
-                </p>
-              </div>
+          {/* String selector pill */}
+          <div className="flex items-center gap-3 p-2 rounded-full mt-4"
+            style={{ background: "#131313" }}>
+            {GUITAR_STRINGS.map((s, i) => {
+              const isActive = i === activeStringIdx;
+              return (
+                <button key={i}
+                  onClick={() => { setActiveStringIdx(i); playRefNote(i); }}
+                  className="w-14 h-14 rounded-full flex items-center justify-center font-Space-Grotesk font-bold text-[20px] transition-all relative"
+                  style={isActive
+                    ? { background: "#14FFB1", color: "#005c3d", boxShadow: "0 0 20px rgba(20,255,177,0.3)" }
+                    : { color: "#adaaaa" }
+                  }>
+                  {playingRef === i && <span className="absolute inset-0 rounded-full animate-ping opacity-20 bg-[#14FFB1]" />}
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Auto-Tune / Manual pill */}
+          <div className="flex items-center p-1 rounded-full mt-6 border"
+            style={{ background: "#000", borderColor: "rgba(72,72,71,0.2)" }}>
+            <button onClick={() => setAutoTune(true)}
+              className="px-8 py-2.5 rounded-full font-Space-Grotesk font-bold text-[11px] uppercase tracking-widest transition-all"
+              style={autoTune
+                ? { background: "#262626", color: "#fff" }
+                : { color: "#adaaaa" }}>
+              Auto-Tune
+            </button>
+            <button onClick={() => setAutoTune(false)}
+              className="px-8 py-2.5 rounded-full font-Space-Grotesk font-bold text-[11px] uppercase tracking-widest transition-all"
+              style={!autoTune
+                ? { background: "#262626", color: "#fff" }
+                : { color: "#adaaaa" }}>
+              Manual
+            </button>
+          </div>
+
+          {/* Start / Stop */}
+          <button onClick={isListening ? stopListening : startListening}
+            className="mt-6 flex items-center gap-3 px-10 py-3.5 rounded-full font-Space-Grotesk font-bold text-[14px] transition-all"
+            style={isListening
+              ? { background: "rgba(239,68,68,0.12)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }
+              : { background: "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)", color: "#005c3d" }}>
+            <MicIcon active={isListening} />
+            {isListening ? "Stop Tuning" : "Start Tuning"}
+          </button>
+        </div>
+      </section>
+
+      {/* ── Bottom panel ── */}
+      <section className="grid grid-cols-12 gap-5 px-12 pb-10"
+        style={{ background: "#131313", borderTop: "1px solid rgba(255,255,255,0.04)", padding: "24px 48px" }}>
+
+        {/* Waveform */}
+        <div className="col-span-8 rounded-xl p-5 flex flex-col justify-between overflow-hidden relative"
+          style={{ background: "#0a0a0a" }}>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="font-Space-Grotesk font-bold text-[11px] uppercase tracking-widest" style={{ color: "#14FFB1" }}>
+                Input Waveform
+              </h3>
+              <p className="font-Inter text-[10px] uppercase mt-0.5 tracking-widest" style={{ color: "#adaaaa" }}>
+                Real-time Audio Analysis
+              </p>
+            </div>
+            <span className="font-Inter text-[10px] px-2 py-0.5 rounded tracking-tighter"
+              style={{ color: "#14FFB1", background: "rgba(20,255,177,0.1)" }}>
+              {isListening ? "LIVE" : "OFFLINE"}
+            </span>
+          </div>
+          <div className="flex items-end gap-1 h-16">
+            {waveformBars.map((h, i) => (
+              <div key={i} className="flex-1 rounded-t-sm transition-all duration-75"
+                style={{
+                  height: `${Math.max(4, h * 100)}%`,
+                  background: h > 0.6
+                    ? "#14FFB1"
+                    : `rgba(20,255,177,${0.2 + h * 0.6})`,
+                  boxShadow: h > 0.6 ? "0 0 8px rgba(20,255,177,0.3)" : "none",
+                }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Input settings */}
+        <div className="col-span-4 rounded-xl p-5 flex flex-col gap-4"
+          style={{ background: "#1a1a1a" }}>
+          <div className="flex items-center justify-between">
+            <h3 className="font-Space-Grotesk font-bold text-[11px] uppercase tracking-widest text-white">
+              Input Settings
+            </h3>
+          </div>
+
+          {/* Sensitivity */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex justify-between font-Inter text-[10px] uppercase tracking-widest" style={{ color: "#adaaaa" }}>
+              <span>Sensitivity</span>
+              <span className="text-white">78%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "#000" }}>
+              <div className="h-full rounded-full" style={{ width: "78%", background: "#14FFB1", boxShadow: "0 0 8px rgba(20,255,177,0.4)" }} />
             </div>
           </div>
+
+          {/* Status */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isListening ? "animate-pulse" : ""}`}
+                style={{ background: isListening ? "#14FFB1" : "#484847" }} />
+              <span className="font-Inter text-[10px] uppercase tracking-widest" style={{ color: "#adaaaa" }}>
+                {isListening ? "Active" : "Ready"}
+              </span>
+            </div>
+            <button onClick={isListening ? stopListening : startListening}
+              className="font-Space-Grotesk font-bold text-[10px] uppercase tracking-widest hover:underline"
+              style={{ color: "#14FFB1" }}>
+              {isListening ? "Stop" : "Calibrate"}
+            </button>
+          </div>
+
+          {/* String status mini */}
+          <div className="flex gap-2 flex-wrap pt-1">
+            {GUITAR_STRINGS.map((s, i) => {
+              const st = stringTuneStatus[s.string];
+              return (
+                <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-full"
+                  style={{ background: "#262626" }}>
+                  <div className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: st ? STATUS_COLOR[st] : "#484847" }} />
+                  <span className="font-Space-Grotesk font-bold text-[11px]"
+                    style={{ color: st === "perfect" ? "#14FFB1" : "#adaaaa" }}>{s.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
     </div>
   );
 

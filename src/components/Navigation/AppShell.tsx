@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useAuth } from "@/hooks/useAuth";
+import LoginModal from "@/components/Auth/LoginModal";
+import UserMenu from "@/components/Auth/UserMenu";
 
 // ── Nav data ──────────────────────────────────────────────────────────────────
 
@@ -118,7 +121,20 @@ const TOOL_ITEMS: NavItem[] = [
   },
 ];
 
-const ALL_ITEMS = [...LEARN_ITEMS, ...PRACTICE_ITEMS, ...TOOL_ITEMS];
+const SavedIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+  </svg>
+);
+
+const LIBRARY_ITEM: NavItem = {
+  href: "/library",
+  label: "My Library",
+  description: "Your saved chords",
+  icon: <SavedIcon />,
+};
+
+const ALL_ITEMS = [...LEARN_ITEMS, ...PRACTICE_ITEMS, ...TOOL_ITEMS, LIBRARY_ITEM];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -183,6 +199,8 @@ export default function AppShell({ children, mobileTitle, topBarRight }: AppShel
   const router = useRouter();
   const pathname = router.pathname;
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const { user, isLoading } = useAuth();
 
   const learnActive    = LEARN_ITEMS.some(i => isActive(i, pathname));
   const practiceActive = PRACTICE_ITEMS.some(i => isActive(i, pathname));
@@ -202,7 +220,6 @@ export default function AppShell({ children, mobileTitle, topBarRight }: AppShel
             <Link href="/">
               <h1 className="font-Space-Grotesk font-bold text-[18px] text-[#1BD79E] tracking-tight leading-tight">ChordsofGuitar</h1>
             </Link>
-            <p className="font-Inter text-[10px] text-[#3f3f46] tracking-[2px] uppercase mt-1">MASTER LEVEL</p>
           </div>
 
           {/* Home + Search */}
@@ -247,6 +264,14 @@ export default function AppShell({ children, mobileTitle, topBarRight }: AppShel
                 {TOOL_ITEMS.map(item => <SidebarItem key={item.href} item={item} pathname={pathname} />)}
               </div>
             </div>
+
+            {/* MY LIBRARY */}
+            <div>
+              <p className="font-Inter text-[10px] text-[#3f3f46] tracking-[2px] uppercase px-4 mb-2">MY LIBRARY</p>
+              <div className="flex flex-col gap-0.5">
+                <SidebarItem item={LIBRARY_ITEM} pathname={pathname} />
+              </div>
+            </div>
           </div>
 
           {/* Footer */}
@@ -282,9 +307,21 @@ export default function AppShell({ children, mobileTitle, topBarRight }: AppShel
                   <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
               </Link>
-              <div className="w-8 h-8 rounded-full bg-[#1BD79E]/10 border border-[#1BD79E]/30 flex items-center justify-center">
-                <span className="font-Space-Grotesk font-bold text-[#1BD79E] text-[11px]">CG</span>
-              </div>
+              {!isLoading && (
+                user ? (
+                  <UserMenu />
+                ) : (
+                  <button
+                    onClick={() => setLoginOpen(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1BD79E]/10 border border-[#1BD79E]/30 hover:bg-[#1BD79E]/20 transition-all"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1BD79E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    <span className="font-Manrope text-[13px] text-[#1BD79E] font-medium">Sign in</span>
+                  </button>
+                )
+              )}
             </div>
           </header>
 
@@ -313,9 +350,21 @@ export default function AppShell({ children, mobileTitle, topBarRight }: AppShel
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
             </Link>
-            <div className="w-9 h-9 rounded-full bg-[#1BD79E]/10 border border-[#1BD79E]/30 flex items-center justify-center">
-              <span className="font-Space-Grotesk font-bold text-[#1BD79E] text-[11px]">CG</span>
-            </div>
+            {!isLoading && (
+              user ? (
+                <UserMenu />
+              ) : (
+                <button
+                  onClick={() => setLoginOpen(true)}
+                  className="w-9 h-9 rounded-full bg-[#1BD79E]/10 border border-[#1BD79E]/30 flex items-center justify-center hover:bg-[#1BD79E]/20 transition-all"
+                  title="Sign in"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1BD79E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </button>
+              )
+            )}
           </div>
         </div>
 
@@ -421,6 +470,9 @@ export default function AppShell({ children, mobileTitle, topBarRight }: AppShel
           </div>
         )}
       </div>
+
+      {/* Login modal — fixed overlay, works for both desktop and mobile */}
+      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
     </>
   );
 }
