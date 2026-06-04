@@ -269,7 +269,7 @@ export default function LibraryPage() {
             </svg>
           </div>
           <h2 className="font-Space-Grotesk font-bold text-white text-[28px] mb-2">No saved chords yet</h2>
-          <p className="font-Manrope text-[#52525b] text-[14px] mb-8">Hit "Save Chord" on any chord page to add it here.</p>
+          <p className="font-Manrope text-[#52525b] text-[14px] mb-8">Hit &quot;Save Chord&quot; on any chord page to add it here.</p>
           <Link href="/chords/cmajor"
             className="px-6 py-3 rounded-full font-Space-Grotesk font-bold text-[13px] transition-all hover:opacity-90"
             style={{ background: "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)", color: "#006644" }}
@@ -333,7 +333,7 @@ export default function LibraryPage() {
             style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
             <div className="flex items-center gap-5">
               <div>
-                <h4 className="font-Space-Grotesk font-bold text-white text-[18px]">Can't find a chord?</h4>
+                <h4 className="font-Space-Grotesk font-bold text-white text-[18px]">Can&apos;t find a chord?</h4>
                 <p className="font-Manrope text-[#52525b] text-[13px] mt-0.5">Browse the full chord library to discover more.</p>
               </div>
               <Link href="/chords/cmajor"
