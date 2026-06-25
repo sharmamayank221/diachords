@@ -1,18 +1,21 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { A } from "@/types/chord.types";
 import { initAudio, playNote } from "@/utils/audioUtils";
 
-// frets[0] = string 6 (low E), frets[5] = string 1 (high e)
-const STRING_NAMES     = ["E", "A", "D", "G", "B", "e"];
-const STRING_BASE_MIDI = [40, 45, 50, 55, 59, 64];
+// frets[0] = string 6 (low E) … frets[5] = string 1 (high e)
+const STRING_NAMES      = ["E", "B", "G", "D", "A", "E"];
+const STRING_BASE_MIDI  = [40, 45, 50, 55, 59, 64];
+const STRING_HEIGHTS    = ["1px", "2px", "3px", "3.5px", "4px", "5px"];
+const FRET_WIDTH_PX     = 96;
+const FRETBOARD_OVERHEAD_PX = 24 + 50 + 8 + 40;
+const MAX_FRETS         = 24;
+const MIN_FRETS         = 12;
 
 interface IGuitar {
   data?: A;
   positionOverride?: number;
   onPositionChange?: (pos: number) => void;
 }
-
-// ── helpers ──────────────────────────────────────────────────────────────────
 
 function getPositionData(data: A | undefined, position: number) {
   const p = data?.positions?.[position];
@@ -24,232 +27,218 @@ function getPositionData(data: A | undefined, position: number) {
   };
 }
 
-// ── sub-components ────────────────────────────────────────────────────────────
+function stringIdx(stringNum: number) {
+  return 6 - stringNum;
+}
 
-const FingerDot = ({
-  finger, isPlaying, onClick, size = 36,
-}: { finger: number; isPlaying: boolean; onClick: () => void; size?: number }) => (
+function absoluteFret(baseFret: number, relativeFret: number) {
+  return baseFret + relativeFret - 1;
+}
+
+const ChordDot = React.memo(({
+  finger, isPlaying, onClick,
+}: {
+  finger: number;
+  isPlaying: boolean;
+  onClick: () => void;
+}) => (
   <button
     onClick={onClick}
-    className="absolute left-1/2 top-1/2 rounded-full flex items-center justify-center z-10 transition-all active:scale-95 focus:outline-none"
-    style={{
-      width: size, height: size,
-      background: "#1BD79E",
-      boxShadow: isPlaying ? "0 0 18px #1BD79E, 0 0 36px #1BD79E55" : "0 2px 8px rgba(0,0,0,.4)",
-      transform: isPlaying
-        ? "translate(-50%,-50%) scale(1.15)"
-        : "translate(-50%,-50%) scale(1)",
-    }}
     aria-label={`Finger ${finger}`}
+    className="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[30px] md:w-[30px] rounded-full transition-all duration-150 cursor-pointer hover:scale-125 active:scale-95 focus:outline-none z-10"
+    style={{
+      background: "#1BD79E",
+      transform: `translate(-50%, -50%) scale(${isPlaying ? 1.25 : 1})`,
+      boxShadow: isPlaying ? "0 0 20px #1BD79E, 0 0 40px #1BD79E" : "none",
+    }}
   >
-    <span className="font-bold text-white leading-none" style={{ fontSize: size < 32 ? 11 : 14 }}>
+    <span className="flex items-center justify-center font-Lora text-xs font-bold text-black">
       {finger || ""}
     </span>
   </button>
-);
+));
+ChordDot.displayName = "ChordDot";
 
-// ── LANDSCAPE CHORD DIAGRAM ───────────────────────────────────────────────────
-// Strings as horizontal rows (low E top → high e bottom)
-// Frets as vertical columns with labels at the bottom: "FRET 1", "FRET 2"…
-// Left column: X (muted) / O (open) / · (fretted) indicators
-// Thick nut border on left edge of Fret 1 column
+export default function Guitar({ data, positionOverride }: IGuitar) {
+  const [position, setPosition]       = useState(positionOverride ?? 0);
+  const [playingString, setPlayingString] = useState<number | null>(null);
+  const [numFrets, setNumFrets]       = useState(MIN_FRETS);
+  const fretboardContainerRef         = useRef<HTMLDivElement>(null);
 
-function LandscapeChordDiagram({
-  frets, fingers, baseFret, barres = [],
-  playingString, onStringClick, compact = false,
-}: {
-  frets: number[]; fingers: number[]; baseFret: number; barres?: number[];
-  playingString: number | null; onStringClick: (i: number) => void;
-  compact?: boolean;
-}) {
-  const SHOW_FRETS   = 5;
-  const ROW_H        = compact ? 42 : 56;
-  const INDICATOR_W  = compact ? 28 : 40;
-  const NAME_COL_W   = compact ? 26 : 36;
-  const DOT_SIZE     = compact ? 28 : 36;
-  const LABEL_H      = compact ? 26 : 32;
+  useEffect(() => {
+    if (positionOverride !== undefined) setPosition(positionOverride);
+  }, [positionOverride]);
 
-  const fretCols = Array.from({ length: SHOW_FRETS }, (_, i) => baseFret + i);
+  useEffect(() => { initAudio(); }, []);
+
+  useEffect(() => {
+    const el = fretboardContainerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const available = el.clientWidth - FRETBOARD_OVERHEAD_PX;
+      const frets = Math.min(MAX_FRETS, Math.max(MIN_FRETS, Math.floor(available / FRET_WIDTH_PX)));
+      setNumFrets(frets);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const { frets, fingers, baseFret, barres } = getPositionData(data, position);
   const barreSet = new Set(barres);
+  const fretCols = Array.from({ length: numFrets }, (_, i) => i + 1);
 
-  // Display order: high E (frets[5]) at top → low E (frets[0]) at bottom,
-  // matching standard TAB / original fretboard orientation.
-  const displayRows = frets
-    .map((fret, originalIdx) => ({
-      fret,
-      finger:      fingers[originalIdx] ?? 0,
-      name:        STRING_NAMES[originalIdx],
-      originalIdx,
-      // string thickness: high E thin (idx5→display row0) → low E thick (idx0→display row5)
-      lineH:       originalIdx === 0 ? 2 : originalIdx === 1 ? 1.5 : originalIdx < 4 ? 1.5 : 1,
-    }))
-    .reverse(); // high E first
+  const getRelativeFret = (stringNum: number) => frets[stringIdx(stringNum)] ?? -1;
+  const getFinger       = (stringNum: number) => fingers[stringIdx(stringNum)] ?? 0;
+
+  const handleStringClick = useCallback((stringNum: number) => {
+    const idx = stringIdx(stringNum);
+    const rel = frets[idx];
+    if (rel === -1) return;
+    const noteMidi = rel === 0
+      ? STRING_BASE_MIDI[idx]
+      : STRING_BASE_MIDI[idx] + absoluteFret(baseFret, rel);
+    setPlayingString(idx);
+    playNote(noteMidi);
+    setTimeout(() => setPlayingString(null), 500);
+  }, [frets, baseFret]);
+
+  const hasFretMarker = (f: number) => [3, 5, 7, 9].includes(f);
+  const hasDoubleMark   = (f: number) => f === 12;
 
   return (
-    <div className="w-full select-none flex flex-col">
-      <div className="flex w-full">
+    <div className="overflow-x-auto w-full" ref={fretboardContainerRef}>
+      <div className="flex" style={{ minWidth: "max-content" }}>
 
-        {/* ── String name + number labels ── */}
-        <div className="flex flex-col flex-shrink-0" style={{ width: NAME_COL_W }}>
-          {displayRows.map(({ originalIdx }) => {
-            const stringNum = 6 - originalIdx;
-            return (
-              <div key={originalIdx}
-                className="flex flex-col items-end justify-center pr-1.5 gap-0.5"
-                style={{ height: ROW_H }}>
-                <span className="font-bold leading-none" style={{ color: "#1BD79E", fontSize: compact ? 10 : 12 }}>
-                  {STRING_NAMES[originalIdx]}
+        {/* String name labels */}
+        <div className="flex flex-col">
+          <div className="h-8" />
+          <div className="h-[199px] md:h-[279px] flex flex-col justify-around pb-1">
+            {STRING_NAMES.map((name, i) => (
+              <span key={i}
+                className="flex items-center justify-center w-6 font-Lora font-bold text-[11px] md:text-[13px]"
+                style={{ color: "#1BD79E" }}>
+                {name}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Open-string zone */}
+        <div className="flex flex-col items-center mr-1">
+          <div className="h-8 flex items-end pb-1">
+            <span className="font-Inter text-[11px] text-gray-500 uppercase tracking-wider w-10 text-center">Open</span>
+          </div>
+          <div className="h-[199px] md:h-[279px] w-10 relative flex flex-col justify-around py-1">
+            {[1, 2, 3, 4, 5, 6].map(stringNum => {
+              const rel       = getRelativeFret(stringNum);
+              const isOpen    = rel === 0;
+              const isMuted   = rel === -1;
+              const isPlaying = playingString === stringIdx(stringNum) && isOpen;
+
+              return (
+                <div key={stringNum} className="flex items-center justify-center">
+                  {isMuted ? (
+                    <span className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center font-Lora font-bold text-[12px] text-red-400">X</span>
+                  ) : isOpen ? (
+                    <button
+                      onClick={() => handleStringClick(stringNum)}
+                      className="w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                      style={{
+                        background: "transparent",
+                        border: "2px solid #1BD79E",
+                        boxShadow: isPlaying ? "0 0 14px #1BD79E" : "none",
+                      }}>
+                      <span className="font-Lora text-[9px] font-bold leading-none text-[#1BD79E]">O</span>
+                    </button>
+                  ) : (
+                    <span className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center font-Lora font-bold text-[12px] text-gray-600">·</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Nut */}
+        <div className="flex flex-col">
+          <div className="h-8" />
+          <div className="h-[199px] md:h-[279px] w-[6px] md:w-[8px] rounded-sm" style={{ background: "#e8e8e8" }} />
+        </div>
+
+        {/* Fret columns */}
+        {fretCols.map(fretNum => {
+          const isBarreCol = Array.from(barreSet).some(r => absoluteFret(baseFret, r) === fretNum);
+
+          const barreStringNums = isBarreCol
+            ? [1, 2, 3, 4, 5, 6].filter(s => {
+                const r = getRelativeFret(s);
+                return r > 0 && barreSet.has(r) && absoluteFret(baseFret, r) === fretNum && getFinger(s) === 1;
+              })
+            : [];
+          const barreTop    = barreStringNums.length ? Math.min(...barreStringNums) : -1;
+          const barreBottom = barreStringNums.length ? Math.max(...barreStringNums) : -1;
+
+          return (
+            <div key={fretNum} className="flex flex-col items-center">
+              <div className="h-8 flex items-end pb-1">
+                <span className="font-Inter text-[11px] text-gray-500 w-[80px] md:w-[96px] text-center">
+                  {fretNum}
                 </span>
-                <span className="text-gray-600 leading-none" style={{ fontSize: compact ? 8 : 9 }}>{stringNum}</span>
               </div>
-            );
-          })}
-          <div style={{ height: LABEL_H }} />
-        </div>
-
-        {/* ── X / O / · indicators ── */}
-        <div className="flex flex-col flex-shrink-0" style={{ width: INDICATOR_W }}>
-          {displayRows.map(({ fret, originalIdx }) => {
-            const isMuted = fret === -1;
-            const isOpen  = fret === 0;
-            return (
-              <div key={originalIdx}
-                className="flex items-center justify-center"
-                style={{ height: ROW_H }}>
-                {isMuted ? (
-                  <span className="text-red-400 font-bold leading-none" style={{ fontSize: compact ? 13 : 15 }}>X</span>
-                ) : isOpen ? (
-                  <span className="font-bold leading-none" style={{ color: "#1BD79E", fontSize: compact ? 13 : 15 }}>O</span>
-                ) : (
-                  <span className="text-[#3a3a3a] leading-none" style={{ fontSize: compact ? 11 : 13 }}>·</span>
-                )}
-              </div>
-            );
-          })}
-          <div style={{ height: LABEL_H }} />
-        </div>
-
-        {/* ── Fret columns ── */}
-        <div className="flex flex-1">
-          {fretCols.map((absoluteFret, colIdx) => {
-            const isFirst    = colIdx === 0;
-            const isLast     = colIdx === SHOW_FRETS - 1;
-            // frets in JSON are 1-based relative to baseFret; barres array also uses relative frets
-            const relativeFret = colIdx + 1;
-            const isBarre    = barreSet.has(relativeFret);
-
-            // Barre spans the consecutive strings with finger=1 at this relative fret
-            const barreOriginalIdxs = isBarre
-              ? frets.reduce<number[]>((acc, f, si) => {
-                  if (f === relativeFret && fingers[si] === 1) acc.push(si);
-                  return acc;
-                }, [])
-              : [];
-            // In display order (reversed), map to display row indices
-            const barreDisplayIdxs = barreOriginalIdxs
-              .map(oi => displayRows.findIndex(r => r.originalIdx === oi))
-              .sort((a, b) => a - b);
-            const barreDispTop    = barreDisplayIdxs[0]   ?? -1;
-            const barreDispBottom = barreDisplayIdxs[barreDisplayIdxs.length - 1] ?? -1;
-
-            return (
-              <div key={absoluteFret} className="flex-1 flex flex-col relative">
-                {displayRows.map(({ fret, finger, originalIdx, lineH }, dispIdx) => {
-                  const isPressed = fret === relativeFret;
-                  const isPlaying = playingString === originalIdx && isPressed;
-                  const isMuted   = fret === -1;
-                  const inBarre   = isBarre && dispIdx >= barreDispTop && dispIdx <= barreDispBottom;
+              <div className="h-[199px] md:h-[279px] w-[80px] md:w-[96px] relative border-r-4 border-r-[#333] border-collapse">
+                {[1, 2, 3, 4, 5, 6].map(stringNum => {
+                  const rel        = getRelativeFret(stringNum);
+                  const finger     = getFinger(stringNum);
+                  const isPressed  = rel > 0 && absoluteFret(baseFret, rel) === fretNum;
+                  const isPlaying  = playingString === stringIdx(stringNum) && isPressed;
+                  const inBarre    = isBarreCol && stringNum >= barreTop && stringNum <= barreBottom;
+                  const hideDot    = inBarre && finger === 1 && stringNum !== barreTop;
 
                   return (
-                    <div key={originalIdx}
-                      className="relative flex items-center justify-center"
-                      style={{
-                        height: ROW_H,
-                        borderLeft:  isFirst ? "3px solid #555" : "1px solid #222",
-                        borderRight: isLast  ? "1px solid #222" : "none",
-                      }}>
-                      {/* String line */}
-                      <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 pointer-events-none"
-                        style={{ height: lineH, background: isMuted ? "#1a1a1a" : "#2d2d2d" }} />
+                    <div key={stringNum}
+                      className="w-full mb-9 md:mb-[52px] relative"
+                      style={{ background: "#FFF", height: STRING_HEIGHTS[stringNum - 1] }}>
 
-                      {/* Barre vertical bar (drawn once from top string) */}
-                      {isBarre && dispIdx === barreDispTop && barreDisplayIdxs.length > 1 && (
-                        <div className="absolute left-1/2 -translate-x-1/2 z-10 rounded-full pointer-events-none"
+                      {isBarreCol && stringNum === barreTop && barreStringNums.length > 1 && (
+                        <div
+                          className="absolute left-1/2 -translate-x-1/2 z-[5] rounded-full pointer-events-none"
                           style={{
-                            width: compact ? 20 : 26,
-                            top: ROW_H / 2,
-                            height: (barreDispBottom - barreDispTop) * ROW_H,
-                            background: "linear-gradient(180deg,#1BD79E 0%,#15c48e 100%)",
+                            width: 26,
+                            top: "50%",
+                            height: (barreBottom - barreTop) * 52,
+                            background: "linear-gradient(180deg, #1BD79E 0%, #15c48e 100%)",
                             boxShadow: "0 0 14px rgba(27,215,158,0.45)",
-                          }} />
+                          }}
+                        />
                       )}
 
-                      {/* Finger dot */}
-                      {isPressed && !(inBarre && finger === 1 && dispIdx !== barreDispTop) && (
-                        <FingerDot
+                      {isPressed && !hideDot && (
+                        <ChordDot
                           finger={finger}
                           isPlaying={isPlaying}
-                          onClick={() => onStringClick(originalIdx)}
-                          size={DOT_SIZE}
+                          onClick={() => handleStringClick(stringNum)}
                         />
                       )}
                     </div>
                   );
                 })}
 
-                {/* Fret label */}
-                <div className="flex items-center justify-center"
-                  style={{ height: LABEL_H, borderLeft: isFirst ? "3px solid #555" : "1px solid #222", borderRight: isLast ? "1px solid #222" : "none" }}>
-                  <span className="font-Inter text-gray-500 uppercase"
-                    style={{ fontSize: compact ? 9 : 10, letterSpacing: compact ? "1px" : "2px" }}>
-                    {compact ? absoluteFret : `Fret ${absoluteFret}`}
-                  </span>
-                </div>
+                {hasFretMarker(fretNum) && (
+                  <div className="w-2.5 h-2.5 bg-[#444] rounded-full absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+                )}
+                {hasDoubleMark(fretNum) && (
+                  <>
+                    <div className="w-2.5 h-2.5 bg-[#444] rounded-full absolute left-1/2 top-[35%] -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+                    <div className="w-2.5 h-2.5 bg-[#444] rounded-full absolute left-1/2 top-[65%] -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+                  </>
+                )}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
     </div>
-  );
-}
-
-// ── Main Guitar component ─────────────────────────────────────────────────────
-
-export default function Guitar({ data, positionOverride, onPositionChange }: IGuitar) {
-  const [position, setPosition] = React.useState(positionOverride ?? 0);
-  const [playingString, setPlayingString] = React.useState<number | null>(null);
-
-  React.useEffect(() => {
-    if (positionOverride !== undefined) setPosition(positionOverride);
-  }, [positionOverride]);
-
-  React.useEffect(() => { initAudio(); }, []);
-
-  const { frets, fingers, baseFret, barres } = getPositionData(data, position);
-
-  const handleStringClick = React.useCallback((stringIdx: number) => {
-    const fret = frets[stringIdx];
-    if (fret === -1) return;
-    const midi = STRING_BASE_MIDI[stringIdx] + fret;
-    setPlayingString(stringIdx);
-    playNote(midi);
-    setTimeout(() => setPlayingString(null), 600);
-  }, [frets]);
-
-  const sharedDiagramProps = { frets, fingers, baseFret, barres, playingString, onStringClick: handleStringClick };
-
-  return (
-    <>
-      {/* ── MOBILE: compact landscape ── */}
-      <div className="lg:hidden w-full">
-        <LandscapeChordDiagram {...sharedDiagramProps} compact />
-      </div>
-
-      {/* ── DESKTOP: full landscape ── */}
-      <div className="hidden lg:block w-full">
-        <LandscapeChordDiagram {...sharedDiagramProps} />
-      </div>
-    </>
   );
 }
