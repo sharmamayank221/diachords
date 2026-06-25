@@ -473,10 +473,8 @@ export default function ChordDetailDesktop({ chordData }: ChordDetailDesktopProp
 
             {/* Fretboard + Tutorial — col 1-8 */}
             <div className="col-span-8 flex flex-col gap-6">
-              <div className="bg-[#0d0d0d] rounded-2xl overflow-hidden" style={{ borderTop: "2px solid rgba(27,215,158,0.25)" }}>
-                <div className="p-6">
-                  <Guitar data={chordData} positionOverride={position} onPositionChange={setPosition} />
-                </div>
+              <div className="bg-black rounded-2xl overflow-hidden p-4">
+                <Guitar data={chordData} positionOverride={position} onPositionChange={setPosition} />
               </div>
 
               {/* Video Tutorial below fretboard */}

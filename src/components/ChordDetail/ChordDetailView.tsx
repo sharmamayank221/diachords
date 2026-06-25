@@ -249,9 +249,9 @@ export default function ChordDetailView({ chordData }: ChordDetailViewProps) {
               </div>
             </div>
 
-            {/* ── FRETBOARD (existing Guitar component) ── */}
-            <div className="-mx-6 bg-[#131313] overflow-hidden">
-              <div className="px-3 py-4">
+            {/* ── FRETBOARD ── */}
+            <div className="-mx-6 bg-black overflow-hidden">
+              <div className="p-4">
                 <Guitar data={chordData} positionOverride={position} onPositionChange={setPosition} />
               </div>
             </div>
