@@ -1,4 +1,7 @@
 import Head from "next/head";
+import Script from "next/script";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
 import { store } from "../app/store";
 import { Provider } from "react-redux";
 import type { AppProps } from "next/app";
@@ -9,6 +12,7 @@ import Layout from "@/components/Layout";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { AuthProvider } from "@/contexts/AuthContext";
+import * as gtag from "@/lib/gtag";
 
 if (typeof window !== "undefined") {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || "", {
@@ -28,9 +32,42 @@ type NextPageWithLayout = AppProps["Component"] & {
 export default function App({ Component, pageProps }: AppProps) {
   const PageComponent = Component as NextPageWithLayout;
   const getLayout = PageComponent.getLayout ?? ((page: React.ReactElement) => <Layout>{page}</Layout>);
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleRouteChange = (url: string) => {
+      gtag.pageview(url);
+    };
+    router.events.on("routeChangeComplete", handleRouteChange);
+    return () => {
+      router.events.off("routeChangeComplete", handleRouteChange);
+    };
+  }, [router.events]);
 
   return (
     <AuthProvider>
+      {gtag.GA_MEASUREMENT_ID && (
+        <>
+          <Script
+            strategy="afterInteractive"
+            src={`https://www.googletagmanager.com/gtag/js?id=${gtag.GA_MEASUREMENT_ID}`}
+          />
+          <Script
+            id="google-analytics"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${gtag.GA_MEASUREMENT_ID}', {
+                  page_path: window.location.pathname,
+                });
+              `,
+            }}
+          />
+        </>
+      )}
       <PostHogProvider client={posthog}>
         <Provider store={store}>
           <Head>
