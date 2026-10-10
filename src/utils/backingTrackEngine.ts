@@ -1,4 +1,6 @@
 import * as Tone from "tone";
+import { findChord } from "@/helpers/chordSearch";
+import { getChordStringNotes } from "@/helpers/chordNotes";
 
 // Backing Track Engine - Generates drums, bass, and rhythm patterns
 
@@ -9,9 +11,10 @@ export interface TrackSettings {
   key: string;
   bpm: number;
   genre: Genre;
-  chordProgression: string[]; // e.g., ["C", "Am", "F", "G"]
-  measures: number;
-  onChordChange?: (chordIndex: number) => void; // Callback when chord changes
+  chordProgression: string[]; // one chord per bar, e.g. ["C", "Am", "F", "G"]
+  countIn?: boolean; // one bar of clicks before the band comes in
+  onChordChange?: (chordIndex: number) => void;
+  onBeat?: (beat: number, countIn: boolean) => void; // 0–3, in time with the audio
 }
 
 export interface BackingTrack {
@@ -20,7 +23,6 @@ export interface BackingTrack {
   stop: () => void;
   setBpm: (bpm: number) => void;
   setVolume: (instrument: "drums" | "bass" | "rhythm", volume: number) => void;
-  toggleMute: (instrument: "drums" | "bass" | "rhythm") => void;
 }
 
 // ============ DRUM PATTERNS BY GENRE ============
@@ -63,14 +65,17 @@ const DRUM_PATTERNS: Record<Genre, { kick: string; snare: string; hihat: string;
 };
 
 // ============ BASS PATTERNS BY GENRE ============
-const BASS_PATTERNS: Record<Genre, number[][]> = {
-  rock: [[0, 0], [4, 0.5], [0, 1], [4, 1.5], [0, 2], [4, 2.5], [0, 3], [4, 3.5]], // Root-fifth pattern
-  blues: [[0, 0], [0, 0.5], [4, 1], [5, 1.5], [4, 2], [0, 2.5], [0, 3], [-2, 3.5]], // Walking bass
-  jazz: [[0, 0], [2, 1], [4, 2], [5, 3]], // Walking quarters
-  pop: [[0, 0], [0, 1], [0, 2], [0, 3]], // Simple root
-  funk: [[0, 0], [0, 0.25], [-12, 0.5], [0, 0.75], [0, 1], [3, 1.5], [0, 2], [0, 2.5], [5, 3], [3, 3.5]],
-  reggae: [[0, 0.5], [0, 1.5], [0, 2.5], [0, 3.5]], // Off-beat
-  country: [[0, 0], [7, 1], [0, 2], [7, 3]], // Root-fifth alternating
+// Chord tones, not fixed semitones, so the bass follows each chord's quality (Am gets C, not C#).
+// [tone, beat within the bar]
+type BassTone = "R" | "3" | "5" | "6" | "b7" | "8" | "approach";
+const BASS_PATTERNS: Record<Genre, [BassTone, number][]> = {
+  rock: [["R", 0], ["R", 0.5], ["5", 1], ["R", 1.5], ["R", 2], ["R", 2.5], ["5", 3], ["8", 3.5]], // driving eighths
+  blues: [["R", 0], ["3", 0.5], ["5", 1], ["6", 1.5], ["b7", 2], ["6", 2.5], ["5", 3], ["3", 3.5]], // boogie walk
+  jazz: [["R", 0], ["3", 1], ["5", 2], ["approach", 3]], // walking quarters into the next chord
+  pop: [["R", 0], ["R", 1], ["R", 2], ["R", 3]],
+  funk: [["R", 0], ["R", 0.75], ["8", 1], ["R", 1.5], ["5", 2.25], ["R", 2.5], ["b7", 3], ["8", 3.5]],
+  reggae: [["R", 0], ["5", 1.5], ["R", 2], ["R", 3.5]], // one-drop feel
+  country: [["R", 0], ["5", 1], ["R", 2], ["5", 3]], // root-fifth alternating
 };
 
 // ============ NOTE MAPPING ============
@@ -80,11 +85,71 @@ const NOTE_TO_MIDI: Record<string, number> = {
   "Ab": 44, "A": 45, "A#": 46, "Bb": 46, "B": 47,
 };
 
-// Parse chord to get root note
 function getChordRoot(chord: string): string {
-  // Handle chords like "Cm", "C#m7", "Dmaj7", etc.
   const match = chord.match(/^([A-G][#b]?)/);
   return match ? match[1] : "C";
+}
+
+// semitone offsets of the chord's 3rd, 5th and 7th from its name
+function chordTones(chord: string) {
+  const q = chord.replace(/^[A-G][#b]?/, "").split("/")[0];
+  const minor = /^m(?!aj)/.test(q) || /^min/.test(q);
+  const dim = /dim|°|m7b5|ø/.test(q);
+  const aug = /aug|\+/.test(q);
+  return {
+    third: minor || dim ? 3 : 4,
+    fifth: dim ? 6 : aug ? 8 : 7,
+    sixth: dim ? 8 : 9,
+    seventh: /maj7|M7|Δ/.test(q) ? 11 : dim && /dim7|°7/.test(q) ? 9 : 10,
+  };
+}
+
+function bassOffset(tone: BassTone, chord: string, nextChord: string): number {
+  const t = chordTones(chord);
+  switch (tone) {
+    case "R": return 0;
+    case "3": return t.third;
+    case "5": return t.fifth;
+    case "6": return t.sixth;
+    case "b7": return t.seventh;
+    case "8": return 12;
+    case "approach": {
+      // a semitone below the next chord's root, leading into it
+      const here = NOTE_TO_MIDI[getChordRoot(chord)] ?? 36;
+      const next = NOTE_TO_MIDI[getChordRoot(nextChord)] ?? here;
+      let off = next - 1 - here;
+      while (off < -5) off += 12;
+      while (off > 6) off -= 12;
+      return off;
+    }
+  }
+}
+
+// beats from the start of the loop → Tone's "bars:quarters:sixteenths"
+function beatsToTime(beats: number): string {
+  const bars = Math.floor(beats / 4);
+  const quarters = Math.floor(beats % 4);
+  const sixteenths = Math.round((beats % 1) * 4);
+  return `${bars}:${quarters}:${sixteenths}`;
+}
+
+// Guitar voicing for a chord name: the chord library's first shape, else a plain triad
+function chordVoicing(chord: string): number[] {
+  const item = findChord(chord);
+  const pos = item?.positions[0];
+  if (pos) {
+    const midi = getChordStringNotes(pos.frets, pos.baseFret, item?.key)
+      .map((n) => n.midi)
+      .filter((m): m is number => m !== null);
+    if (midi.length) return midi;
+  }
+  const root = (NOTE_TO_MIDI[getChordRoot(chord)] ?? 36) + 12;
+  const t = chordTones(chord);
+  return [root, root + t.third, root + t.fifth];
+}
+
+export function isKnownChord(chord: string): boolean {
+  return /^[A-G][#b]?/.test(chord) && !!findChord(chord);
 }
 
 // ============ SYNTH SETUP ============
@@ -266,197 +331,151 @@ function createDrumSequence(genre: Genre) {
   );
 }
 
-function createBassSequence(genre: Genre, chordProgression: string[], measures: number) {
+function createBassPart(genre: Genre, chordProgression: string[]) {
   const pattern = BASS_PATTERNS[genre];
-  const events: { note: string; time: number }[] = [];
-  
-  // For each measure (each chord)
-  for (let measure = 0; measure < chordProgression.length; measure++) {
-    const chord = chordProgression[measure % chordProgression.length];
-    const rootNote = getChordRoot(chord);
-    const rootMidi = NOTE_TO_MIDI[rootNote] || 36;
-    
-    // Apply bass pattern
-    pattern.forEach(([semitoneOffset, beatOffset]) => {
-      const midiNote = rootMidi + semitoneOffset;
-      const note = Tone.Frequency(midiNote, "midi").toNote();
-      const time = measure * 4 + beatOffset; // 4 beats per measure
-      events.push({ note, time });
+  const events: { time: string; note: string }[] = [];
+  chordProgression.forEach((chord, bar) => {
+    const next = chordProgression[(bar + 1) % chordProgression.length];
+    const rootMidi = NOTE_TO_MIDI[getChordRoot(chord)] ?? 36;
+    pattern.forEach(([tone, beat]) => {
+      events.push({
+        time: beatsToTime(bar * 4 + beat),
+        note: Tone.Frequency(rootMidi + bassOffset(tone, chord, next), "midi").toNote(),
+      });
     });
-  }
-  
-  // Convert to Tone.Part with typed events
-  const partEvents = events.map(e => ({
-    time: e.time + ":0:0",
-    note: e.note
-  }));
-  
+  });
   const part = new Tone.Part<{ time: string; note: string }>((time, event) => {
-    if (bassSynth && event.note) {
-      bassSynth.triggerAttackRelease(event.note, "8n", time);
-    }
-  }, partEvents);
-  
+    bassSynth?.triggerAttackRelease(event.note, "8n", time);
+  }, events);
   part.loop = true;
   part.loopEnd = `${chordProgression.length}:0:0`;
-  
   return part;
 }
 
-function createRhythmSequence(genre: Genre, chordProgression: string[]) {
-  // Simple rhythm guitar/keys - plays chord on beats based on genre
-  const rhythmPatterns: Record<Genre, number[]> = {
-    rock: [0, 2],        // Beats 1 and 3
-    blues: [0, 1, 2, 3], // All beats
-    jazz: [0.5, 1.5, 2.5, 3.5], // Off-beats (comping)
-    pop: [0, 1, 2, 3],   // All beats
-    funk: [0.5, 1, 2.5, 3], // Syncopated
-    reggae: [0.5, 2.5],  // Off-beat skank
-    country: [1, 3],     // Beats 2 and 4
+function createRhythmPart(genre: Genre, chordProgression: string[]) {
+  // where the guitar strums within each bar
+  const strums: Record<Genre, number[]> = {
+    rock: [0, 2],
+    blues: [0, 1, 2, 3],
+    jazz: [0.5, 1.5, 2.5, 3.5],
+    pop: [0, 1, 2, 3],
+    funk: [0.5, 1, 2.5, 3],
+    reggae: [1, 3],
+    country: [1, 3],
   };
-  
-  const beats = rhythmPatterns[genre];
-  const events: { chord: string; time: number }[] = [];
-  
-  chordProgression.forEach((chord, measure) => {
-    beats.forEach((beat) => {
-      events.push({ chord, time: measure * 4 + beat });
-    });
+  const voicings = chordProgression.map(chordVoicing);
+  const events: { time: string; bar: number }[] = [];
+  chordProgression.forEach((_, bar) => {
+    strums[genre].forEach((beat) => events.push({ time: beatsToTime(bar * 4 + beat), bar }));
   });
-  
-  const chordNotes: Record<string, string[]> = {
-    // Major chords
-    "C": ["C4", "E4", "G4"], "D": ["D4", "F#4", "A4"], "E": ["E4", "G#4", "B4"],
-    "F": ["F4", "A4", "C5"], "G": ["G4", "B4", "D5"], "A": ["A4", "C#5", "E5"],
-    "B": ["B4", "D#5", "F#5"],
-    // Minor chords
-    "Cm": ["C4", "Eb4", "G4"], "Dm": ["D4", "F4", "A4"], "Em": ["E4", "G4", "B4"],
-    "Fm": ["F4", "Ab4", "C5"], "Gm": ["G4", "Bb4", "D5"], "Am": ["A4", "C5", "E5"],
-    "Bm": ["B4", "D5", "F#5"],
-    // Sharps/flats major
-    "C#": ["C#4", "F4", "G#4"], "Db": ["Db4", "F4", "Ab4"],
-    "D#": ["D#4", "G4", "A#4"], "Eb": ["Eb4", "G4", "Bb4"],
-    "F#": ["F#4", "A#4", "C#5"], "Gb": ["Gb4", "Bb4", "Db5"],
-    "G#": ["G#4", "C5", "D#5"], "Ab": ["Ab4", "C5", "Eb5"],
-    "A#": ["A#4", "D5", "F5"], "Bb": ["Bb4", "D5", "F5"],
-    // Sharps/flats minor
-    "C#m": ["C#4", "E4", "G#4"], "Dbm": ["Db4", "E4", "Ab4"],
-    "D#m": ["D#4", "F#4", "A#4"], "Ebm": ["Eb4", "Gb4", "Bb4"],
-    "F#m": ["F#4", "A4", "C#5"], "Gbm": ["Gb4", "A4", "Db5"],
-    "G#m": ["G#4", "B4", "D#5"], "Abm": ["Ab4", "B4", "Eb5"],
-    "A#m": ["A#4", "C#5", "F5"], "Bbm": ["Bb4", "Db5", "F5"],
-  };
-  
-  // Convert to Tone.Part with typed events
-  const partEvents = events.map(e => ({
-    time: `${Math.floor(e.time / 4)}:${e.time % 4}:0`,
-    chord: e.chord
-  }));
-  
-  const part = new Tone.Part<{ time: string; chord: string }>((time, event) => {
-    if (guitarSampler && event.chord) {
-      const notes = chordNotes[event.chord] || chordNotes["C"];
-      // Play each note of the chord with slight strum delay for realistic guitar sound
-      notes.forEach((note, i) => {
-        guitarSampler!.triggerAttackRelease(note, "2n", time + i * 0.02);
-      });
-    }
-  }, partEvents);
-  
+  const part = new Tone.Part<{ time: string; bar: number }>((time, event) => {
+    if (!guitarSampler) return;
+    voicings[event.bar].forEach((midi, i) => {
+      // low → high, a few ms apart, like a down-strum
+      guitarSampler!.triggerAttackRelease(Tone.Frequency(midi, "midi").toNote(), "4n", time + i * 0.012);
+    });
+  }, events);
   part.loop = true;
   part.loopEnd = `${chordProgression.length}:0:0`;
-  
   return part;
 }
 
 // ============ MAIN API ============
 
+let beatPart: Tone.Part | null = null;
+let countInPart: Tone.Part | null = null;
+let countClick: Tone.MembraneSynth | null = null;
+
+function disposeParts() {
+  for (const p of [drumSequence, bassSequence, rhythmSequence, chordTrackingPart, beatPart, countInPart]) {
+    try {
+      p?.stop(0);
+      p?.dispose();
+    } catch {
+      /* already disposed */
+    }
+  }
+  drumSequence = null;
+  bassSequence = null;
+  rhythmSequence = null;
+  chordTrackingPart = null;
+  beatPart = null;
+  countInPart = null;
+}
+
 export async function createBackingTrack(settings: TrackSettings): Promise<BackingTrack> {
+  // load every sample first, so a count-in is never followed by a silent gap
   await initSynths();
   await Tone.start();
-  
-  // Stop any existing sequences safely
+
   try {
-    if (drumSequence) { drumSequence.stop(); drumSequence.dispose(); }
-  } catch (e) { /* ignore */ }
-  try {
-    if (bassSequence) { bassSequence.stop(); bassSequence.dispose(); }
-  } catch (e) { /* ignore */ }
-  try {
-    if (rhythmSequence) { rhythmSequence.stop(); rhythmSequence.dispose(); }
-  } catch (e) { /* ignore */ }
-  try {
-    if (chordTrackingPart) { chordTrackingPart.stop(); chordTrackingPart.dispose(); }
-  } catch (e) { /* ignore */ }
-  
-  Tone.Transport.bpm.value = settings.bpm;
-  Tone.Transport.stop();
-  // Reset position safely
-  try {
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
     Tone.Transport.position = "0:0:0";
-  } catch (e) {
-    // Ignore position reset errors
+  } catch {
+    /* ignore */
   }
-  
-  // Create sequences
+  disposeParts();
+  Tone.Transport.bpm.value = settings.bpm;
+
+  const bars = settings.chordProgression.length;
   drumSequence = createDrumSequence(settings.genre);
-  bassSequence = createBassSequence(settings.genre, settings.chordProgression, settings.measures) as unknown as Tone.Sequence;
-  rhythmSequence = createRhythmSequence(settings.genre, settings.chordProgression) as unknown as Tone.Sequence;
-  
-  // Create chord tracking part - triggers callback at start of each measure
-  const chordEvents = settings.chordProgression.map((_, idx) => ({
-    time: `${idx}:0:0`,
-    chordIndex: idx
-  }));
-  
-  chordTrackingPart = new Tone.Part<{ time: string; chordIndex: number }>((time, event) => {
-    // Use Tone.Draw to sync with visual updates
+  bassSequence = createBassPart(settings.genre, settings.chordProgression) as unknown as Tone.Sequence;
+  rhythmSequence = createRhythmPart(settings.genre, settings.chordProgression) as unknown as Tone.Sequence;
+
+  // one event per beat drives the chord display and beat lights from the audio clock
+  const beatEvents: { time: string; bar: number; beat: number }[] = [];
+  for (let bar = 0; bar < bars; bar++) for (let beat = 0; beat < 4; beat++) beatEvents.push({ time: `${bar}:${beat}:0`, bar, beat });
+  beatPart = new Tone.Part<{ time: string; bar: number; beat: number }>((time, e) => {
     Tone.Draw.schedule(() => {
-      if (settings.onChordChange) {
-        settings.onChordChange(event.chordIndex);
-      }
+      if (e.beat === 0) settings.onChordChange?.(e.bar);
+      settings.onBeat?.(e.beat, false);
     }, time);
-  }, chordEvents);
-  
-  chordTrackingPart.loop = true;
-  chordTrackingPart.loopEnd = `${settings.chordProgression.length}:0:0`;
-  
+  }, beatEvents);
+  beatPart.loop = true;
+  beatPart.loopEnd = `${bars}:0:0`;
+
+  if (settings.countIn) {
+    if (!countClick) {
+      countClick = new Tone.MembraneSynth({
+        pitchDecay: 0.008,
+        octaves: 2,
+        envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
+      }).toDestination();
+    }
+    countInPart = new Tone.Part<{ time: string; beat: number }>(
+      (time, e) => {
+        countClick?.triggerAttackRelease(e.beat === 0 ? "G4" : "C4", "32n", time);
+        Tone.Draw.schedule(() => settings.onBeat?.(e.beat, true), time);
+      },
+      [0, 1, 2, 3].map((beat) => ({ time: `0:${beat}:0`, beat }))
+    );
+  }
+
   let isPlaying = false;
-  
   return {
     isPlaying,
-    
     start: () => {
       if (isPlaying) return;
       isPlaying = true;
-      
-      // Immediately trigger first chord
-      if (settings.onChordChange) {
-        settings.onChordChange(0);
-      }
-      
-      drumSequence?.start(0);
-      bassSequence?.start(0);
-      rhythmSequence?.start(0);
-      chordTrackingPart?.start(0);
-      Tone.Transport.start();
+      const offset = settings.countIn ? "1m" : 0; // the band enters after the count-in bar
+      countInPart?.start(0);
+      for (const p of [drumSequence, bassSequence, rhythmSequence, beatPart]) p?.start(offset);
+      Tone.Transport.start("+0.05");
     },
-    
     stop: () => {
       isPlaying = false;
-      // Stop each component separately to avoid one failure stopping others
-      try { Tone.Transport.stop(); } catch (e) { /* ignore */ }
-      try { Tone.Transport.cancel(); } catch (e) { /* ignore */ }
-      try { drumSequence?.stop(0); } catch (e) { /* ignore */ }
-      try { bassSequence?.stop(0); } catch (e) { /* ignore */ }
-      try { rhythmSequence?.stop(0); } catch (e) { /* ignore */ }
-      try { chordTrackingPart?.stop(0); } catch (e) { /* ignore */ }
+      try {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+      } catch {
+        /* ignore */
+      }
+      disposeParts();
     },
-    
     setBpm: (bpm: number) => {
       Tone.Transport.bpm.value = bpm;
     },
-    
     setVolume: (instrument: "drums" | "bass" | "rhythm", volume: number) => {
       // volume: 0-100
       const db = volume === 0 ? -Infinity : (volume - 100) * 0.5;
@@ -464,26 +483,16 @@ export async function createBackingTrack(settings: TrackSettings): Promise<Backi
       if (instrument === "bass" && bassVolume) bassVolume.volume.value = db;
       if (instrument === "rhythm" && rhythmVolume) rhythmVolume.volume.value = db;
     },
-    
-    toggleMute: (instrument: "drums" | "bass" | "rhythm") => {
-      if (instrument === "drums" && drumVolume) drumVolume.mute = !drumVolume.mute;
-      if (instrument === "bass" && bassVolume) bassVolume.mute = !bassVolume.mute;
-      if (instrument === "rhythm" && rhythmVolume) rhythmVolume.mute = !rhythmVolume.mute;
-    },
   };
 }
 
 // Cleanup function
 export function disposeBackingTrack() {
-  try { Tone.Transport.stop(); } catch (e) { /* ignore */ }
-  try { Tone.Transport.cancel(); } catch (e) { /* ignore */ }
-  try { drumSequence?.dispose(); } catch (e) { /* ignore */ }
-  try { bassSequence?.dispose(); } catch (e) { /* ignore */ }
-  try { rhythmSequence?.dispose(); } catch (e) { /* ignore */ }
-  try { chordTrackingPart?.dispose(); } catch (e) { /* ignore */ }
-  drumSequence = null;
-  bassSequence = null;
-  rhythmSequence = null;
-  chordTrackingPart = null;
+  try {
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+  } catch {
+    /* ignore */
+  }
+  disposeParts();
 }
-

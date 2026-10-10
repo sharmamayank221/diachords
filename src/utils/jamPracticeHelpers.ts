@@ -66,7 +66,7 @@ export function buildJamShareUrl(basePath: string, snapshot: Partial<JamSessionS
     params.set("speed", String(snapshot.playbackSpeed));
   }
   if (snapshot.loopLimit) params.set("loops", String(snapshot.loopLimit));
-  if (snapshot.countIn) params.set("countin", "1");
+  if (snapshot.countIn !== undefined) params.set("countin", snapshot.countIn ? "1" : "0");
   if (snapshot.customChords) params.set("chords", snapshot.customChords);
   if (snapshot.scale) params.set("scale", snapshot.scale);
   if (snapshot.lastTab === "scales") params.set("tab", "scales");
