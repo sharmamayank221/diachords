@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22 # @supabase/supabase-js requires Node 22+
           cache: yarn
 
       # fails if yarn.lock is out of step with package.json (what broke the Vercel build before)
