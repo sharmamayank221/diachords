@@ -123,7 +123,7 @@ export default function ChordPlayer({
           <div className="flex flex-col">
             <span className="font-Lora text-white text-2xl leading-tight">{chordName}</span>
             <span className="font-Inter text-xs text-gray-500 uppercase tracking-wider">
-              Variation {variation} of {totalVariations}
+              Shape {variation} of {totalVariations}
             </span>
             <button
               onClick={() => playSequence(ARPEGGIO_GAP_MS)}

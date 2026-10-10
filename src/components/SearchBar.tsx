@@ -7,6 +7,7 @@ import {
 } from "@/helpers/chordSearch";
 
 const EXAMPLES = ["Am", "G7", "F#m7", "Cmaj7", "D/F#"];
+export const OPEN_SEARCH_EVENT = "chord-search:open";
 
 export default function Searchbar() {
   const router = useRouter();
@@ -29,6 +30,16 @@ export default function Searchbar() {
   const flatItems = React.useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   React.useEffect(() => setActiveIndex(0), [query]);
+
+  // other parts of the page can open search with: window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))
+  React.useEffect(() => {
+    const open = () => {
+      inputRef.current?.focus();
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_SEARCH_EVENT, open);
+    return () => window.removeEventListener(OPEN_SEARCH_EVENT, open);
+  }, []);
 
   // "/" focuses the search from anywhere
   React.useEffect(() => {
@@ -125,7 +136,7 @@ export default function Searchbar() {
           className={`h-[48px] md:h-[60px] w-full rounded-full border border-transparent bg-[#2D2D2D] pl-11 pr-20 font-Lora text-base md:text-lg text-white placeholder:text-gray-500 outline-none transition-colors focus:border-[#1BD79E]/60 ${
             open ? "bg-[#1f1f1f]" : ""
           }`}
-          placeholder="Search chords — try Am, G7, F#m7"
+          placeholder="Search chords"
           value={query}
           onChange={(e) => {
             setQuery(e.currentTarget.value);

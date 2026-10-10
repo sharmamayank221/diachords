@@ -1,13 +1,19 @@
-
 import Link from "next/link";
 import Image from "next/image";
 import React, { useState } from "react";
+import { useRouter } from "next/router";
 import { Dialog } from "@headlessui/react";
 import Searchbar from "@/components/SearchBar";
-import AudioPlayer from "./Player/AudioPlayer";
 import GuitarHintsModal from "./Modal/GuitarHintsModal";
 
+const NAV = [
+  { href: "/chords", label: "Chords", match: (p: string) => p.startsWith("/chords") },
+  { href: "/scales", label: "Scales", match: (p: string) => p.startsWith("/scales") },
+  { href: "/practice", label: "Practice", match: (p: string) => p.startsWith("/practice") || p.startsWith("/jam") },
+];
+
 export default function Header() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   function closeModal() {
@@ -18,29 +24,49 @@ export default function Header() {
     setIsOpen(true);
   }
 
+  const navLinks = (className: string) =>
+    NAV.map((item) => {
+      const active = item.match(router.pathname);
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          aria-current={active ? "page" : undefined}
+          className={`${className} font-Inter text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] rounded-full ${
+            active ? "text-white bg-white/10" : "text-gray-400 hover:text-white"
+          }`}
+        >
+          {item.label}
+        </Link>
+      );
+    });
+
   return (
-    <div className="bg-black">
-      <div className="">
-        <div className="pb-5 flex justify-center items-center w-full pt-5">
-          <div className="w-[10%] flex items-center justify-center pr-2">
-            <Link href={"/"}>
-              <Image src="/Logo.svg" alt="logo" width={41} height={41} />
-            </Link>
-          </div>
-          <div className="w-[60%]">
-            <Searchbar />
-        
-          </div>
-          <div className="">
-            <button
-              type="button"
-              onClick={openModal}
-              className="rounded-md bg-black font-Lora bg-opacity-20 px-4 py-2 text-xl md:text-2xl font-medium text-white hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75"
-            >
-              Hints
-            </button>
-          </div>
-          <GuitarHintsModal isOpen={isOpen} onClose={closeModal}>
+    <header className="bg-black sticky top-0 z-40 border-b border-white/5">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 md:gap-6">
+        <Link href="/" aria-label="Chords of Guitar home" className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-[#1BD79E]">
+          <Image src="/Logo.svg" alt="" width={40} height={40} />
+        </Link>
+        <nav aria-label="Main" className="hidden md:flex items-center gap-1">
+          {navLinks("px-3.5 py-2")}
+        </nav>
+        <div className="flex-1 min-w-0">
+          <Searchbar />
+        </div>
+        <button
+          type="button"
+          onClick={openModal}
+          aria-label="How to read chord diagrams"
+          title="How to read chord diagrams"
+          className="shrink-0 h-10 w-10 rounded-full border border-[#333] text-gray-300 font-Inter text-base font-semibold hover:border-[#1BD79E] hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+        >
+          ?
+        </button>
+      </div>
+      <nav aria-label="Main" className="md:hidden max-w-6xl mx-auto px-4 pb-3 flex gap-1 overflow-x-auto no-scrollbar">
+        {navLinks("px-3.5 py-1.5 shrink-0")}
+      </nav>
+      <GuitarHintsModal isOpen={isOpen} onClose={closeModal}>
             {" "}
             <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
               <Dialog.Title
@@ -124,8 +150,6 @@ export default function Header() {
               </div>
             </Dialog.Panel>
           </GuitarHintsModal>
-        </div>
-      </div>
-    </div>
+    </header>
   );
 }

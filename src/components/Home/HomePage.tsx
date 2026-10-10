@@ -1,177 +1,306 @@
 import React from "react";
 import Link from "next/link";
 import Head from "next/head";
+import ChordDiagram from "@/components/Chord/ChordDiagram";
+import { OPEN_SEARCH_EVENT } from "@/components/SearchBar";
+import { findChord, type ChordSearchItem } from "@/helpers/chordSearch";
+import { getChordStringNotes } from "@/helpers/chordNotes";
+import { initAudio } from "@/utils/audioUtils";
+import { playProgression, strum } from "@/utils/strum";
 
-const DAILY_FOCUS = [
-  {
-    chord: "C Major",
-    href: "/chords/cmajor",
-    desc: "The most common open chord — a perfect place to start jamming in the key of C.",
-    level: "Beginner",
-    jamHref: "key=C&genre=pop&preset=0&bpm=90",
-  },
-  {
-    chord: "G Major",
-    href: "/chords/gmajor",
-    desc: "Essential for country, rock, and folk. Pair it with a blues or rock backing track.",
-    level: "Beginner",
-    jamHref: "key=G&genre=rock&preset=1&bpm=100",
-  },
-  {
-    chord: "Am",
-    href: "/chords/aminor",
-    desc: "The relative minor of C — great for emotional progressions and slow jams.",
-    level: "Intermediate",
-    jamHref: "key=A&genre=pop&preset=4&bpm=85",
-  },
-  {
-    chord: "Cmaj7",
-    href: "/chords/cmaj7",
-    desc: "Jazz and neo-soul staple. Try the ii–V–I preset in C.",
-    level: "Advanced",
-    jamHref: "key=C&genre=jazz&preset=2&bpm=80",
-  },
-];
+const HERO_CHORDS = ["G", "C", "D", "Em", "Am", "F"];
+const POPULAR_CHORDS = ["C", "G", "D", "A", "E", "F", "Am", "Em", "Dm", "G7", "C7", "Cmaj7"];
 
 const JAM_PRESETS = [
   {
     title: "Pop in C",
-    subtitle: "I–V–vi–IV · 90 BPM",
+    subtitle: "90 BPM · the four-chord song",
+    chords: ["C", "G", "Am", "F"],
     href: "/practice?tab=jam&key=C&genre=pop&preset=0&bpm=90",
-    color: "#ec4899",
   },
   {
     title: "Blues in G",
-    subtitle: "12-bar · 100 BPM",
+    subtitle: "100 BPM · 12-bar shuffle",
+    chords: ["G", "C", "D"],
     href: "/practice?tab=jam&key=G&genre=blues&preset=6&bpm=100",
-    color: "#f59e0b",
   },
   {
     title: "Jazz in C",
-    subtitle: "ii–V–I · 80 BPM",
+    subtitle: "80 BPM · ii–V–I",
+    chords: ["Dm", "G", "C"],
     href: "/practice?tab=jam&key=C&genre=jazz&preset=2&bpm=80",
-    color: "#8b5cf6",
   },
 ];
 
-const focus = DAILY_FOCUS[new Date().getDate() % DAILY_FOCUS.length];
+function chordMidi(chord?: ChordSearchItem): number[] {
+  const p = chord?.positions[0];
+  if (!p) return [];
+  return getChordStringNotes(p.frets, p.baseFret, chord?.key)
+    .map((n) => n.midi)
+    .filter((m): m is number => m !== null);
+}
+
+// Chord of the day rotates through the hero chords
+const dayIndex = new Date().getDate() % HERO_CHORDS.length;
+
+const PlayIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+    <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z" />
+  </svg>
+);
+const StopIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+  </svg>
+);
+
+function HeroChordCard() {
+  const [selected, setSelected] = React.useState(HERO_CHORDS[dayIndex]);
+  const [ringing, setRinging] = React.useState<number[]>([]);
+  const chord = React.useMemo(() => findChord(selected), [selected]);
+  const position = chord?.positions[0];
+
+  React.useEffect(() => {
+    initAudio();
+  }, []);
+
+  const play = (name = selected) => {
+    const c = findChord(name);
+    const p = c?.positions[0];
+    if (!c || !p) return;
+    const strings = getChordStringNotes(p.frets, p.baseFret, c.key).filter((n) => n.midi !== null);
+    strum(
+      strings.map((n) => n.midi as number),
+      45,
+      (i) => {
+        setRinging((r) => [...r, strings[i].stringNumber]);
+        setTimeout(() => setRinging((r) => r.filter((s) => s !== strings[i].stringNumber)), 350);
+      }
+    );
+  };
+
+  return (
+    <div className="rounded-3xl bg-[#111] border border-white/5 p-5 md:p-7">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-Inter text-[11px] font-semibold uppercase tracking-wider text-[#1BD79E]">
+            {selected === HERO_CHORDS[dayIndex] ? "Chord of the day" : "Try a chord"}
+          </p>
+          <h2 className="font-Lora text-4xl md:text-5xl text-white mt-1">{chord?.display}</h2>
+          <p className="font-Inter text-sm text-gray-400 mt-1">{chord?.fullName}</p>
+        </div>
+        <button
+          onClick={() => play()}
+          aria-label={`Strum ${chord?.display}`}
+          className="h-14 w-14 shrink-0 rounded-full bg-[#1BD79E] text-black flex items-center justify-center transition-transform hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-[#1BD79E] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+        >
+          <PlayIcon className="h-6 w-6 ml-0.5" />
+        </button>
+      </div>
+
+      <div className="flex justify-center py-4">
+        <ChordDiagram position={position} size={210} highlightStrings={ringing} title={`${chord?.display} chord diagram`} />
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Pick a chord">
+        {HERO_CHORDS.map((name) => {
+          const active = name === selected;
+          return (
+            <button
+              key={name}
+              onClick={() => {
+                setSelected(name);
+                play(name);
+              }}
+              aria-pressed={active}
+              className={`h-9 min-w-[44px] px-3 rounded-full font-Lora text-[15px] transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+                active ? "bg-[#1BD79E] text-black" : "bg-[#1f1f1f] text-white hover:bg-[#2a2a2a]"
+              }`}
+            >
+              {name}
+            </button>
+          );
+        })}
+      </div>
+
+      {chord && (
+        <Link
+          href={chord.href}
+          className="mt-5 inline-flex items-center gap-1.5 font-Inter text-sm font-semibold text-[#1BD79E] hover:underline underline-offset-4"
+        >
+          All {chord.positions.length} shapes of {chord.display} →
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function PresetCard({ preset }: { preset: (typeof JAM_PRESETS)[number] }) {
+  const [activeChord, setActiveChord] = React.useState(-1);
+  const cancelRef = React.useRef<(() => void) | null>(null);
+  const chords = React.useMemo(() => preset.chords.map((c) => findChord(c)), [preset.chords]);
+
+  React.useEffect(() => () => cancelRef.current?.(), []);
+
+  const toggle = () => {
+    if (activeChord >= 0) {
+      cancelRef.current?.();
+      setActiveChord(-1);
+      return;
+    }
+    cancelRef.current = playProgression(chords.map(chordMidi), 750, setActiveChord);
+  };
+
+  const playing = activeChord >= 0;
+
+  return (
+    <div className="rounded-2xl bg-[#111] border border-white/5 p-5 flex flex-col gap-4 hover:border-[#1BD79E]/30 transition-colors">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-Lora text-xl text-white">{preset.title}</h3>
+          <p className="font-Inter text-xs text-gray-400 mt-1">{preset.subtitle}</p>
+        </div>
+        <button
+          onClick={toggle}
+          aria-label={playing ? `Stop ${preset.title} preview` : `Preview ${preset.title}`}
+          className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+            playing ? "bg-[#1BD79E] text-black" : "border border-[#1BD79E]/50 text-[#1BD79E] hover:bg-[#1BD79E]/10"
+          }`}
+        >
+          {playing ? <StopIcon /> : <PlayIcon className="h-4 w-4 ml-0.5" />}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {chords.map((c, i) =>
+          c ? (
+            <Link
+              key={`${c.href}-${i}`}
+              href={c.href}
+              className={`h-9 min-w-[44px] px-3 rounded-full flex items-center justify-center font-Lora text-[15px] transition-all ${
+                activeChord === i ? "bg-[#1BD79E] text-black scale-105" : "bg-[#1f1f1f] text-white hover:bg-[#2a2a2a]"
+              }`}
+            >
+              {c.display}
+            </Link>
+          ) : null
+        )}
+      </div>
+
+      <Link
+        href={preset.href}
+        className="mt-auto inline-flex items-center gap-1.5 font-Inter text-sm font-semibold text-[#1BD79E] hover:underline underline-offset-4"
+      >
+        Jam with drums &amp; bass →
+      </Link>
+    </div>
+  );
+}
 
 export default function HomePage() {
+  const popular = React.useMemo(
+    () => POPULAR_CHORDS.map((c) => findChord(c)).filter((c): c is ChordSearchItem => !!c),
+    []
+  );
+
   return (
     <>
       <Head>
-        <title>ChordsofGuitar — Guitar Chords, Scales &amp; AI Backing Tracks</title>
+        <title>ChordsofGuitar — Guitar Chords, Scales &amp; Backing Tracks</title>
         <meta
           name="description"
-          content="Practice guitar with AI backing tracks, interactive chord diagrams, and scale tools. Start jamming in seconds."
+          content="Learn any guitar chord with interactive diagrams and audio, then jam along with AI drums and bass in the same key."
         />
       </Head>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 md:py-12 font-Lora text-white">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 pt-8 md:pt-14 pb-16 text-white">
+        {/* ── Hero ── */}
+        <section className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-8 lg:gap-14 items-center mb-16 md:mb-24">
+          <div>
+            <h1 className="font-Lora text-4xl sm:text-5xl md:text-[3.5rem] font-bold leading-[1.08] tracking-tight" style={{ textWrap: "balance" } as React.CSSProperties}>
+              Learn any chord.
+              <br />
+              <span className="text-[#1BD79E]">Then jam with a band.</span>
+            </h1>
+            <p className="font-Inter text-gray-400 text-base md:text-lg max-w-xl mt-5 leading-relaxed">
+              550+ chords you can see and hear, scale patterns for soloing, and backing tracks that
+              play along in your key.
+            </p>
 
-        {/* Hero — jam first */}
-        <section className="mb-10 md:mb-14">
-          <p className="text-[#1BD79E] text-sm md:text-base font-semibold uppercase tracking-widest mb-3">
-            Practice studio · Backing tracks · Scales
-          </p>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-4">
-            Jam the progression, solo the scale —{" "}
-            <span className="text-[#1BD79E]">same key, one session</span>
-          </h1>
-          <p className="text-[#adaaaa] text-base md:text-lg max-w-2xl mb-8 leading-relaxed">
-            AI drums and bass plus an interactive fretboard and pitch check. Switch tabs without losing your key or tempo.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/practice"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full font-bold text-[#064] text-lg transition-opacity hover:opacity-90"
-              style={{ background: "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)" }}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))}
+              className="mt-8 w-full max-w-xl h-14 rounded-full bg-[#1a1a1a] border border-white/10 hover:border-[#1BD79E]/50 pl-5 pr-3 flex items-center gap-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
             >
-              Open practice studio
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-            </Link>
-            <Link
-              href={`/practice?tab=jam&${focus.jamHref.split("?")[1] ?? ""}`}
-              className="inline-flex items-center justify-center px-8 py-4 rounded-full font-bold text-white text-lg border border-white/10 bg-[#131313] hover:border-[#1BD79E]/40 transition-colors"
-            >
-              Quick jam: {focus.chord}
-            </Link>
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+              </svg>
+              <span className="flex-1 font-Lora text-base md:text-lg text-gray-500">Find a chord — Am, G7, F#m7…</span>
+              <kbd className="hidden sm:flex h-7 min-w-[28px] items-center justify-center rounded-md border border-[#444] px-2 font-Inter text-xs text-gray-400">
+                /
+              </kbd>
+            </button>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="/chords"
+                className="inline-flex items-center justify-center h-12 px-6 rounded-full bg-[#1BD79E] text-black font-Inter font-semibold transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-[#1BD79E] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              >
+                Browse all chords
+              </Link>
+              <Link
+                href="/practice"
+                className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-full border border-white/15 text-white font-Inter font-semibold hover:border-[#1BD79E]/60 transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+              >
+                <PlayIcon className="h-3.5 w-3.5" />
+                Start a backing track
+              </Link>
+            </div>
           </div>
+
+          <HeroChordCard />
         </section>
 
-        {/* Preset cards */}
-        <section className="mb-10">
-          <h2 className="text-xl font-bold mb-4">Popular jam presets</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {JAM_PRESETS.map(p => (
+        {/* ── Popular chords ── */}
+        <section className="mb-16 md:mb-24" aria-labelledby="popular-heading">
+          <div className="flex items-end justify-between gap-4 mb-5">
+            <div>
+              <h2 id="popular-heading" className="font-Lora text-2xl md:text-3xl">Popular chords</h2>
+              <p className="font-Inter text-sm text-gray-400 mt-1">The shapes behind most songs you know.</p>
+            </div>
+            <Link href="/chords" className="shrink-0 font-Inter text-sm font-semibold text-[#1BD79E] hover:underline underline-offset-4">
+              All chords →
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+            {popular.map((c) => (
               <Link
-                key={p.href}
-                href={p.href}
-                className="rounded-xl p-5 flex flex-col gap-2 transition-transform hover:scale-[1.02] bg-[#131313] border border-white/5"
-                style={{ borderTopColor: p.color, borderTopWidth: 2 }}
+                key={c.href}
+                href={c.href}
+                className="group rounded-2xl bg-[#111] border border-white/5 hover:border-[#1BD79E]/40 p-3 pb-4 flex flex-col items-center transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
               >
-                <span className="font-bold text-lg">{p.title}</span>
-                <span className="text-sm text-[#71717a]">{p.subtitle}</span>
-                <span className="text-[#1BD79E] text-sm font-semibold mt-2">Start →</span>
+                <ChordDiagram position={c.positions[0]} size={92} showFingers={false} title={`${c.display} chord`} />
+                <span className="font-Lora text-lg text-white group-hover:text-[#1BD79E] transition-colors mt-1">{c.display}</span>
               </Link>
             ))}
           </div>
         </section>
 
-        {/* Daily focus + chord library */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div className="rounded-xl p-6 md:p-8 bg-[#131313] flex flex-col justify-between gap-6">
-            <div>
-              <span className="inline-block px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold mb-4"
-                style={{ background: "rgba(27,215,158,0.12)", color: "#1BD79E" }}>
-                Chord of the day
-              </span>
-              <h2 className="text-4xl md:text-5xl font-bold mb-3">{focus.chord}</h2>
-              <p className="text-[#adaaaa] text-sm leading-relaxed">{focus.desc}</p>
-              <p className="text-[#52525b] text-xs mt-2 uppercase tracking-wide">{focus.level}</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link href={focus.href}
-                className="text-center px-5 py-3 rounded-full font-bold text-[#064] text-sm"
-                style={{ background: "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)" }}>
-                View chord diagram
-              </Link>
-              <Link href={`/practice?tab=jam&${focus.jamHref}`}
-                className="text-center px-5 py-3 rounded-full font-bold text-[#1BD79E] text-sm border border-[#1BD79E]/30 bg-[#1BD79E]/5">
-                Jam in this key
-              </Link>
-            </div>
-          </div>
-
-          <div className="rounded-xl p-6 md:p-8 bg-[#131313] flex flex-col gap-4">
-            <h2 className="text-xl font-bold">Explore</h2>
-            <p className="text-[#adaaaa] text-sm leading-relaxed">
-              Search any chord in the header, open the library, or jump straight into a backing track.
+        {/* ── Jam presets ── */}
+        <section aria-labelledby="jam-heading">
+          <div className="mb-5">
+            <h2 id="jam-heading" className="font-Lora text-2xl md:text-3xl">Play along</h2>
+            <p className="font-Inter text-sm text-gray-400 mt-1">
+              Hear the progression, learn the chords, then jam with drums and bass.
             </p>
-            <ul className="flex flex-col gap-3 mt-auto">
-              {[
-                { href: "/practice", label: "Practice studio", hint: "Backing tracks + scale fretboard" },
-                { href: "/practice?tab=scales", label: "Scale explorer", hint: "Patterns, pitch detection, soloing" },
-                { href: "/chords/cmajor", label: "Chord library", hint: "Diagrams, audio & voicings" },
-              ].map(item => (
-                <li key={item.href}>
-                  <Link href={item.href}
-                    className="flex items-center justify-between p-4 rounded-xl bg-[#0a0a0a] hover:bg-[#1a1a1a] transition-colors group">
-                    <div>
-                      <span className="font-semibold block">{item.label}</span>
-                      <span className="text-xs text-[#52525b]">{item.hint}</span>
-                    </div>
-                    <span className="text-[#1BD79E] opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {JAM_PRESETS.map((p) => (
+              <PresetCard key={p.href} preset={p} />
+            ))}
           </div>
         </section>
-
-        <p className="text-center text-[#52525b] text-xs">
-          Use the search bar above to find any chord — then jam over it in the same key.
-        </p>
       </div>
     </>
   );

@@ -1,6 +1,6 @@
 import React from "react";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
-import { toAbsoluteFret } from "@/helpers/chordNotes";
+import { toAbsoluteFret, type BarreInfo } from "@/helpers/chordNotes";
 interface IFret {
   fretsToUse?: number[];
   fingersToUse?: number[];
@@ -9,6 +9,7 @@ interface IFret {
   baseFret?: number;
   mutedStrings?: number[];
   playingStrings?: number[];
+  barre?: BarreInfo; // set only on the column the barre sits on
   onStringClick?: (stringNum: number) => void;
 }
 
@@ -23,6 +24,7 @@ export default function Fret({
   baseFret = 1,
   mutedStrings = [],
   playingStrings = [],
+  barre,
   onStringClick,
 }: IFret) {
   const FingerPositionOnStringsWithFretNums = useGetStringNumAndFretNum(
@@ -72,6 +74,9 @@ export default function Fret({
           const hasNote = string.fretNum !== undefined;
           const isMuted = isOpenColumn && mutedStrings.includes(string.stringNum);
           const isPlaying = hasNote && playingStrings.includes(string.stringNum);
+          const inBarre = !!barre && string.stringNum >= barre.fromString && string.stringNum <= barre.toString;
+          // one finger lies across the strings, so label it once at the top of the bar
+          const hideFinger = inBarre && string.stringNum !== barre!.fromString;
           return (
             <div
               className={`w-[84px] md:w-[103px] mb-9 md:mb-[52px] h-1 relative`}
@@ -84,16 +89,29 @@ export default function Fret({
                   {string.stringNum}
                 </span>
               )}
+              {inBarre && string.stringNum < barre!.toString && (
+                // bridge down to the next string's centre so the dots read as one bar
+                <span
+                  aria-hidden
+                  className="absolute z-[5] left-1/2 top-1/2 -translate-x-1/2 w-6 md:w-8 h-[39px] md:h-[55px] bg-[#1BD79E]"
+                />
+              )}
+              {inBarre && !hasNote && (
+                <span
+                  aria-hidden
+                  className="absolute z-[5] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 md:w-8 h-6 md:h-8 bg-[#1BD79E]"
+                />
+              )}
               {hasNote && (
                 <button
                   onClick={() => onStringClick?.(string.stringNum)}
                   aria-label={`Play string ${string.stringNum}`}
-                  className={`absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full bg-[#1BD79E] flex items-center justify-center cursor-pointer transition-all duration-150 hover:scale-110 focus:outline-none ${
+                  className={`absolute z-10 left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] h-6 w-6 md:h-[32px] md:w-[32px] rounded-full bg-[#1BD79E] flex items-center justify-center cursor-pointer transition-all duration-150 hover:scale-110 focus:outline-none ${
                     isPlaying ? "scale-125 shadow-[0_0_20px_#1BD79E,0_0_40px_#1BD79E]" : ""
                   }`}
                 >
                   <span className="mt-[-2px] font-Lora text-base md:text-2xl text-black leading-none">
-                    {string.fretNum === 0 ? "O" : string.fingerNum}
+                    {string.fretNum === 0 ? "O" : hideFinger ? "" : string.fingerNum}
                   </span>
                 </button>
               )}

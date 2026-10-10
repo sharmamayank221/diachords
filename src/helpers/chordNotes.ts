@@ -51,7 +51,51 @@ export function getChordStringNotes(
 export function formatChordName(chordKey?: string, suffix?: string): string {
   if (!chordKey) return "";
   const key = chordKey.replace("sharp", "#");
-  if (!suffix || suffix === "major") return key;
+  if (!suffix || suffix === "major") return `${key} major`;
   if (suffix === "minor") return `${key} minor`;
   return `${key}${suffix}`;
+}
+
+export interface ChordShapeInfo {
+  label: string; // "Open", "Fret 5"
+  barres: BarreInfo[];
+}
+
+export interface BarreInfo {
+  relativeFret: number; // column index on the fretboard
+  fret: number; // absolute fret on the neck
+  fromString: number; // highest-pitched string covered (smaller number)
+  toString: number; // lowest-pitched string covered
+  finger: number | undefined;
+}
+
+export function getChordShapeInfo(position?: {
+  frets: number[];
+  fingers?: number[];
+  baseFret?: number;
+  barres?: number[];
+}): ChordShapeInfo {
+  if (!position?.frets) return { label: "", barres: [] };
+  const baseFret = position.baseFret ?? 1;
+  const fretted = position.frets.filter((f) => f > 0).map((f) => toAbsoluteFret(f, baseFret));
+  const lowest = fretted.length ? Math.min(...fretted) : 0;
+  const label = baseFret === 1 && position.frets.includes(0) ? "Open" : `Fret ${lowest}`;
+
+  const barres = (position.barres ?? [])
+    .map((rel): BarreInfo | null => {
+      const idxs = position.frets.map((f, i) => (f === rel ? i : -1)).filter((i) => i >= 0);
+      if (idxs.length < 2) return null;
+      const lowIdx = Math.min(...idxs);
+      const highIdx = Math.max(...idxs);
+      return {
+        relativeFret: rel,
+        fret: toAbsoluteFret(rel, baseFret),
+        fromString: 6 - highIdx,
+        toString: 6 - lowIdx,
+        finger: position.fingers?.[lowIdx],
+      };
+    })
+    .filter((b): b is BarreInfo => b !== null);
+
+  return { label, barres };
 }

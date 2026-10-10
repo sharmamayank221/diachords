@@ -11,6 +11,15 @@ export interface ChordSearchItem {
   href: string;
   category: ChordCategory;
   order: number; // position in the data's suffix list (common chords first)
+  positions: ChordPosition[];
+}
+
+export interface ChordPosition {
+  frets: number[];
+  fingers: number[];
+  baseFret: number;
+  barres: number[];
+  midi?: number[];
 }
 
 export type ChordCategory = "Basic" | "Sus & add" | "Extended" | "Dim, aug & altered" | "Slash";
@@ -68,6 +77,7 @@ export const CHORD_INDEX: ChordSearchItem[] = Object.values((data as any).chords
     href: chordHref(c.key, c.suffix),
     category: categorize(c.suffix),
     order: suffixOrder.indexOf(c.suffix),
+    positions: c.positions,
   }));
 
 // Canonical, lower-case form of a chord quality so aliases compare equal
@@ -135,4 +145,9 @@ export function searchChords(input: string, limit = 30): SearchResult {
     .map((x) => x.c);
 
   return { mode: scored.length ? "match" : "none", rootLabel, items: scored };
+}
+
+// Best single chord for a name like "Am", "G7", "Cmaj7"
+export function findChord(name: string): ChordSearchItem | undefined {
+  return searchChords(name, 1).items[0];
 }
