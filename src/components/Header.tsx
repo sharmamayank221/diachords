@@ -23,7 +23,7 @@ export default function Header() {
       <div className="">
         <div className="pb-5 flex justify-center items-center w-full pt-5">
           <div className="w-[10%] flex items-center justify-center pr-2">
-            <Link href={"/chords/cmajor"}>
+            <Link href={"/"}>
               <Image src="/Logo.svg" alt="logo" width={41} height={41} />
             </Link>
           </div>

@@ -23,6 +23,9 @@ const config = {
     extend: {
       fontFamily: {
         Lora: ['"Lora"'],
+        "Space-Grotesk": ['"Space Grotesk"', "sans-serif"],
+        Manrope: ['"Manrope"', "sans-serif"],
+        Inter: ['"Inter"', "sans-serif"],
       },
     },
   },

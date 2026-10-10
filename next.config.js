@@ -2,13 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   async redirects() {
-    return [
-      {
-        source: "/chords/cmajor",
-        destination: "/",
-        permanent: true,
-      },
-    ];
+    return [];
   },
   async rewrites() {
     return [
