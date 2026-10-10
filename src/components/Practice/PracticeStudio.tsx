@@ -145,10 +145,10 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
               border: active ? "1px solid rgba(27,215,158,0.35)" : "1px solid transparent",
             }}
           >
-            <span className="font-Space-Grotesk font-bold text-[13px]" style={{ color: active ? "#1BD79E" : "white" }}>
+            <span className="font-Inter font-semibold text-sm" style={{ color: active ? "#1BD79E" : "white" }}>
               {item.label}
             </span>
-            <span className="font-Inter text-[10px] text-[#52525b]">{item.sub}</span>
+            <span className="font-Inter text-[11px] text-gray-500">{item.sub}</span>
           </button>
         );
       })}
@@ -158,11 +158,12 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
   const KeyScaleBar = (
     <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
       <div className="flex flex-col gap-2 min-w-[100px]">
-        <label className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">Practice key</label>
+        <label htmlFor="practice-key" className="font-Inter text-xs font-semibold text-gray-400 uppercase tracking-wider">Key</label>
         <select
+          id="practice-key"
           value={practiceKey}
           onChange={e => setKey(e.target.value)}
-          className="bg-[#131313] border border-white/5 text-white font-Space-Grotesk font-bold text-[16px] rounded-xl px-4 py-3 focus:outline-none appearance-none cursor-pointer"
+          className="bg-[#161616] border border-white/10 text-white font-Lora text-lg rounded-xl px-4 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] cursor-pointer"
         >
           {PRACTICE_KEYS.map(k => (
             <option key={k} value={k}>
@@ -172,11 +173,12 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
         </select>
       </div>
       <div className="flex flex-col gap-2 flex-1 min-w-[140px]">
-        <label className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">Scale (solo)</label>
+        <label htmlFor="practice-scale" className="font-Inter text-xs font-semibold text-gray-400 uppercase tracking-wider">Scale</label>
         <select
+          id="practice-scale"
           value={practiceScale}
           onChange={e => setScale(e.target.value)}
-          className="bg-[#131313] border border-white/5 text-white font-Space-Grotesk font-bold text-[15px] rounded-xl px-4 py-3 focus:outline-none appearance-none cursor-pointer"
+          className="bg-[#161616] border border-white/10 text-white font-Lora text-lg rounded-xl px-4 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] cursor-pointer"
         >
           {Object.entries(SCALES).map(([id, s]) => (
             <option key={id} value={id}>
@@ -185,26 +187,31 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
           ))}
         </select>
       </div>
-      <p className="font-Manrope text-[12px] text-[#52525b] sm:max-w-xs sm:pb-1">
-        One key for both tabs — jam the progression, then solo with{" "}
-        <span className="text-[#38DBE5]">{practiceKey} {scaleLabel}</span> on the fretboard.
+      <p className="font-Inter text-xs text-gray-500 sm:max-w-xs sm:pb-2">
+        Shared by both tabs: jam in {practiceKey}, then solo with{" "}
+        <span className="text-[#1BD79E]">{practiceKey} {scaleLabel}</span>.
       </p>
     </div>
   );
 
   return (
-    <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8 pt-4 pb-8 max-w-[1400px] mx-auto">
+    <div className="flex flex-col gap-6 px-4 md:px-6 pt-6 pb-12 max-w-6xl mx-auto">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-          <p className="font-Inter text-[10px] text-[#1BD79E] uppercase tracking-[2px] mb-2">Practice studio</p>
-          <h1 className="font-Space-Grotesk font-bold text-3xl lg:text-4xl text-white tracking-tight">
-            Jam &amp; scales, same session
+          <p className="font-Inter text-xs font-semibold text-[#1BD79E] uppercase tracking-wider mb-2">Practice studio</p>
+          <h1 className="font-Lora text-3xl lg:text-4xl text-white">
+            {tab === "scales" ? "Guitar scale explorer" : "Backing tracks"}
           </h1>
+          <p className="font-Inter text-sm text-gray-400 mt-1">
+            {tab === "scales"
+              ? "See every scale on the neck, hear it, and check your playing by ear."
+              : "Drums, bass and chords that play along in your key."}
+          </p>
         </div>
         {TabBar}
       </div>
 
-      <div className="bg-[#0b0b0b] rounded-2xl lg:rounded-3xl border border-[#1a1a1a] p-5 lg:p-6">{KeyScaleBar}</div>
+      <div className="bg-[#0f0f0f] rounded-2xl border border-white/5 p-4 lg:p-5">{KeyScaleBar}</div>
 
       {tab === "jam" ? (
         <BackingTrackGenerator

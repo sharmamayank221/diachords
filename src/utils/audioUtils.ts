@@ -234,3 +234,8 @@ export async function playProgressionWithDrums(
     }
   };
 }
+
+// Change the tempo of a progression that's already playing (it runs on Tone.Transport)
+export function setProgressionBpm(bpm: number): void {
+  Tone.Transport.bpm.value = bpm;
+}
