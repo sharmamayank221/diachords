@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { track as trackEvent } from "@/lib/analytics";
 import { useRouter } from "next/router";
 import { createBackingTrack, disposeBackingTrack, Genre, BackingTrack } from "@/utils/backingTrackEngine";
 import {
@@ -265,6 +266,7 @@ export default function BackingTrackGenerator({
     track.setVolume("rhythm", muted.rhythm ? 0 : volumes.rhythm);
     track.start();
     setIsPlaying(true);
+    trackEvent("backing_track_play", { key: selectedKey, genre: selectedGenre, bpm: effectiveBpm, chords: chords.join(" ") });
     lastChordIdxRef.current = 0;
     loopsCompletedRef.current = 0;
     setLoopsDone(0);

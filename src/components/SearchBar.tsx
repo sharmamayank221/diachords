@@ -1,5 +1,6 @@
 import React from "react";
 import { useRouter } from "next/router";
+import { track } from "@/lib/analytics";
 import {
   CATEGORY_ORDER,
   searchChords,
@@ -72,6 +73,7 @@ export default function Searchbar() {
   };
 
   const go = (item: { href: string }) => {
+    track("search_select", { query: query.trim(), destination: item.href, type: item.href.startsWith("/chords/") ? "chord" : "tool" });
     setQuery("");
     close();
     if (router.asPath !== item.href) router.push(item.href);

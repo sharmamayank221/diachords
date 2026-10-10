@@ -8,6 +8,7 @@ import GuitarHintsModal from "./Modal/GuitarHintsModal";
 import UserMenu from "@/components/Auth/UserMenu";
 import LoginModal from "@/components/Auth/LoginModal";
 import { useAuth } from "@/hooks/useAuth";
+import { track } from "@/lib/analytics";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 const NAV = [
@@ -93,7 +94,10 @@ function AccountButton() {
       ) : (
         <button
           type="button"
-          onClick={() => setLoginOpen(true)}
+          onClick={() => {
+            track("sign_in_open", { from: "header" });
+            setLoginOpen(true);
+          }}
           className="shrink-0 h-10 px-4 rounded-full border border-[#1BD79E]/40 text-[#1BD79E] font-Inter text-sm font-semibold hover:bg-[#1BD79E]/10 transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
         >
           Sign in

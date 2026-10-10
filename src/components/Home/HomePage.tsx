@@ -7,6 +7,7 @@ import { findChord, type ChordSearchItem } from "@/helpers/chordSearch";
 import { getChordStringNotes } from "@/helpers/chordNotes";
 import { initAudio } from "@/utils/audioUtils";
 import { playProgression, strum } from "@/utils/strum";
+import { track } from "@/lib/analytics";
 
 const HERO_CHORDS = ["G", "C", "D", "Em", "Am", "F"];
 const TOOLS = [
@@ -97,6 +98,7 @@ function HeroChordCard() {
     const c = findChord(name);
     const p = c?.positions[0];
     if (!c || !p) return;
+    track("chord_play", { chord: c.display, mode: "strum", source: "home" });
     const strings = getChordStringNotes(p.frets, p.baseFret, c.key).filter((n) => n.midi !== null);
     strum(
       strings.map((n) => n.midi as number),
@@ -177,6 +179,7 @@ function PresetCard({ preset }: { preset: (typeof JAM_PRESETS)[number] }) {
       setActiveChord(-1);
       return;
     }
+    track("preset_preview", { preset: preset.title });
     cancelRef.current = playProgression(chords.map(chordMidi), 750, setActiveChord);
   };
 

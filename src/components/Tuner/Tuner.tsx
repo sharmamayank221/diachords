@@ -1,6 +1,7 @@
 import React from "react";
 import { initAudio, playNote } from "@/utils/audioUtils";
 import { detectPitchYin } from "@/utils/pitch";
+import { track } from "@/lib/analytics";
 
 // ── Tunings ──────────────────────────────────────────────────────────────────
 // Notes are listed low string (6) → high string (1).
@@ -276,6 +277,7 @@ export default function Tuner() {
       quietSince.current = performance.now();
       setInputHint(null);
       setListening(true);
+      track("tuner_start", { tuning: live.current.strings.map((x) => x.name).join("") });
     } catch (e: any) {
       setMicError(
         e?.name === "NotAllowedError" || e?.name === "SecurityError"
@@ -305,6 +307,10 @@ export default function Tuner() {
     stop();
     await start(id);
   };
+
+  React.useEffect(() => {
+    if (tuned.size === 6) track("tuner_complete", { tuning: TUNINGS[tuningIdx].label });
+  }, [tuned.size, tuningIdx]);
 
   // a new tuning means new targets: progress starts over
   React.useEffect(() => {
