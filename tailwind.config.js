@@ -15,7 +15,6 @@ const config = {
     ringOpacity: false,
     ringWidth: false,
     textOpacity: false,
-    boxShadow: false,
   },
   purge: ["./public/**/*.html", "./src/**/*.{js,jsx,ts,tsx,vue}"],
   content: ["./src/**/*.{js,ts,jsx,tsx}"],

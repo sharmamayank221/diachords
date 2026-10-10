@@ -8,10 +8,42 @@ import {
   getChordStringNotes,
 } from "@/helpers/chordNotes";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
+import TutorialSection from "@/components/ChordDetail/TutorialSection";
+import LoginModal from "@/components/Auth/LoginModal";
+import { useAuth } from "@/hooks/useAuth";
+import { useFavorites } from "@/hooks/useFavorites";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 interface IGuitar {
   id?: string;
   data?: A;
+}
+
+// ♥ save to "My library"; signed-out visitors are asked to sign in first
+function FavoriteButton({ chordId, chordKey, suffix, chordName }: { chordId: string; chordKey: string; suffix: string; chordName: string }) {
+  const { user } = useAuth();
+  const { isFavorited, toggle, loading } = useFavorites(chordId, chordKey, suffix);
+  const [loginOpen, setLoginOpen] = React.useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => (user ? toggle() : setLoginOpen(true))}
+        disabled={loading}
+        aria-pressed={isFavorited}
+        aria-label={isFavorited ? `Remove ${chordName} from My library` : `Save ${chordName} to My library`}
+        title={isFavorited ? "Saved to My library" : "Save to My library"}
+        className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center border transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] disabled:opacity-50 ${
+          isFavorited ? "bg-[#1BD79E]/15 border-[#1BD79E]/50 text-[#1BD79E]" : "border-white/15 text-gray-400 hover:text-white hover:border-white/30"
+        }`}
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill={isFavorited ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} aria-hidden>
+          <path d="M12 21s-7.5-4.6-9.5-9.4C1.2 8.4 3.3 5 6.8 5c2 0 3.5 1.1 4.2 2.4h2C13.7 6.1 15.2 5 17.2 5c3.5 0 5.6 3.4 4.3 6.6C19.5 16.4 12 21 12 21z" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
+    </>
+  );
 }
 
 const Chevron = ({ dir }: { dir: "left" | "right" }) => (
@@ -78,7 +110,12 @@ export default function Guitar({ data }: IGuitar) {
       {/* ── Toolbar: chord name + shape picker ── */}
       <div className="w-full max-w-[1536px] mx-auto px-4 md:px-6 mb-3 flex flex-col md:flex-row md:items-end md:justify-between gap-3 md:gap-6">
         <div className="min-w-0">
-          <h1 className="font-Lora text-white text-3xl md:text-4xl leading-tight">{chordName}</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="font-Lora text-white text-3xl md:text-4xl leading-tight">{chordName}</h1>
+            {isSupabaseConfigured && data?.id && data?.key && (
+              <FavoriteButton chordId={data.id} chordKey={data.key} suffix={data.suffix} chordName={chordName} />
+            )}
+          </div>
           <div className="mt-1 h-5 flex items-center gap-2 font-Inter text-xs text-gray-400">
             {barre ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1BD79E]/10 text-[#1BD79E] px-2.5 py-0.5 font-semibold">
@@ -157,6 +194,12 @@ export default function Guitar({ data }: IGuitar) {
           playStringRef={chordPlayerRef}
         />
       </div>
+
+      {data?.key && (
+        <section className="w-full max-w-[860px] mx-auto px-4 md:px-0 mb-12" aria-label={`${chordName} video tutorial`}>
+          <TutorialSection chordKey={data.key} chordSuffix={data.suffix} />
+        </section>
+      )}
     </>
   );
 }

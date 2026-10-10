@@ -1,10 +1,14 @@
 import Link from "next/link";
 import Image from "next/image";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { Dialog } from "@headlessui/react";
 import Searchbar from "@/components/SearchBar";
 import GuitarHintsModal from "./Modal/GuitarHintsModal";
+import UserMenu from "@/components/Auth/UserMenu";
+import LoginModal from "@/components/Auth/LoginModal";
+import { useAuth } from "@/hooks/useAuth";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 const NAV = [
   { href: "/chords", label: "Chords", match: (p: string) => p.startsWith("/chords") },
@@ -13,6 +17,92 @@ const NAV = [
   { href: "/tuner", label: "Tuner", match: (p: string) => p.startsWith("/tuner") },
   { href: "/metronome", label: "Metronome", match: (p: string) => p.startsWith("/metronome") },
 ];
+
+// Less-used tools live under "More" so the main row stays short
+const MORE = [
+  { href: "/ear-training", label: "Ear training", hint: "Recognise chords and intervals by ear" },
+  { href: "/chord-recognition", label: "Chord detect", hint: "Play a chord, see its name" },
+  { href: "/library", label: "My library", hint: "Your saved chords", needsAuth: true },
+].filter((m) => !("needsAuth" in m) || isSupabaseConfigured);
+
+function MoreMenu({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const active = MORE.some((m) => pathname.startsWith(m.href));
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  useEffect(() => setOpen(false), [pathname]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={`px-3 py-2 rounded-full font-Inter text-sm font-medium inline-flex items-center gap-1 transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+          active ? "text-white bg-white/10" : "text-gray-400 hover:text-white"
+        }`}
+      >
+        More
+        <svg viewBox="0 0 20 20" className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} fill="currentColor" aria-hidden>
+          <path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" />
+        </svg>
+      </button>
+      {open && (
+        <div role="menu" className="absolute left-0 top-full mt-2 w-64 rounded-2xl border border-[#333] bg-[#1a1a1a] p-2 shadow-2xl shadow-black/60 z-50">
+          {MORE.map((m) => (
+            <Link
+              key={m.href}
+              href={m.href}
+              role="menuitem"
+              className="block rounded-xl px-3 py-2.5 hover:bg-white/5 focus-visible:bg-white/5 outline-none"
+            >
+              <span className="block font-Inter text-sm font-medium text-white">{m.label}</span>
+              <span className="block font-Inter text-xs text-gray-400 mt-0.5">{m.hint}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AccountButton() {
+  const { user, isLoading } = useAuth();
+  const [loginOpen, setLoginOpen] = useState(false);
+  if (!isSupabaseConfigured) return null;
+  if (isLoading) return <div className="h-10 w-10 shrink-0" aria-hidden />;
+  return (
+    <>
+      {user ? (
+        <UserMenu />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setLoginOpen(true)}
+          className="shrink-0 h-10 px-4 rounded-full border border-[#1BD79E]/40 text-[#1BD79E] font-Inter text-sm font-semibold hover:bg-[#1BD79E]/10 transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+        >
+          Sign in
+        </button>
+      )}
+      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
+    </>
+  );
+}
 
 export default function Header() {
   const router = useRouter();
@@ -49,8 +139,9 @@ export default function Header() {
         <Link href="/" aria-label="Chords of Guitar home" className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-[#1BD79E]">
           <Image src="/Logo.svg" alt="" width={40} height={40} />
         </Link>
-        <nav aria-label="Main" className="hidden md:flex items-center gap-0.5 lg:gap-1">
-          {navLinks("px-2.5 lg:px-3.5 py-2")}
+        <nav aria-label="Main" className="hidden lg:flex items-center gap-0.5 xl:gap-1">
+          {navLinks("px-2.5 xl:px-3.5 py-2")}
+          <MoreMenu pathname={router.pathname} />
         </nav>
         <div className="flex-1 min-w-0">
           <Searchbar />
@@ -64,9 +155,22 @@ export default function Header() {
         >
           ?
         </button>
+        <AccountButton />
       </div>
-      <nav aria-label="Main" className="md:hidden max-w-6xl mx-auto px-4 pb-3 flex gap-1 overflow-x-auto no-scrollbar">
+      <nav aria-label="Main" className="lg:hidden max-w-6xl mx-auto px-4 pb-3 flex gap-1 overflow-x-auto no-scrollbar">
         {navLinks("px-3.5 py-1.5 shrink-0")}
+        {MORE.map((m) => (
+          <Link
+            key={m.href}
+            href={m.href}
+            aria-current={router.pathname.startsWith(m.href) ? "page" : undefined}
+            className={`px-3.5 py-1.5 shrink-0 font-Inter text-sm font-medium rounded-full transition-colors ${
+              router.pathname.startsWith(m.href) ? "text-white bg-white/10" : "text-gray-400 hover:text-white"
+            }`}
+          >
+            {m.label}
+          </Link>
+        ))}
       </nav>
       <GuitarHintsModal isOpen={isOpen} onClose={closeModal}>
             {" "}

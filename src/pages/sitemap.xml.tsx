@@ -11,6 +11,9 @@ const STATIC_PAGES: { path: string; priority: number; changefreq: string }[] = [
   { path: "/metronome", priority: 0.9, changefreq: "monthly" },
   { path: "/scales", priority: 0.8, changefreq: "monthly" },
   { path: "/practice", priority: 0.8, changefreq: "monthly" },
+  { path: "/jam", priority: 0.8, changefreq: "weekly" },
+  { path: "/ear-training", priority: 0.8, changefreq: "monthly" },
+  { path: "/chord-recognition", priority: 0.8, changefreq: "monthly" },
 ];
 
 function buildSitemap(chordIds: string[]): string {
