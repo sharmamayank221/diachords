@@ -1,4 +1,5 @@
 import React from "react";
+import { track } from "@/lib/analytics";
 
 // ── Meters & subdivisions ────────────────────────────────────────────────────
 // BPM always counts the pulse: quarter notes in simple meters, dotted quarters in 6/8 and 12/8.
@@ -366,6 +367,7 @@ export default function Metronome() {
     timerRef.current = setInterval(schedule, LOOKAHEAD_MS);
     rafRef.current = requestAnimationFrame(animate);
     setPlaying(true);
+    track("metronome_start", { bpm: want.bpm, meter: want.meter.name, subdivision: want.subdiv, trainer: want.trainer.enabled, count_in: countIn });
   };
 
   const toggle = () => (playing ? stop() : start());

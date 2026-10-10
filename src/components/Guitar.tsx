@@ -12,6 +12,7 @@ import TutorialSection from "@/components/ChordDetail/TutorialSection";
 import LoginModal from "@/components/Auth/LoginModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useFavorites } from "@/hooks/useFavorites";
+import { track } from "@/lib/analytics";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 interface IGuitar {
@@ -28,7 +29,15 @@ function FavoriteButton({ chordId, chordKey, suffix, chordName }: { chordId: str
     <>
       <button
         type="button"
-        onClick={() => (user ? toggle() : setLoginOpen(true))}
+        onClick={() => {
+          if (!user) {
+            track("sign_in_open", { from: "favorite" });
+            setLoginOpen(true);
+            return;
+          }
+          track(isFavorited ? "favorite_remove" : "favorite_add", { chord: chordId });
+          toggle();
+        }}
         disabled={loading}
         aria-pressed={isFavorited}
         aria-label={isFavorited ? `Remove ${chordName} from My library` : `Save ${chordName} to My library`}

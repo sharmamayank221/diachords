@@ -23,8 +23,9 @@ const MetaTags: FC<{
   chordKey,
   chordSuffix 
 }) => {
-  const chordName = currentPageTitle.replace(/([a-z])([A-Z])/g, '$1 $2');
-  const fullTitle = `${chordName} Guitar Chord - How to Play | ChordsofGuitar.com`;
+  // prefer the readable name passed by the page ("A minor"); the id ("aminor") is only a fallback
+  const chordName = chordKey && chordSuffix ? `${chordKey} ${chordSuffix}` : currentPageTitle.replace(/([a-z])([A-Z])/g, '$1 $2');
+  const fullTitle = title || `${chordName} Guitar Chord - How to Play | ChordsofGuitar.com`;
   const fullDescription = description || `Learn how to play the ${chordName} chord on guitar. View finger positions, fret numbers, and hear how it sounds. Free guitar chord diagram and tutorial.`;
   const canonicalUrl = url || `${SITE_URL}/chords/${currentPageTitle.toLowerCase()}`;
   const imageUrl = image.startsWith("http") ? image : `${SITE_URL}${image}`;

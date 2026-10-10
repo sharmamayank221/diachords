@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { track } from "@/lib/analytics";
 import { initAudio, playNote } from "@/utils/audioUtils";
 import type { ChordStringNote } from "@/helpers/chordNotes";
 
@@ -75,13 +76,14 @@ export default function ChordPlayer({
       timers.current.forEach(clearTimeout);
       timers.current = [];
       active.current.clear();
+      track("chord_play", { chord: chordName, mode: gap === STRUM_GAP_MS ? "strum" : "arpeggio" });
       notes
         .filter((n) => n.midi !== null)
         .forEach((note, i) => {
           timers.current.push(setTimeout(() => playString(note), i * gap));
         });
     },
-    [notes, playString]
+    [notes, playString, chordName]
   );
 
   // Space = strum, 1–6 = individual strings

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function UserMenu() {
@@ -21,26 +22,23 @@ export default function UserMenu() {
     ? user.email.slice(0, 2).toUpperCase()
     : "??";
 
-  const emailLabel = user?.email
-    ? user.email.length > 22 ? user.email.slice(0, 22) + "…" : user.email
-    : "";
-
+  
   return (
     <div className="relative" ref={ref}>
+      {/* avatar only: the email lives in the menu, so the header keeps room for search */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 px-2 py-1 rounded-full bg-[#1BD79E]/10 border border-[#1BD79E]/30 hover:bg-[#1BD79E]/20 transition-all"
+        aria-label={`Account menu for ${user?.email ?? "you"}`}
+        aria-expanded={open}
         title={user?.email}
+        className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center bg-[#1BD79E]/15 border border-[#1BD79E]/40 hover:bg-[#1BD79E]/25 transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
       >
-        <div className="w-6 h-6 rounded-full bg-[#1BD79E]/20 flex items-center justify-center flex-shrink-0">
-          <span className="font-Space-Grotesk font-bold text-[#1BD79E] text-[10px]">{initials}</span>
-        </div>
-        <span className="font-Manrope text-[13px] text-[#1BD79E] font-medium pr-1">{emailLabel}</span>
+        <span className="font-Inter font-bold text-[#1BD79E] text-xs">{initials}</span>
       </button>
 
       {open && (
         <div
-          className="absolute right-0 top-10 w-52 rounded-2xl z-50 overflow-hidden"
+          className="absolute right-0 top-12 w-56 rounded-2xl z-50 overflow-hidden"
           style={{
             background: "rgba(16,16,16,0.98)",
             border: "1px solid rgba(255,255,255,0.07)",
@@ -55,6 +53,16 @@ export default function UserMenu() {
 
           {/* Actions */}
           <div className="p-2">
+            <Link
+              href="/library"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-all text-left font-Manrope text-[#adaaaa] text-[13px] hover:text-white"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
+                <path d="M12 21s-7.5-4.6-9.5-9.4C1.2 8.4 3.3 5 6.8 5c2 0 3.5 1.1 4.2 2.4h2C13.7 6.1 15.2 5 17.2 5c3.5 0 5.6 3.4 4.3 6.6C19.5 16.4 12 21 12 21z" />
+              </svg>
+              My library
+            </Link>
             <button
               onClick={async () => { setOpen(false); await signOut(); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-all group text-left"

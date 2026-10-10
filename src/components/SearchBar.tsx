@@ -1,5 +1,6 @@
 import React from "react";
 import { useRouter } from "next/router";
+import { track } from "@/lib/analytics";
 import {
   CATEGORY_ORDER,
   searchChords,
@@ -72,6 +73,7 @@ export default function Searchbar() {
   };
 
   const go = (item: { href: string }) => {
+    track("search_select", { query: query.trim(), destination: item.href, type: item.href.startsWith("/chords/") ? "chord" : "tool" });
     setQuery("");
     close();
     if (router.asPath !== item.href) router.push(item.href);
@@ -176,7 +178,7 @@ export default function Searchbar() {
             ref={listRef}
             role="listbox"
             aria-label="Search results"
-            className="fixed inset-x-4 top-20 md:absolute md:inset-x-0 md:top-full mt-3 max-h-[70vh] overflow-y-auto rounded-[20px] border border-[#333] bg-[#1a1a1a] p-4 md:p-5 shadow-2xl shadow-black/60"
+            className="fixed inset-x-4 top-20 md:absolute md:left-auto md:right-0 md:top-full md:w-[max(100%,min(620px,calc(100vw-2rem)))] mt-3 max-h-[70vh] overflow-y-auto rounded-[20px] border border-[#333] bg-[#1a1a1a] p-4 md:p-5 shadow-2xl shadow-black/60"
           >
             {result.mode === "none" && tools.length === 0 ? (
               <div className="py-6 text-center">
