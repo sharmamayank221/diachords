@@ -1,22 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/router";
-import {
-  SCALES,
-  ROOT_NOTES,
-  GUITAR_STRINGS,
-  getScaleNotesOnFretboard,
-  getIntervalName,
-  getScaleFormula,
-  getProgressionChords,
-  Scale,
-  ChordProgression,
-} from "@/data/scales";
-import { initAudio, playNote, playChord, playProgressionWithDrums, ProgressionChord } from "@/utils/audioUtils";
-import ChordTooltip from "./ChordTooltip";
-import { usePitchDetection } from "@/hooks/usePitchDetection";
-import { jamKeyToRootIndex, rootIndexToJamKey } from "@/utils/practiceKeySync";
-import { loadJamSession, saveJamSession } from "@/utils/jamPracticeHelpers";
+import { SCALES, GUITAR_STRINGS, getIntervalName, getChordMidiNotes } from "@/data/scales";
+import { initAudio, playNote, playProgressionWithDrums, setProgressionBpm, ProgressionChord } from "@/utils/audioUtils";
+import { jamKeyToRootIndex } from "@/utils/practiceKeySync";
+import { spellScale } from "@/helpers/scaleSpelling";
+import { findChord } from "@/helpers/chordSearch";
+import { getChordStringNotes } from "@/helpers/chordNotes";
+import { useNoteListener, LISTEN_ERROR_TEXT } from "@/hooks/useNoteListener";
+import ChordDiagram from "@/components/Chord/ChordDiagram";
+import { track } from "@/lib/analytics";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,6 +26,14 @@ interface ScaleNote {
 
 const STRING_HEIGHTS = ["1px", "2px", "3px", "3.5px", "4px", "5px"];
 const NUM_FRETS = 24;
+const STRINGS = [1, 2, 3, 4, 5, 6]; // high E (top) → low E (bottom)
+const STRING_NAMES: Record<number, string> = { 1: "E", 2: "B", 3: "G", 4: "D", 5: "A", 6: "E" };
+const SINGLE_DOTS = [3, 5, 7, 9, 15, 17, 19, 21];
+const DOUBLE_DOTS = [12, 24];
+const MIN_BPM = 60;
+const MAX_BPM = 180;
+
+const CHORD_SUFFIX: Record<string, string> = { major: "", minor: "m", dim: "dim", "7": "7", m7: "m7", maj7: "maj7" };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FretboardNote — DO NOT MODIFY (user-approved look)
@@ -71,7 +71,7 @@ const FretboardNote = React.memo(({
 ));
 FretboardNote.displayName = "FretboardNote";
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export interface ScaleFretboardProps {
   practiceKey?: string;
@@ -81,635 +81,479 @@ export interface ScaleFretboardProps {
   onOpenJam?: () => void;
 }
 
-export default function ScaleFretboard({
-  practiceKey,
-  onPracticeKeyChange,
-  practiceScaleId,
-  onPracticeScaleChange,
-  onOpenJam,
-}: ScaleFretboardProps = {} as ScaleFretboardProps) {
-  const router = useRouter();
-  const studioMode = practiceKey !== undefined;
+export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "major", onOpenJam }: ScaleFretboardProps) {
+  const scaleId = SCALES[practiceScaleId] ? practiceScaleId : "major";
+  const scale = SCALES[scaleId];
+  const rootPc = jamKeyToRootIndex(practiceKey);
+  const spelled = useMemo(() => spellScale(rootPc, scale.intervals, scaleId), [rootPc, scale, scaleId]);
 
-  const [selectedScale, setSelectedScale] = useState<string>("major");
-  const [selectedRoot, setSelectedRoot]   = useState<number>(0);
-  const [scaleNotes, setScaleNotes]       = useState<ScaleNote[]>([]);
-  const [playingNote, setPlayingNote]     = useState<number | null>(null);
-  const [showIntervals, setShowIntervals] = useState<boolean>(false);
-  const [isPlaying, setIsPlaying]         = useState<boolean>(false);
-  const [selectedProgression, setSelectedProgression] = useState<number>(0);
-  const [isPlayingProgression, setIsPlayingProgression] = useState<boolean>(false);
-  const [currentChordIndex, setCurrentChordIndex]   = useState<number | null>(null);
-  const [currentBeat, setCurrentBeat]     = useState<number>(0);
-  const [bpm, setBpm]                     = useState<number>(90);
-  const [loopCount, setLoopCount]         = useState<number>(1);
-  const [stopProgression, setStopProgression] = useState<(() => void) | null>(null);
+  const [showIntervals, setShowIntervals] = useState(false);
+  const [position, setPosition] = useState<number | null>(null); // null = all notes
+  const [playingNote, setPlayingNote] = useState<number | null>(null);
+  const [scalePlaying, setScalePlaying] = useState(false);
+  const [progIdx, setProgIdx] = useState(0);
+  const [progPlaying, setProgPlaying] = useState(false);
+  const [currentChord, setCurrentChord] = useState<number | null>(null);
+  const [currentBeat, setCurrentBeat] = useState(0);
+  const [bpm, setBpm] = useState(90);
 
-  useEffect(() => {
-    if (!studioMode || !practiceKey) return;
-    setSelectedRoot(jamKeyToRootIndex(practiceKey));
-  }, [studioMode, practiceKey]);
+  const scaleRun = useRef(0); // bump to cancel a running "play scale"
+  const stopProg = useRef<(() => void) | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const fretRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const bpmRef = useRef(bpm);
+  bpmRef.current = bpm;
+
+  const listener = useNoteListener();
 
   useEffect(() => {
-    if (!studioMode || !practiceScaleId || !SCALES[practiceScaleId]) return;
-    setSelectedScale(practiceScaleId);
-  }, [studioMode, practiceScaleId]);
+    initAudio();
+  }, []);
 
-  useEffect(() => {
-    if (!studioMode) return;
-    const saved = loadJamSession();
-    saveJamSession({
-      key: practiceKey ?? saved?.key ?? "C",
-      genre: saved?.genre ?? "rock",
-      bpm: saved?.bpm ?? 100,
-      preset: saved?.preset ?? 0,
-      playbackSpeed: saved?.playbackSpeed ?? 1,
-      loopLimit: saved?.loopLimit ?? 0,
-      countIn: saved?.countIn ?? true,
-      customChords: saved?.customChords,
-      scale: practiceScaleId ?? selectedScale,
-      lastTab: "scales",
+  // ── Notes on the neck ──────────────────────────────────────────────────────
+  const notes: ScaleNote[] = useMemo(() => {
+    const out: ScaleNote[] = [];
+    for (const s of GUITAR_STRINGS) {
+      for (let fret = 0; fret <= NUM_FRETS; fret++) {
+        const midi = s.openNote + fret;
+        const iv = (midi - rootPc + 120) % 12;
+        const idx = scale.intervals.indexOf(iv);
+        if (idx === -1) continue;
+        out.push({ string: s.string, fret, note: spelled.names[idx], midiNote: midi, isRoot: iv === 0, interval: iv, color: s.color });
+      }
+    }
+    return out;
+  }, [rootPc, scale, spelled]);
+  const noteAt = useMemo(() => {
+    const m = new Map<string, ScaleNote>();
+    notes.forEach((n) => m.set(`${n.string}:${n.fret}`, n));
+    return m;
+  }, [notes]);
+
+  // Positions: a 5-fret window starting just below each scale note on the low E string,
+  // beginning at the root — the familiar "boxes" (5 for pentatonic, 7 for seven-note scales).
+  const positions = useMemo(() => {
+    const lowE = 40;
+    const rootFret = (rootPc - (lowE % 12) + 12) % 12;
+    const starts = notes
+      .filter((n) => n.string === 6 && n.fret >= rootFret && n.fret < rootFret + 12)
+      .map((n) => n.fret)
+      .sort((a, b) => a - b);
+    return starts.map((f) => {
+      const from = Math.max(0, f - 1);
+      return { from, to: from + 4 };
     });
-  }, [studioMode, practiceKey, practiceScaleId, selectedScale]);
+  }, [notes, rootPc]);
+  const win = position !== null ? positions[position] : null;
+  const inWindow = (fret: number) => !win || (fret >= win.from && fret <= win.to);
 
-  // Apply ?scale= and ?root= URL params on mount / navigation (standalone /scales)
+  // a new key or scale starts from "all notes"
   useEffect(() => {
-    if (studioMode || !router.isReady) return;
-    const scaleParam = router.query.scale as string | undefined;
-    const rootParam  = router.query.root  as string | undefined;
-    if (scaleParam && SCALES[scaleParam]) setSelectedScale(scaleParam);
-    if (rootParam) {
-      const rootIdx = parseInt(rootParam, 10);
-      if (!isNaN(rootIdx) && rootIdx >= 0 && rootIdx < ROOT_NOTES.length) setSelectedRoot(rootIdx);
-    }
-  }, [studioMode, router.isReady, router.query.scale, router.query.root]);
+    setPosition(null);
+    setProgIdx(0);
+  }, [rootPc, scaleId]);
 
-  const handleRootSelect = (idx: number) => {
-    setSelectedRoot(idx);
-    onPracticeKeyChange?.(rootIndexToJamKey(idx));
-  };
-
-  const handleScaleSelect = (id: string) => {
-    setSelectedScale(id);
-    onPracticeScaleChange?.(id);
-  };
-
-  const JamCta = onOpenJam ? (
-    <button
-      type="button"
-      onClick={onOpenJam}
-      className="flex items-center justify-center gap-2 px-4 py-3 rounded-full font-Space-Grotesk font-bold text-[13px] border border-[#1BD79E]/40 text-[#1BD79E] bg-[#1BD79E]/5 hover:bg-[#1BD79E]/10 transition-all"
-    >
-      Jam with backing track →
-    </button>
-  ) : null;
-
-  const { isListening, startListening, stopListening, detectedMidi, detectedNote } = usePitchDetection();
-
-  const scale             = SCALES[selectedScale];
-  const rootNote          = ROOT_NOTES[selectedRoot];
-  const currentProg       = scale.progressions[selectedProgression] || scale.progressions[0];
-  const progressionChords = currentProg ? getProgressionChords(selectedRoot, scale, currentProg) : [];
-
-  useEffect(() => { initAudio(); }, []);
-
+  // bring the chosen position (or the first root) into view — matters most on phones
   useEffect(() => {
-    setScaleNotes(getScaleNotesOnFretboard(selectedRoot, scale, NUM_FRETS));
-  }, [selectedScale, selectedRoot, scale]);
-
-  const handleNoteClick = (note: ScaleNote) => {
-    setPlayingNote(note.midiNote);
-    playNote(note.midiNote);
-    setTimeout(() => setPlayingNote(null), 500);
-  };
-
-  const playScaleAscending = async () => {
-    if (isPlaying) return;
-    setIsPlaying(true);
-    const rootNotes = scaleNotes.filter(n => n.isRoot);
-    if (!rootNotes.length) { setIsPlaying(false); return; }
-    const lowestRoot = rootNotes.reduce((l, c) => c.midiNote < l.midiNote ? c : l, rootNotes[0]);
-    const octaveMidi = lowestRoot.midiNote + 12;
-    const unique: ScaleNote[] = [];
-    const seen = new Set<number>();
-    for (const n of scaleNotes
-      .filter(n => n.midiNote >= lowestRoot.midiNote && n.midiNote <= octaveMidi)
-      .sort((a, b) => a.midiNote - b.midiNote)) {
-      if (!seen.has(n.midiNote)) { seen.add(n.midiNote); unique.push(n); }
-    }
-    for (const n of unique) {
-      setPlayingNote(n.midiNote);
-      playNote(n.midiNote);
-      await new Promise(r => setTimeout(r, 350));
-    }
-    setPlayingNote(null);
-    setIsPlaying(false);
-  };
-
-  const playProgression = async () => {
-    if (stopProgression) {
-      stopProgression();
-      setStopProgression(null); setIsPlayingProgression(false);
-      setCurrentChordIndex(null); setCurrentBeat(0); setLoopCount(1);
+    const scroller = scrollerRef.current;
+    const target = win ? win.from : positions[0]?.from ?? 0;
+    const col = target === 0 ? null : fretRefs.current[target];
+    if (!scroller) return;
+    if (!col) {
+      scroller.scrollTo({ left: 0, behavior: "smooth" });
       return;
     }
-    if (!progressionChords.length) return;
-    setIsPlayingProgression(true); setCurrentBeat(0); setLoopCount(1);
-    const chordsForPlayer: ProgressionChord[] = progressionChords.map(c => ({ midiNotes: c.midiNotes, name: c.chord }));
-    const stop = await playProgressionWithDrums(
-      chordsForPlayer, bpm,
-      (ci, beat, loop) => { setCurrentChordIndex(ci); setCurrentBeat(beat); setLoopCount(loop); },
-      () => {
-        setIsPlayingProgression(false); setCurrentChordIndex(null);
-        setCurrentBeat(0); setLoopCount(1); setStopProgression(null);
-      }
-    );
-    setStopProgression(() => stop);
+    // keep the window's first fret just right of the pinned string labels (+ the open-string column)
+    const labelsWidth = 32 + 48;
+    const offset = col.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft;
+    scroller.scrollTo({ left: Math.max(0, offset - labelsWidth - 8), behavior: "smooth" });
+  }, [win, positions]);
+
+  // ── Playback ───────────────────────────────────────────────────────────────
+  const flash = (midi: number, ms = 450) => {
+    setPlayingNote(midi);
+    setTimeout(() => setPlayingNote((p) => (p === midi ? null : p)), ms);
   };
 
-  const getNoteAtPosition = (s: number, f: number) => scaleNotes.find(n => n.string === s && n.fret === f);
-  const hasFretMarker   = (f: number) => [3,5,7,9,15,17,19,21].includes(f);
-  const hasDoubleMark   = (f: number) => f === 12 || f === 24;
-  const detectedInScale = detectedNote && scaleNotes.some(n => n.note === detectedNote);
+  const handleNoteClick = useCallback((n: ScaleNote) => {
+    playNote(n.midiNote);
+    setPlayingNote(n.midiNote);
+    setTimeout(() => setPlayingNote((p) => (p === n.midiNote ? null : p)), 450);
+  }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // THE FRETBOARD
-  // ─────────────────────────────────────────────────────────────────────────
-  const STRING_NAMES = ["E", "B", "G", "D", "A", "E"]; // strings 1–6
-  const FRET_COLS    = Array.from({ length: NUM_FRETS }, (_, i) => i + 1);
+  const toggleScale = async () => {
+    if (scalePlaying) {
+      scaleRun.current++;
+      setScalePlaying(false);
+      setPlayingNote(null);
+      return;
+    }
+    // inside the chosen position, or one octave up from the lowest root
+    let run: number[];
+    if (win) {
+      run = Array.from(new Set(notes.filter((n) => inWindow(n.fret)).map((n) => n.midiNote))).sort((a, b) => a - b);
+    } else {
+      const low = Math.min(...notes.filter((n) => n.isRoot).map((n) => n.midiNote));
+      run = Array.from(new Set(notes.filter((n) => n.midiNote >= low && n.midiNote <= low + 12).map((n) => n.midiNote))).sort((a, b) => a - b);
+    }
+    const sequence = [...run, ...run.slice(0, -1).reverse()];
+    const id = ++scaleRun.current;
+    setScalePlaying(true);
+    track("scale_play", { key: spelled.rootName, scale: scaleId, position: position === null ? "all" : position + 1 });
+    for (const midi of sequence) {
+      if (scaleRun.current !== id) return;
+      playNote(midi);
+      flash(midi, 300);
+      await new Promise((r) => setTimeout(r, 60000 / bpmRef.current / 2)); // eighth notes at the current tempo
+    }
+    if (scaleRun.current === id) setScalePlaying(false);
+  };
 
-  const Fretboard = (
-    <div className="overflow-x-auto w-full">
-      <div className="flex" style={{ minWidth: "max-content" }}>
+  const progression = scale.progressions[progIdx] ?? scale.progressions[0];
+  const progChords = useMemo(() => {
+    if (!progression) return [];
+    return progression.degrees.map((deg, i) => {
+      const quality = progression.qualities[i];
+      const name = `${spelled.names[deg]}${CHORD_SUFFIX[quality] ?? quality}`;
+      const item = findChord(name);
+      const pos = item?.positions[0];
+      const guitarMidi = pos
+        ? getChordStringNotes(pos.frets, pos.baseFret, item?.key).map((n) => n.midi).filter((m): m is number => m !== null)
+        : [];
+      return {
+        name,
+        numeral: progression.numerals[i],
+        href: item?.href,
+        position: pos,
+        // real guitar voicing from the chord library; plain triad only if a shape is missing
+        midi: guitarMidi.length ? guitarMidi : getChordMidiNotes((rootPc + scale.intervals[deg]) % 12, quality),
+      };
+    });
+  }, [progression, spelled, rootPc, scale]);
 
-        {/* ── String name labels (left gutter) ── */}
-        <div className="flex flex-col">
-          {/* header spacer aligns with fret number row */}
-          <div className="h-8" />
-          {/* nut spacer */}
-          <div className="h-[199px] md:h-[279px] flex flex-col justify-around pb-1">
-            {STRING_NAMES.map((name, i) => (
-              <span key={i}
-                className="flex items-center justify-center w-6 font-Lora font-bold text-[11px] md:text-[13px]"
-                style={{ color: "#1BD79E" }}>
-                {name}
-              </span>
-            ))}
-          </div>
-        </div>
+  const stopProgression = useCallback(() => {
+    stopProg.current?.();
+    stopProg.current = null;
+    setProgPlaying(false);
+    setCurrentChord(null);
+    setCurrentBeat(0);
+  }, []);
 
-        {/* ── Open-string zone (O / empty) — before the nut ── */}
-        <div className="flex flex-col items-center mr-1">
-          <div className="h-8 flex items-end pb-1">
-            <span className="font-Inter text-[11px] text-gray-500 uppercase tracking-wider w-10 text-center">Open</span>
-          </div>
-          <div className="h-[199px] md:h-[279px] w-10 relative flex flex-col justify-around py-1">
-            {[1,2,3,4,5,6].map(stringNum => {
-              const openNote = getNoteAtPosition(stringNum, 0);
-              const isDetected = openNote && detectedMidi === openNote.midiNote;
-              return (
-                <div key={stringNum} className="flex items-center justify-center">
-                  {openNote ? (
-                    <button
-                      onClick={() => handleNoteClick(openNote)}
-                      className="w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                      style={{
-                        background: openNote.isRoot ? "#1BD79E" : "transparent",
-                        border: `2px solid ${openNote.isRoot ? "#1BD79E" : "#1BD79E"}`,
-                        boxShadow: playingNote === openNote.midiNote ? "0 0 14px #1BD79E" : isDetected ? "0 0 14px #38DBE5" : "none",
-                      }}>
-                      <span className={`font-Lora text-[9px] font-bold leading-none ${openNote.isRoot ? "text-black" : "text-[#1BD79E]"}`}>
-                        {showIntervals ? getIntervalName(openNote.interval) : "O"}
-                      </span>
-                    </button>
-                  ) : (
-                    <span className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center font-Lora font-bold text-[12px] text-gray-600">·</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+  const toggleProgression = async () => {
+    if (progPlaying) return stopProgression();
+    if (!progChords.length) return;
+    setProgPlaying(true);
+    track("progression_play", { key: spelled.rootName, scale: scaleId, progression: progression?.name ?? "", bpm });
+    const chords: ProgressionChord[] = progChords.map((c) => ({ midiNotes: c.midi, name: c.name }));
+    stopProg.current = await playProgressionWithDrums(
+      chords,
+      bpm,
+      (ci, beat) => {
+        setCurrentChord(ci);
+        setCurrentBeat(beat);
+      },
+      () => {
+        setProgPlaying(false);
+        setCurrentChord(null);
+        setCurrentBeat(0);
+      }
+    );
+  };
 
-        {/* ── NUT — thick vertical divider ── */}
-        <div className="flex flex-col">
-          <div className="h-8" />
-          <div className="h-[199px] md:h-[279px] w-[6px] md:w-[8px] rounded-sm" style={{ background: "#e8e8e8" }} />
-        </div>
+  // tempo changes apply live
+  useEffect(() => {
+    if (progPlaying) setProgressionBpm(bpm);
+  }, [bpm, progPlaying]);
 
-        {/* ── Fret columns 1–24 ── */}
-        {FRET_COLS.map(fretNum => (
-          <div key={fretNum} className="flex flex-col items-center">
-            {/* Fret number label */}
-            <div className="h-8 flex items-end pb-1">
-              <span className="font-Inter text-[11px] text-gray-500 w-[80px] md:w-[96px] text-center">
-                {fretNum}
-              </span>
-            </div>
-            {/* Fret column */}
-            <div className="h-[199px] md:h-[279px] w-[80px] md:w-[96px] relative border-r-4 border-r-[#333] border-collapse">
-              {[1,2,3,4,5,6].map(stringNum => {
-                const note         = getNoteAtPosition(stringNum, fretNum);
-                const openMidi     = GUITAR_STRINGS.find(s => s.string === stringNum)?.openNote || 0;
-                const isWrongNote  = detectedMidi === openMidi + fretNum && !note && isListening;
-                return (
-                  <div key={stringNum}
-                    className="w-full mb-9 md:mb-[52px] relative"
-                    style={{ background:"#FFF", height: STRING_HEIGHTS[stringNum - 1] }}>
-                    {isWrongNote && (
-                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 md:h-7 md:w-7 rounded-full bg-red-500/40 border-2 border-red-400 animate-pulse z-20 flex items-center justify-center"
-                        style={{ boxShadow:"0 0 16px red" }}>
-                        <span className="text-white font-Lora text-[9px] font-bold">{detectedNote}</span>
-                      </div>
-                    )}
-                    {note && (
-                      <FretboardNote
-                        note={note}
-                        isNotePlaying={playingNote === note.midiNote}
-                        isDetected={detectedMidi === note.midiNote}
-                        showIntervals={showIntervals}
-                        onClick={handleNoteClick}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-              {/* Position markers (dots) */}
-              {hasFretMarker(fretNum) && (
-                <div className="w-2.5 h-2.5 bg-[#444] rounded-full absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-              )}
-              {hasDoubleMark(fretNum) && (
-                <>
-                  <div className="w-2.5 h-2.5 bg-[#444] rounded-full absolute left-1/2 top-[35%] -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-                  <div className="w-2.5 h-2.5 bg-[#444] rounded-full absolute left-1/2 top-[65%] -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-                </>
-              )}
-            </div>
-          </div>
-        ))}
+  // a different key, scale or progression restarts from silence
+  useEffect(() => {
+    stopProgression();
+  }, [rootPc, scaleId, progIdx, stopProgression]);
 
-      </div>
-    </div>
+  // leaving the tab or the page stops everything
+  useEffect(
+    () => () => {
+      stopProg.current?.();
+      stopProg.current = null;
+      scaleRun.current++;
+    },
+    []
   );
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // MOBILE VIEW
-  // ─────────────────────────────────────────────────────────────────────────
-  const MobileView = (
-    <div className="max-w-[430px] mx-auto px-4 py-5 flex flex-col gap-4">
-        {/* Selectors */}
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <label className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px] block mb-1">Root</label>
-            <select value={selectedRoot} onChange={e => handleRootSelect(Number(e.target.value))}
-              disabled={studioMode}
-              className="w-full bg-[#131313] border border-white/5 rounded-xl px-4 py-3 font-Space-Grotesk font-bold text-white text-[15px] focus:outline-none appearance-none disabled:opacity-60">
-              {ROOT_NOTES.map((r, idx) => <option key={r.name} value={idx}>{r.name}</option>)}
-            </select>
-          </div>
-          <div className="flex-[2]">
-            <label className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px] block mb-1">Scale</label>
-            <select value={selectedScale} onChange={e => handleScaleSelect(e.target.value)}
-              disabled={studioMode}
-              className="w-full bg-[#131313] border border-white/5 rounded-xl px-4 py-3 font-Space-Grotesk font-bold text-white text-[15px] focus:outline-none appearance-none disabled:opacity-60">
-              {Object.entries(SCALES).map(([key, s]) => <option key={key} value={key}>{s.name}</option>)}
-            </select>
-          </div>
-        </div>
+  // ── Listening ──────────────────────────────────────────────────────────────
+  const heard = listener.midi;
+  const heardPc = heard !== null ? ((heard % 12) + 12) % 12 : null;
+  const heardName = heardPc !== null ? spelled.nameForPc(heardPc) : undefined;
+  const heardInScale = heardName !== undefined;
+  const SHARP_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-        {JamCta}
+  const toggleListen = () => {
+    if (listener.listening) listener.stop();
+    else {
+      track("scale_listen_start", { key: spelled.rootName, scale: scaleId });
+      listener.start();
+    }
+  };
 
-        {/* Display toggle */}
-        <div className="flex gap-1 bg-[#131313] rounded-full p-1">
-          {[{label:"Notes",val:false},{label:"Intervals",val:true}].map(({label,val}) => (
-            <button key={label} onClick={() => setShowIntervals(val)}
-              className="flex-1 py-2.5 rounded-full font-Space-Grotesk font-bold text-[13px] transition-all"
-              style={{ background: showIntervals === val ? "#1a1a1a" : "transparent", color: showIntervals === val ? "white" : "#71717a" }}>
-              {label}
-            </button>
-          ))}
-        </div>
+  // ── Render ─────────────────────────────────────────────────────────────────
+  const rowH = "h-10 md:h-[46px]";
+  const fretW = "w-[58px] md:w-[76px]";
 
-        {/* Action buttons */}
-        <div className="flex gap-2">
-          <button onClick={playScaleAscending} disabled={isPlaying}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-full font-Space-Grotesk font-bold text-[13px]"
-            style={{ background: isPlaying ? "rgba(27,215,158,0.1)" : "#1BD79E", color: isPlaying ? "#1BD79E" : "black" }}>
-            {isPlaying ? <><span className="w-2 h-2 rounded-full bg-[#1BD79E] animate-ping"/>Playing…</> : <>▶ Play Scale</>}
-          </button>
-          <button onClick={isListening ? stopListening : startListening}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-full font-Space-Grotesk font-bold text-[13px] border"
-            style={{ background: isListening ? "rgba(239,68,68,0.1)" : "transparent", color: isListening ? "#ef4444" : "#1BD79E", borderColor: isListening ? "rgba(239,68,68,0.4)" : "rgba(27,215,158,0.4)" }}>
-            {isListening ? <>● Stop</> : <>🎤 Practice</>}
-          </button>
-        </div>
-
-        {/* Detected badge */}
-        {isListening && detectedNote && (
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full self-start border font-Space-Grotesk font-bold text-[13px] ${detectedInScale ? "bg-[rgba(27,215,158,0.1)] text-[#1BD79E] border-[#1BD79E]/40" : "bg-[rgba(239,68,68,0.1)] text-red-400 border-red-500/40"}`}>
-            <span className={`w-2 h-2 rounded-full animate-pulse ${detectedInScale ? "bg-[#1BD79E]" : "bg-red-400"}`} />
-            {detectedNote} — {detectedInScale ? "In scale ✓" : "Not in scale"}
+  const renderCell = (stringNum: number, fret: number) => {
+    const n = noteAt.get(`${stringNum}:${fret}`);
+    const openMidi = GUITAR_STRINGS.find((s) => s.string === stringNum)!.openNote;
+    const wrong = listener.listening && heard === openMidi + fret && !n;
+    return (
+      <div key={stringNum} className={`relative ${rowH}`}>
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-white/90" style={{ height: STRING_HEIGHTS[stringNum - 1] }} />
+        {n && (
+          <div className={`transition-opacity ${inWindow(fret) ? "opacity-100" : "opacity-20"}`}>
+            <FretboardNote
+              note={n}
+              isNotePlaying={playingNote === n.midiNote}
+              isDetected={heard === n.midiNote}
+              showIntervals={showIntervals}
+              onClick={handleNoteClick}
+            />
           </div>
         )}
-
-        {/* Fretboard */}
-        <div className="bg-black rounded-2xl p-4">{Fretboard}</div>
-
-        {/* Scale info */}
-        <div className="bg-[#111] border border-[#222] rounded-2xl p-5 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-Inter text-[10px] text-gray-500 uppercase tracking-[1.5px]">CURRENT SCALE</p>
-              <h3 className="font-Lora text-[#1BD79E] text-xl font-bold mt-0.5">{rootNote.name.split("/")[0]} {scale.name}</h3>
-            </div>
-            <span className="font-Lora text-gray-500 text-xs">{scale.description?.slice(0, 30)}…</span>
+        {wrong && (
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 md:h-7 md:w-7 rounded-full bg-red-500/40 border-2 border-red-400 z-20 flex items-center justify-center">
+            <span className="text-white font-Inter text-[9px] font-bold">{SHARP_NAMES[heardPc!]}</span>
           </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {getScaleFormula(scale).map((degree, idx) => {
-              const isRoot = degree === "1";
-              const isMaj = ["1","2","3","4","5","6","7"].includes(degree);
-              return (
-                <span key={idx} className="px-2 py-1 rounded-md font-Lora text-xs font-semibold"
-                  style={{ background: isRoot ? "#1BD79E" : isMaj ? "#2a2a2a" : "rgba(239,68,68,0.12)", color: isRoot ? "black" : isMaj ? "white" : "#ef4444" }}>
-                  {degree}
-                </span>
-              );
-            })}
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {scale.intervals.map((interval, idx) => {
-              const n = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"][(selectedRoot + interval) % 12];
-              return (
-                <span key={idx} className={`px-3 py-1.5 rounded-xl font-Lora text-sm font-bold ${interval === 0 ? "bg-[#1BD79E] text-black" : "bg-[#1a1a1a] text-white border border-[#333]"}`}>
-                  {n}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Chord progressions */}
-        <div className="bg-[#111] border border-[#222] rounded-2xl p-5 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-Lora text-white text-lg">Chord Progressions</h3>
-            <div className="flex gap-1">
-              {scale.progressions.map((prog, idx) => (
-                <button key={idx} onClick={() => setSelectedProgression(idx)}
-                  className={`px-2 py-1 rounded-full font-Lora text-xs transition-all ${selectedProgression === idx ? "bg-[#1BD79E] text-black" : "bg-[#2a2a2a] text-gray-400"}`}>
-                  {prog.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          {currentProg && (
-            <>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={playProgression}
-                  className={`px-3 py-1.5 rounded-full font-Lora font-semibold text-xs flex items-center gap-2 ${isPlayingProgression ? "bg-red-500 text-white" : "bg-[#38DBE5] text-black"}`}>
-                  {isPlayingProgression ? <>■ Stop</> : <>▶ Play</>}
-                </button>
-                <div className="flex items-center gap-1 bg-[#2a2a2a] rounded-full px-3 py-1.5">
-                  <button onClick={() => setBpm(b => Math.max(60, b - 5))} disabled={isPlayingProgression} className="text-gray-400 font-bold w-4">−</button>
-                  <span className="font-Lora text-white text-sm min-w-[28px] text-center">{bpm}</span>
-                  <button onClick={() => setBpm(b => Math.min(160, b + 5))} disabled={isPlayingProgression} className="text-gray-400 font-bold w-4">+</button>
-                  <span className="text-gray-600 text-xs ml-1">BPM</span>
-                </div>
-                {isPlayingProgression && (
-                  <div className="flex gap-1">
-                    {[0,1,2,3].map(b => (
-                      <div key={b} className="w-2 h-2 rounded-full transition-all"
-                        style={{ background: currentBeat === b ? "#1BD79E" : "#333", transform: currentBeat === b ? "scale(1.4)" : "scale(1)" }} />
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {progressionChords.map((c, idx) => (
-                  <ChordTooltip key={idx} chordName={c.chord} searchId={c.searchId} isHighlighted={currentChordIndex === idx}>
-                    <Link href={`/chords/${c.searchId}`}>
-                      <span className="inline-block px-3 py-2 rounded-xl font-Lora font-bold text-sm transition-all"
-                        style={{ background: currentChordIndex === idx ? "#1BD79E" : "#2a2a2a", color: currentChordIndex === idx ? "black" : "white", border: currentChordIndex === idx ? "none" : "1px solid #333" }}>
-                        {c.chord}
-                      </span>
-                    </Link>
-                  </ChordTooltip>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-    </div>
-  );
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // DESKTOP VIEW — Figma practice frame bento layout
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const DesktopView = (
-    <div className="h-full flex flex-col px-8 pt-5 pb-4 gap-4 overflow-hidden">
-
-      {/* ── Session header ── */}
-      <div className="flex items-center gap-8 flex-shrink-0">
-        <div className="flex-1">
-          <p className="font-Inter text-[11px] text-gray-500 tracking-[2.5px] uppercase mb-1">
-            {studioMode ? "PRACTICE STUDIO · SCALES" : "CURRENT SESSION"}
-          </p>
-          <h2 className="font-Space-Grotesk font-bold text-[40px] leading-none tracking-[-2px] text-white">
-            {rootNote.name.split("/")[0]} <span className="text-[#1BD79E]">{scale.name}</span>
-          </h2>
-          <p className="font-Manrope text-gray-500 text-[13px] mt-1">{scale.description}</p>
-        </div>
-        <div className="flex gap-3">
-          <button onClick={playScaleAscending} disabled={isPlaying}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full font-Space-Grotesk font-bold text-[13px] transition-all"
-            style={{ background: isPlaying ? "rgba(27,215,158,0.1)" : "#1BD79E", color: isPlaying ? "#1BD79E" : "black" }}>
-            {isPlaying ? <><span className="w-2 h-2 rounded-full bg-[#1BD79E] animate-ping"/>Playing…</> : <>▶ Play Scale</>}
-          </button>
-          <button onClick={isListening ? stopListening : startListening}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full font-Space-Grotesk font-bold text-[13px] border transition-all"
-            style={{ background: isListening ? "rgba(239,68,68,0.1)" : "transparent", color: isListening ? "#ef4444" : "#1BD79E", borderColor: isListening ? "rgba(239,68,68,0.4)" : "rgba(27,215,158,0.4)" }}>
-            {isListening ? <><span className="w-2 h-2 rounded-full bg-red-400 animate-ping"/>Stop Practice</> : <>🎤 Start Practice</>}
-          </button>
-        </div>
+        )}
       </div>
+    );
+  };
 
-      {/* ── Controls row ── */}
-      <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
-        <div className="flex items-center gap-2 bg-[#111] border border-[#222] rounded-xl px-3 py-2">
-          <span className="font-Inter text-[10px] text-gray-500 uppercase tracking-wider">Root</span>
-          <select value={selectedRoot} onChange={e => handleRootSelect(Number(e.target.value))}
-            disabled={studioMode}
-            className="bg-transparent font-Space-Grotesk font-bold text-white text-[14px] focus:outline-none appearance-none cursor-pointer pr-2 disabled:opacity-60">
-            {ROOT_NOTES.map((r, idx) => <option key={r.name} value={idx}>{r.name}</option>)}
-          </select>
+  return (
+    <div className="flex flex-col gap-5 text-white">
+      {/* ── Scale header ── */}
+      <section className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div>
+          <h2 className="font-Lora text-3xl md:text-4xl">
+            {spelled.rootName} <span className="text-[#1BD79E]">{scale.name}</span>
+          </h2>
+          <p className="font-Inter text-sm text-gray-400 mt-1">{scale.description}</p>
         </div>
-        <div className="flex items-center gap-2 bg-[#111] border border-[#222] rounded-xl px-3 py-2">
-          <span className="font-Inter text-[10px] text-gray-500 uppercase tracking-wider">Scale</span>
-          <select value={selectedScale} onChange={e => handleScaleSelect(e.target.value)}
-            disabled={studioMode}
-            className="bg-transparent font-Space-Grotesk font-bold text-white text-[14px] focus:outline-none appearance-none cursor-pointer pr-2 disabled:opacity-60">
-            {Object.entries(SCALES).map(([key, s]) => <option key={key} value={key}>{s.name}</option>)}
-          </select>
-        </div>
-        {JamCta}
-        <div className="flex gap-1 bg-[#111] border border-[#222] rounded-xl p-1">
-          {[{label:"Notes",val:false},{label:"Intervals",val:true}].map(({label,val}) => (
-            <button key={label} onClick={() => setShowIntervals(val)}
-              className="px-3 py-1.5 rounded-lg font-Space-Grotesk font-bold text-[12px] transition-all"
-              style={{ background: showIntervals === val ? "#1a1a1a" : "transparent", color: showIntervals === val ? "white" : "#52525b" }}>
+        <ol className="flex flex-wrap gap-1.5" aria-label="Notes in this scale">
+          {spelled.names.map((name, i) => (
+            <li
+              key={name + i}
+              className={`min-w-[44px] px-2 py-1.5 rounded-xl text-center ${i === 0 ? "bg-[#1BD79E] text-black" : "bg-[#161616] text-white border border-white/5"}`}
+            >
+              <span className="block font-Lora text-base leading-none">{name}</span>
+              <span className={`block font-Inter text-[10px] mt-1 ${i === 0 ? "text-black/60" : "text-gray-500"}`}>{spelled.degrees[i]}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* ── Controls ── */}
+      <section className="flex flex-wrap items-center gap-3" aria-label="Fretboard controls">
+        <div className="flex rounded-full bg-[#161616] p-1" role="group" aria-label="Label notes by">
+          {[{ label: "Notes", val: false }, { label: "Intervals", val: true }].map(({ label, val }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setShowIntervals(val)}
+              aria-pressed={showIntervals === val}
+              className={`h-8 px-3.5 rounded-full font-Inter text-sm transition-colors ${showIntervals === val ? "bg-white/10 text-white font-semibold" : "text-gray-400 hover:text-white"}`}
+            >
               {label}
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5 flex-wrap ml-auto">
-          {getScaleFormula(scale).map((degree, idx) => {
-            const isRoot = degree === "1";
-            const isMaj = ["1","2","3","4","5","6","7"].includes(degree);
+
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar" role="group" aria-label="Scale position">
+          <span className="font-Inter text-xs uppercase tracking-wider text-gray-500 mr-1 shrink-0">Position</span>
+          {[null, ...positions.map((_, i) => i)].map((p) => {
+            const active = position === p;
             return (
-              <span key={idx} className="px-2 py-0.5 rounded-md font-Lora text-xs font-semibold"
-                style={{ background: isRoot ? "#1BD79E" : isMaj ? "#1a1a1a" : "rgba(239,68,68,0.12)", color: isRoot ? "black" : isMaj ? "white" : "#ef4444", border: isRoot ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
-                {degree}
-              </span>
+              <button
+                key={p === null ? "all" : p}
+                type="button"
+                onClick={() => setPosition(p)}
+                aria-pressed={active}
+                title={p === null ? "Show every note" : `Frets ${positions[p].from}–${positions[p].to}`}
+                className={`shrink-0 h-8 min-w-[32px] px-2.5 rounded-full font-Inter text-sm transition-colors ${active ? "bg-[#1BD79E] text-black font-semibold" : "bg-[#161616] text-gray-300 hover:bg-[#222]"}`}
+              >
+                {p === null ? "All" : p + 1}
+              </button>
             );
           })}
         </div>
-      </div>
 
-      {/* ── FRETBOARD — grows to fill remaining height ── */}
-      <div className="flex-1 min-h-0 bg-black rounded-2xl p-5 flex items-center overflow-hidden">
-        {Fretboard}
-      </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={toggleScale}
+            className={`h-10 px-4 rounded-full font-Inter text-sm font-semibold inline-flex items-center gap-2 transition-colors ${scalePlaying ? "bg-white text-black" : "bg-[#1BD79E] text-black hover:brightness-110"}`}
+          >
+            {scalePlaying ? "■ Stop" : "▶ Play scale"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleListen}
+            aria-pressed={listener.listening}
+            className={`h-10 px-4 rounded-full font-Inter text-sm font-semibold inline-flex items-center gap-2 border transition-colors ${
+              listener.listening ? "border-[#38DBE5] text-[#38DBE5] bg-[#38DBE5]/10" : "border-white/15 text-gray-200 hover:border-[#1BD79E]/60"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${listener.listening ? "bg-[#38DBE5] animate-pulse" : "bg-gray-500"}`} />
+            {listener.listening ? "Listening" : "Listen to me play"}
+          </button>
+        </div>
+      </section>
 
-      {/* ── Bottom bento grid — fixed height, never compresses fretboard ── */}
-      <div className="grid grid-cols-12 gap-4 flex-shrink-0">
+      {/* listening feedback */}
+      {(listener.listening || listener.error) && (
+        <p role="status" aria-live="polite" className="font-Inter text-sm -mt-2 h-5">
+          {listener.error ? (
+            <span className="text-[#f59e0b]">{LISTEN_ERROR_TEXT[listener.error]}</span>
+          ) : heard === null ? (
+            <span className="text-gray-400">Play any note — it lights up on the fretboard.</span>
+          ) : heardInScale ? (
+            <span className="text-[#1BD79E] font-semibold">✓ {heardName} is in {spelled.rootName} {scale.name}</span>
+          ) : (
+            <span className="text-red-400 font-semibold">✗ {SHARP_NAMES[heardPc!]} isn&rsquo;t in this scale</span>
+          )}
+        </p>
+      )}
 
-        {/* Chord Progression — 7 cols */}
-        <div className="col-span-7 bg-[#111] border border-[#222] rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
-          <div className="absolute right-0 top-0 w-48 h-full opacity-5 pointer-events-none"
-            style={{ background:"linear-gradient(135deg, #1BD79E 0%, transparent 70%)" }}/>
-
-          <div className="flex items-start justify-between relative z-10">
-            <div>
-              <p className="font-Inter text-[10px] text-gray-500 uppercase tracking-[2px]">CHORD PROGRESSION</p>
-              <h3 className="font-Space-Grotesk font-bold text-white text-[18px] mt-0.5">{currentProg?.name || ""}</h3>
+      {/* ── Fretboard ── */}
+      <section className="rounded-2xl bg-black border border-white/5 py-4" aria-label={`${spelled.rootName} ${scale.name} on the fretboard`}>
+        <div ref={scrollerRef} className="overflow-x-auto pr-3">
+          <div className="flex" style={{ minWidth: "max-content" }}>
+            {/* string names */}
+            <div className="sticky left-0 z-30 bg-black pl-3 pr-1 shadow-[8px_0_8px_-4px_rgba(0,0,0,0.9)]">
+              <div className="h-6" />
+              {STRINGS.map((s) => (
+                <div key={s} className={`${rowH} w-5 flex items-center justify-center font-Inter text-xs font-semibold text-[#1BD79E]`}>
+                  {STRING_NAMES[s]}
+                </div>
+              ))}
             </div>
-            <div className="flex gap-1.5">
-              {scale.progressions.map((prog, idx) => (
-                <button key={idx} onClick={() => setSelectedProgression(idx)}
-                  className="px-3 py-1 rounded-full font-Inter text-[12px] transition-all"
-                  style={{ background: selectedProgression === idx ? "#1BD79E" : "#1a1a1a", color: selectedProgression === idx ? "black" : "#52525b", border: selectedProgression === idx ? "none" : "1px solid #2a2a2a" }}>
-                  {prog.name}
+
+            {/* open strings + nut */}
+            <div>
+              <div className="h-6 flex items-center justify-center font-Inter text-[10px] uppercase tracking-wider text-gray-500 w-12">Open</div>
+              <div className="w-12 border-r-[6px] border-[#e8e8e8]">{STRINGS.map((s) => renderCell(s, 0))}</div>
+            </div>
+
+            {/* frets */}
+            {Array.from({ length: NUM_FRETS }, (_, i) => i + 1).map((fret) => (
+              <div key={fret} ref={(el) => (fretRefs.current[fret] = el)}>
+                <div className={`h-6 flex items-center justify-center font-Inter text-[11px] ${fretW} ${inWindow(fret) && win ? "text-[#1BD79E] font-semibold" : "text-gray-500"}`}>
+                  {fret}
+                </div>
+                <div className={`relative ${fretW} border-r-[3px] border-[#3a3a3a] ${win && inWindow(fret) ? "bg-[#1BD79E]/[0.06]" : ""}`}>
+                  {SINGLE_DOTS.includes(fret) && (
+                    <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-[#444] pointer-events-none" />
+                  )}
+                  {DOUBLE_DOTS.includes(fret) && (
+                    <>
+                      <span className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-[#444] pointer-events-none" />
+                      <span className="absolute left-1/2 top-2/3 -translate-x-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-[#444] pointer-events-none" />
+                    </>
+                  )}
+                  {STRINGS.map((s) => renderCell(s, fret))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Progression ── */}
+      {progression && (
+        <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5" aria-labelledby="prog-heading">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 id="prog-heading" className="font-Lora text-xl">Chords in {spelled.rootName} {scale.name}</h3>
+              <p className="font-Inter text-sm text-gray-400 mt-0.5">Play the progression, then solo over it with the scale above.</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Progression">
+              {scale.progressions.map((p, i) => (
+                <button
+                  key={p.name}
+                  type="button"
+                  onClick={() => setProgIdx(i)}
+                  aria-pressed={i === progIdx}
+                  className={`h-8 px-3 rounded-full font-Inter text-sm transition-colors ${i === progIdx ? "bg-[#1BD79E] text-black font-semibold" : "bg-[#161616] text-gray-300 hover:bg-[#222]"}`}
+                >
+                  {p.name}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-3 relative z-10 overflow-x-auto pb-1">
-            {progressionChords.map((c, idx) => (
-              <React.Fragment key={idx}>
-                <ChordTooltip chordName={c.chord} searchId={c.searchId} isHighlighted={currentChordIndex === idx}>
-                  <Link href={`/chords/${c.searchId}`}>
-                    <div className="flex flex-col items-center gap-1.5 cursor-pointer">
-                      <div className="w-14 h-16 rounded-2xl flex items-center justify-center transition-all"
-                        style={{
-                          background: currentChordIndex === idx ? "linear-gradient(135deg,#1BD79E 0%,#15c48e 100%)" : "#1a1a1a",
-                          boxShadow: currentChordIndex === idx ? "0 0 20px rgba(27,215,158,0.4)" : "none",
-                          border: currentChordIndex === idx ? "none" : "1px solid #2a2a2a",
-                          transform: currentChordIndex === idx ? "scale(1.08)" : "scale(1)",
-                        }}>
-                        <span className={`font-Space-Grotesk font-bold text-[20px] ${currentChordIndex === idx ? "text-black" : "text-white"}`}>{c.chord}</span>
-                      </div>
-                      <span className={`font-Inter text-[10px] uppercase tracking-wider ${currentChordIndex === idx ? "text-[#1BD79E]" : "text-gray-600"}`}>{currentProg?.numerals[idx]}</span>
-                    </div>
-                  </Link>
-                </ChordTooltip>
-                {idx < progressionChords.length - 1 && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2a2a2a" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-3 relative z-10">
-            <button onClick={playProgression}
-              className="flex items-center gap-2 px-4 py-2 rounded-full font-Space-Grotesk font-bold text-[12px] transition-all"
-              style={{ background: isPlayingProgression ? "rgba(239,68,68,0.12)" : "#38DBE5", color: isPlayingProgression ? "#ef4444" : "black", border: isPlayingProgression ? "1px solid rgba(239,68,68,0.3)" : "none" }}>
-              {isPlayingProgression ? <>■ Stop</> : <>▶ Play</>}
-            </button>
-            <div className="flex gap-2">
-              {[0,1,2,3].map(b => (
-                <div key={b} className="h-1 w-10 rounded-full transition-all"
-                  style={{ background: isPlayingProgression && currentBeat === b ? "#1BD79E" : "#1a1a1a", boxShadow: isPlayingProgression && currentBeat === b ? "0 0 8px rgba(27,215,158,0.6)" : "none" }}/>
-              ))}
-            </div>
-            {isPlayingProgression && <span className="font-Inter text-[11px] text-gray-500">Loop {loopCount}</span>}
-          </div>
-        </div>
-
-        {/* Metronome — 3 cols */}
-        <div className="col-span-3 bg-[#111] border border-[#222] rounded-2xl p-4 flex flex-col justify-between">
-          <div>
-            <p className="font-Inter text-[10px] text-gray-500 uppercase tracking-[2px]">TEMPO</p>
-            <p className="font-Manrope text-gray-600 text-[12px] mt-0.5">{bpm} beats per min</p>
-          </div>
-          <div className="flex items-end gap-1 justify-center my-2">
-            <span className="font-Space-Grotesk font-bold text-white leading-none" style={{ fontSize: 56 }}>{bpm}</span>
-            <span className="font-Inter text-[14px] text-gray-500 mb-1">BPM</span>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <button onClick={() => setBpm(b => Math.max(60, b - 5))} disabled={isPlayingProgression}
-              className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg bg-[#1a1a1a] border border-[#2a2a2a] text-gray-400 hover:text-white disabled:opacity-40 transition-all">
-              −
-            </button>
-            <div className="flex-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-              <div className="h-full bg-[#1BD79E] rounded-full transition-all"
-                style={{ width: `${((bpm - 60) / 100) * 100}%` }}/>
-            </div>
-            <button onClick={() => setBpm(b => Math.min(160, b + 5))} disabled={isPlayingProgression}
-              className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg bg-[#1BD79E] text-black hover:bg-[#15c48e] disabled:opacity-40 transition-all">
-              +
-            </button>
-          </div>
-        </div>
-
-        {/* Settings — 2 cols */}
-        <div className="col-span-2 bg-[#111] border border-[#222] rounded-2xl p-4 flex flex-col justify-between">
-          <div>
-            <p className="font-Inter text-[10px] text-gray-500 uppercase tracking-[2px] mb-3">SETTINGS</p>
-            <div className="flex flex-col gap-0 border border-[#1a1a1a] rounded-xl overflow-hidden">
-              {[
-                { label:"Key",   val: rootNote.name.split("/")[0] },
-                { label:"Scale", val: scale.name.split(" ")[0] },
-                { label:"Tempo", val: `${bpm}` },
-              ].map(({ label, val }, i) => (
-                <div key={i} className={`flex items-center justify-between px-3 py-2.5 ${i < 2 ? "border-b border-[#1a1a1a]" : ""}`}>
-                  <span className="font-Manrope text-[11px] text-gray-500">{label}</span>
-                  <span className="font-Space-Grotesk font-bold text-[12px] text-white">{val}</span>
+          <div className="mt-4 flex gap-3 overflow-x-auto no-scrollbar pb-1">
+            {progChords.map((c, i) => {
+              const active = currentChord === i;
+              const card = (
+                <div
+                  className={`w-[104px] shrink-0 rounded-2xl p-2 pb-3 flex flex-col items-center border transition-all ${
+                    active ? "border-[#1BD79E] bg-[#1BD79E]/10 scale-105" : "border-white/5 bg-[#161616] hover:border-white/15"
+                  }`}
+                >
+                  {c.position && <ChordDiagram position={c.position} size={78} showFingers={false} title={`${c.name} chord shape`} />}
+                  <span className={`font-Lora text-lg mt-1 ${active ? "text-[#1BD79E]" : "text-white"}`}>{c.name}</span>
+                  <span className="font-Inter text-[11px] text-gray-500">{c.numeral}</span>
                 </div>
+              );
+              return c.href ? (
+                <Link key={i} href={c.href} title={`How to play ${c.name}`}>
+                  {card}
+                </Link>
+              ) : (
+                <div key={i}>{card}</div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <button
+              type="button"
+              onClick={toggleProgression}
+              className={`h-11 px-5 rounded-full font-Inter text-sm font-semibold transition-colors ${progPlaying ? "bg-white text-black" : "bg-[#1BD79E] text-black hover:brightness-110"}`}
+            >
+              {progPlaying ? "■ Stop" : "▶ Play with drums"}
+            </button>
+            <div className="flex items-center gap-2" aria-label="Tempo">
+              <button
+                type="button"
+                onClick={() => setBpm((b) => Math.max(MIN_BPM, b - 5))}
+                aria-label="Slower"
+                className="h-9 w-9 rounded-full bg-[#161616] text-lg text-gray-200 hover:bg-[#222]"
+              >
+                −
+              </button>
+              <span className="font-Inter text-sm tabular-nums w-16 text-center">
+                <span className="text-white font-semibold">{bpm}</span> <span className="text-gray-500">BPM</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setBpm((b) => Math.min(MAX_BPM, b + 5))}
+                aria-label="Faster"
+                className="h-9 w-9 rounded-full bg-[#161616] text-lg text-gray-200 hover:bg-[#222]"
+              >
+                +
+              </button>
+            </div>
+            <div className="flex gap-1.5" aria-hidden>
+              {[0, 1, 2, 3].map((b) => (
+                <span key={b} className={`h-1.5 w-8 rounded-full transition-colors ${progPlaying && currentBeat === b ? "bg-[#1BD79E]" : "bg-[#262626]"}`} />
               ))}
             </div>
+            {onOpenJam && (
+              <button type="button" onClick={onOpenJam} className="ml-auto font-Inter text-sm font-semibold text-[#1BD79E] hover:underline underline-offset-4">
+                Full backing track with bass →
+              </button>
+            )}
           </div>
-          <button onClick={isListening ? stopListening : startListening}
-            className="w-full py-3 rounded-2xl font-Space-Grotesk font-bold text-[13px] transition-all mt-3 relative overflow-hidden"
-            style={{
-              background: isListening ? "rgba(239,68,68,0.12)" : "linear-gradient(135deg,#1BD79E 0%,#15c48e 100%)",
-              color: isListening ? "#ef4444" : "black",
-              border: isListening ? "1px solid rgba(239,68,68,0.3)" : "none",
-            }}>
-            {isListening ? (
-              <><span className="w-2 h-2 rounded-full bg-red-400 animate-ping absolute left-4 top-1/2 -translate-y-1/2"/>Stop</>
-            ) : "Start Practice"}
-          </button>
-        </div>
-
-      </div>
+        </section>
+      )}
     </div>
-  );
-
-  return (
-    <>
-      <div className="lg:hidden">{MobileView}</div>
-      <div className="hidden lg:block">{DesktopView}</div>
-    </>
   );
 }
