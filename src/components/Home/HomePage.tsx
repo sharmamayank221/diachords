@@ -26,7 +26,7 @@ const TOOLS = [
   {
     href: "/metronome",
     title: "Metronome",
-    desc: "40–240 BPM, 4/4, 3/4 and 6/8, tap tempo and accented downbeats.",
+    desc: "Subdivisions, 6/8 and 12/8, tap tempo, count-in and a speed trainer that ramps up as you play.",
     cta: "Keep time",
     icon: (
       <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

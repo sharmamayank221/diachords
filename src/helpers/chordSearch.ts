@@ -162,7 +162,7 @@ export interface ToolSearchItem {
 
 export const TOOL_INDEX: ToolSearchItem[] = [
   { href: "/tuner", display: "Guitar tuner", description: "Tune with your microphone", keywords: ["tuner", "tune", "tuning", "guitar tuner", "pitch", "standard tuning"] },
-  { href: "/metronome", display: "Metronome", description: "Tempo, time signatures, tap tempo", keywords: ["metronome", "tempo", "bpm", "tap tempo", "click", "beat", "timing"] },
+  { href: "/metronome", display: "Metronome", description: "Subdivisions, tap tempo, speed trainer", keywords: ["metronome", "tempo", "bpm", "tap tempo", "click", "beat", "timing"] },
   { href: "/scales", display: "Scale explorer", description: "Scale patterns on the fretboard", keywords: ["scales", "scale", "modes", "pentatonic", "blues scale", "fretboard"] },
   { href: "/practice", display: "Backing tracks", description: "Jam with drums and bass", keywords: ["backing track", "backing", "jam", "practice", "drums", "bass", "play along"] },
   { href: "/chords", display: "Chord library", description: "Every chord in every key", keywords: ["chords", "chord library", "library", "all chords"] },

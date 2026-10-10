@@ -117,3 +117,33 @@ html {
 .tuner-gauge-active {
     animation: gauge-glow 1s ease-in-out infinite;
 }
+
+/* Metronome sliders: brand-green thumb instead of the browser default */
+.metronome-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 9999px;
+    cursor: pointer;
+}
+.metronome-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: #fff;
+    border: 3px solid #1BD79E;
+    box-shadow: 0 0 0 4px rgba(27, 215, 158, 0.15);
+}
+.metronome-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: #fff;
+    border: 3px solid #1BD79E;
+}
+.metronome-range:focus-visible {
+    outline: 2px solid #1BD79E;
+    outline-offset: 4px;
+}

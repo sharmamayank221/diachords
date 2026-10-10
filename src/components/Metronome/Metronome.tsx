@@ -1,567 +1,634 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import * as Tone from "tone";
+import React from "react";
 
-// ── Data ──────────────────────────────────────────────────────────────────────
+// ── Meters & subdivisions ────────────────────────────────────────────────────
+// BPM always counts the pulse: quarter notes in simple meters, dotted quarters in 6/8 and 12/8.
 
-const TIME_SIGNATURES = [
-  { name: "4/4", beats: 4 },
-  { name: "3/4", beats: 3 },
-  { name: "6/8", beats: 6 },
-  { name: "2/4", beats: 2 },
-];
-
-const QUICK_BPMS = [60, 80, 100, 120, 140, 160];
-
-const TEMPO_MARKS = [
-  { name: "Largo",    range: "40–60",   min: 40,  max: 60  },
-  { name: "Adagio",   range: "66–76",   min: 66,  max: 76  },
-  { name: "Andante",  range: "76–108",  min: 76,  max: 108 },
-  { name: "Moderato", range: "108–120", min: 108, max: 120 },
-  { name: "Allegro",  range: "120–168", min: 120, max: 168 },
-  { name: "Presto",   range: "168–200", min: 168, max: 200 },
-];
-
-function getTempoName(bpm: number) {
-  return TEMPO_MARKS.find(m => bpm >= m.min && bpm <= m.max)?.name ?? "Vivace";
+interface Meter {
+  name: string;
+  pulses: number;
+  compound: boolean; // pulse divides into three eighths
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const METERS: Meter[] = [
+  { name: "2/4", pulses: 2, compound: false },
+  { name: "3/4", pulses: 3, compound: false },
+  { name: "4/4", pulses: 4, compound: false },
+  { name: "6/8", pulses: 2, compound: true },
+  { name: "12/8", pulses: 4, compound: true },
+];
+
+const SIMPLE_SUBDIVS = [
+  { value: 1, label: "Quarters" },
+  { value: 2, label: "Eighths" },
+  { value: 3, label: "Triplets" },
+  { value: 4, label: "16ths" },
+];
+const COMPOUND_SUBDIVS = [
+  { value: 1, label: "Pulse only" },
+  { value: 3, label: "Eighths" },
+  { value: 6, label: "16ths" },
+];
+
+const MIN_BPM = 30;
+const MAX_BPM = 260;
+
+const TEMPO_NAMES: [number, string][] = [
+  [200, "Prestissimo"],
+  [176, "Presto"],
+  [156, "Vivace"],
+  [120, "Allegro"],
+  [108, "Moderato"],
+  [76, "Andante"],
+  [66, "Adagio"],
+  [60, "Larghetto"],
+  [40, "Largo"],
+  [0, "Grave"],
+];
+const tempoName = (bpm: number) => TEMPO_NAMES.find(([min]) => bpm >= min)![1];
+const clampBpm = (v: number) => Math.round(Math.min(MAX_BPM, Math.max(MIN_BPM, v)));
+
+// ── Scheduler constants ──────────────────────────────────────────────────────
+const LOOKAHEAD_MS = 25; // how often the scheduler wakes up
+const SCHEDULE_AHEAD_S = 0.12; // how far ahead clicks are queued on the audio clock
+
+type ClickKind = "accent" | "pulse" | "sub" | "count";
+const CLICK: Record<ClickKind, { freq: number; gain: number; decay: number }> = {
+  accent: { freq: 2000, gain: 1, decay: 0.06 },
+  pulse: { freq: 1400, gain: 0.75, decay: 0.045 },
+  sub: { freq: 900, gain: 0.4, decay: 0.03 },
+  count: { freq: 2400, gain: 0.8, decay: 0.05 },
+};
+
+interface ScheduledStep {
+  time: number;
+  step: number;
+  pulseIdx: number;
+  isPulse: boolean;
+  countIn: boolean;
+  pulseDur: number;
+  pulseCount: number; // running pulse number, for pendulum direction
+  subdiv: number;
+  meter: Meter;
+}
+
+interface Trainer {
+  enabled: boolean;
+  step: number;
+  everyBars: number;
+  target: number;
+}
+
+const STORAGE_KEY = "metronome-settings";
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Small UI pieces ──────────────────────────────────────────────────────────
+
+function Chip({ active, onClick, children, label }: { active: boolean; onClick: () => void; children: React.ReactNode; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={label}
+      className={`h-9 px-3.5 rounded-full font-Inter text-sm transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+        active ? "bg-[#1BD79E] text-black font-semibold" : "bg-[#161616] text-gray-300 hover:bg-[#222]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${checked ? "bg-[#1BD79E]" : "bg-[#333]"}`}
+    >
+      <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${checked ? "left-6" : "left-1"}`} />
+    </button>
+  );
+}
+
+function NumberField({ value, onChange, min, max, label, suffix }: { value: number; onChange: (v: number) => void; min: number; max: number; label: string; suffix?: string }) {
+  return (
+    <label className="flex items-center gap-1.5 font-Inter text-sm text-gray-300">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={value}
+        aria-label={label}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          if (!Number.isNaN(v)) onChange(Math.min(max, Math.max(min, Math.round(v))));
+        }}
+        className="w-16 h-9 rounded-lg bg-[#161616] border border-white/10 px-2 text-center text-white outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+      />
+      {suffix}
+    </label>
+  );
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function Metronome() {
-  const [isPlaying, setIsPlaying]       = useState(false);
-  const [bpm, setBpm]                   = useState(100);
-  const [currentBeat, setCurrentBeat]   = useState(0);
-  const [timeSignature, setTimeSignature] = useState(TIME_SIGNATURES[0]);
-  const [tapTimes, setTapTimes]         = useState<number[]>([]);
-  const [pendulumDir, setPendulumDir]   = useState(1); // 1 = right, -1 = left
+  const [bpm, setBpm] = React.useState(100);
+  const [meterIdx, setMeterIdx] = React.useState(2);
+  const [subdiv, setSubdiv] = React.useState(1);
+  const [accent, setAccent] = React.useState(true);
+  const [volume, setVolume] = React.useState(0.8);
+  const [countIn, setCountIn] = React.useState(false);
+  const [trainer, setTrainer] = React.useState<Trainer>({ enabled: false, step: 5, everyBars: 4, target: 140 });
+  const [playing, setPlaying] = React.useState(false);
+  const [position, setPosition] = React.useState<{ step: number; pulseIdx: number; countIn: boolean } | null>(null);
+  const [taps, setTaps] = React.useState<number[]>([]);
 
-  const clickHigh = useRef<Tone.Synth | null>(null);
-  const clickLow  = useRef<Tone.Synth | null>(null);
-  const loopRef   = useRef<Tone.Loop | null>(null);
-  const beatRef   = useRef(0);
+  const meter = METERS[meterIdx];
+  const subdivOptions = meter.compound ? COMPOUND_SUBDIVS : SIMPLE_SUBDIVS;
 
-  // Init synths
-  useEffect(() => {
-    clickHigh.current = new Tone.Synth({
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
-    }).toDestination();
-    clickHigh.current.volume.value = -6;
+  // restore last-used settings (per browser)
+  React.useEffect(() => {
+    const s = loadSettings();
+    if (!s) return;
+    if (typeof s.bpm === "number") setBpm(clampBpm(s.bpm));
+    if (typeof s.meterIdx === "number" && METERS[s.meterIdx]) setMeterIdx(s.meterIdx);
+    if (typeof s.subdiv === "number") setSubdiv(s.subdiv);
+    if (typeof s.accent === "boolean") setAccent(s.accent);
+    if (typeof s.volume === "number") setVolume(Math.min(1, Math.max(0, s.volume)));
+  }, []);
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ bpm, meterIdx, subdiv, accent, volume }));
+    } catch {
+      // storage unavailable: settings just won't persist
+    }
+  }, [bpm, meterIdx, subdiv, accent, volume]);
 
-    clickLow.current = new Tone.Synth({
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
-    }).toDestination();
-    clickLow.current.volume.value = -10;
+  // switching between simple and compound meters resets to that family's natural feel
+  // (6/8 and 12/8 are felt in eighths); within a family your subdivision is kept
+  const selectMeter = (i: number) => {
+    if (METERS[i].compound !== meter.compound) setSubdiv(METERS[i].compound ? 3 : 1);
+    setMeterIdx(i);
+  };
+  React.useEffect(() => {
+    if (!subdivOptions.some((o) => o.value === subdiv)) setSubdiv(meter.compound ? 3 : 1);
+  }, [meter.compound, subdiv, subdivOptions]);
 
-    return () => {
-      loopRef.current?.dispose();
-      clickHigh.current?.dispose();
-      clickLow.current?.dispose();
-    };
+  // ── Audio engine (own AudioContext, so it never touches the backing-track clock) ──
+  const ctxRef = React.useRef<AudioContext | null>(null);
+  const masterRef = React.useRef<GainNode | null>(null);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const rafRef = React.useRef<number | null>(null);
+  const pendulumRef = React.useRef<SVGGElement | null>(null);
+
+  const desired = React.useRef({ bpm, meter, subdiv, accent, trainer });
+  desired.current = { bpm, meter, subdiv, accent, trainer };
+
+  const engine = React.useRef({
+    nextTime: 0,
+    step: 0,
+    meter: METERS[2],
+    subdiv: 1,
+    bar: 0,
+    countInBars: 0,
+    pulseCount: 0,
+    bpm: 100,
+    queue: [] as ScheduledStep[],
+    lastPulse: null as ScheduledStep | null,
+  });
+
+  React.useEffect(() => {
+    if (masterRef.current) masterRef.current.gain.value = volume;
+  }, [volume]);
+
+  const playClick = (time: number, kind: ClickKind) => {
+    const ctx = ctxRef.current;
+    const master = masterRef.current;
+    if (!ctx || !master) return;
+    const { freq, gain, decay } = CLICK[kind];
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(freq, time);
+    env.gain.setValueAtTime(0.0001, time);
+    env.gain.exponentialRampToValueAtTime(gain, time + 0.001);
+    env.gain.exponentialRampToValueAtTime(0.0001, time + decay);
+    osc.connect(env).connect(master);
+    osc.start(time);
+    osc.stop(time + decay + 0.01);
+  };
+
+  const schedule = () => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    const e = engine.current;
+    const want = desired.current;
+
+    while (e.nextTime < ctx.currentTime + SCHEDULE_AHEAD_S) {
+      // meter changes land on the next bar, subdivision changes on the next pulse
+      if (e.step === 0 && e.meter !== want.meter) {
+        e.meter = want.meter;
+        e.subdiv = want.subdiv;
+      } else if (e.subdiv !== want.subdiv && e.step % e.subdiv === 0) {
+        e.step = (e.step / e.subdiv) * want.subdiv;
+        e.subdiv = want.subdiv;
+      }
+
+      const pulseDur = 60 / e.bpm;
+      const stepDur = pulseDur / e.subdiv;
+      const isPulse = e.step % e.subdiv === 0;
+      const pulseIdx = Math.floor(e.step / e.subdiv);
+      const inCountIn = e.countInBars > 0;
+
+      if (isPulse) e.pulseCount += 1;
+      if (!inCountIn || isPulse) {
+        const kind: ClickKind = inCountIn
+          ? "count"
+          : !isPulse
+          ? "sub"
+          : pulseIdx === 0 && want.accent
+          ? "accent"
+          : "pulse";
+        playClick(e.nextTime, kind);
+      }
+      e.queue.push({
+        time: e.nextTime,
+        step: e.step,
+        pulseIdx,
+        isPulse,
+        countIn: inCountIn,
+        pulseDur,
+        pulseCount: e.pulseCount,
+        subdiv: e.subdiv,
+        meter: e.meter,
+      });
+
+      e.nextTime += stepDur;
+      e.step += 1;
+      if (e.step >= e.meter.pulses * e.subdiv) {
+        e.step = 0;
+        if (inCountIn) {
+          e.countInBars -= 1;
+        } else {
+          e.bar += 1;
+          const t = want.trainer;
+          if (t.enabled && e.bar % t.everyBars === 0 && e.bpm < t.target) {
+            e.bpm = Math.min(t.target, e.bpm + t.step);
+            setBpm(e.bpm);
+          }
+        }
+      }
+    }
+  };
+
+  // visuals follow the audio clock, not timers, so lights and pendulum stay on the click
+  const animate = () => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    const e = engine.current;
+    const now = ctx.currentTime - ((ctx as any).outputLatency ?? 0);
+
+    let current: ScheduledStep | null = null;
+    while (e.queue.length && e.queue[0].time <= now) {
+      current = e.queue.shift()!;
+      if (current.isPulse) e.lastPulse = current;
+    }
+    if (current) {
+      const c = current;
+      setPosition((p) => (p && p.step === c.step && p.countIn === c.countIn && p.pulseIdx === c.pulseIdx ? p : { step: c.step, pulseIdx: c.pulseIdx, countIn: c.countIn }));
+    }
+
+    const lp = e.lastPulse;
+    if (lp && pendulumRef.current) {
+      // passes centre exactly on each pulse, swinging out and back in between, alternating sides
+      const phase = Math.min(1, Math.max(0, (now - lp.time) / lp.pulseDur));
+      const dir = lp.pulseCount % 2 === 0 ? 1 : -1;
+      pendulumRef.current.style.transform = `rotate(${dir * 26 * Math.sin(Math.PI * phase)}deg)`;
+    }
+    rafRef.current = requestAnimationFrame(animate);
+  };
+
+  const stop = React.useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    timerRef.current = null;
+    rafRef.current = null;
+    engine.current.queue = [];
+    engine.current.lastPulse = null;
+    if (pendulumRef.current) pendulumRef.current.style.transform = "rotate(0deg)";
+    // let the last click ring out, then release the audio hardware
+    const ctx = ctxRef.current;
+    ctxRef.current = null;
+    masterRef.current = null;
+    if (ctx) setTimeout(() => ctx.close().catch(() => {}), 150);
+    setPlaying(false);
+    setPosition(null);
   }, []);
 
-  useEffect(() => { Tone.Transport.bpm.value = bpm; }, [bpm]);
+  const start = async () => {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx: AudioContext = new Ctx({ latencyHint: "interactive" });
+    await ctx.resume();
+    const master = ctx.createGain();
+    master.gain.value = volume;
+    master.connect(ctx.destination);
+    ctxRef.current = ctx;
+    masterRef.current = master;
 
-  const startMetronome = async () => {
-    await Tone.start();
-    beatRef.current = 0;
-    setCurrentBeat(0);
-    loopRef.current?.dispose();
-
-    loopRef.current = new Tone.Loop((time) => {
-      const beat = beatRef.current;
-      if (beat === 0) {
-        clickHigh.current?.triggerAttackRelease("C6", "32n", time);
-      } else {
-        clickLow.current?.triggerAttackRelease("G5", "32n", time);
-      }
-      Tone.Draw.schedule(() => {
-        setCurrentBeat(beat);
-        setPendulumDir(prev => prev * -1);
-      }, time);
-      beatRef.current = (beat + 1) % timeSignature.beats;
-    }, "4n");
-
-    loopRef.current.start(0);
-    Tone.Transport.start();
-    setIsPlaying(true);
-  };
-
-  const stopMetronome = () => {
-    loopRef.current?.stop();
-    Tone.Transport.stop();
-    Tone.Transport.position = 0;
-    setIsPlaying(false);
-    setCurrentBeat(0);
-    beatRef.current = 0;
-    setPendulumDir(1);
-  };
-
-  const toggleMetronome = () => (isPlaying ? stopMetronome() : startMetronome());
-
-  const handleTapTempo = useCallback(() => {
-    const now = Date.now();
-    const taps = [...tapTimes, now].filter(t => now - t < 3000);
-    setTapTimes(taps);
-    if (taps.length >= 2) {
-      const intervals = taps.slice(1).map((t, i) => t - taps[i]);
-      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      const calc = Math.round(60000 / avg);
-      if (calc >= 40 && calc <= 240) setBpm(calc);
-    }
-  }, [tapTimes]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Space" && e.target === document.body) { e.preventDefault(); toggleMetronome(); }
-      else if (e.code === "KeyT") { handleTapTempo(); }
+    const want = desired.current;
+    engine.current = {
+      nextTime: ctx.currentTime + 0.06,
+      step: 0,
+      meter: want.meter,
+      subdiv: want.subdiv,
+      bar: 0,
+      countInBars: countIn ? 1 : 0,
+      pulseCount: 0,
+      bpm: want.bpm,
+      queue: [],
+      lastPulse: null,
     };
+    schedule();
+    timerRef.current = setInterval(schedule, LOOKAHEAD_MS);
+    rafRef.current = requestAnimationFrame(animate);
+    setPlaying(true);
+  };
+
+  const toggle = () => (playing ? stop() : start());
+
+  // leaving the page stops the metronome and frees the audio device
+  React.useEffect(() => stop, [stop]);
+
+  // BPM edits apply straight away during playback (the trainer then continues from here)
+  const changeBpm = (v: number) => {
+    const next = clampBpm(v);
+    setBpm(next);
+    engine.current.bpm = next;
+  };
+
+  const tap = () => {
+    const now = performance.now();
+    // a pause of more than 2 s starts a new measurement; average the last few taps
+    const last = taps[taps.length - 1];
+    const fresh = [...(last !== undefined && now - last < 2000 ? taps : []), now].slice(-6);
+    setTaps(fresh);
+    if (fresh.length >= 2) {
+      const intervals = fresh.slice(1).map((t, i) => t - fresh[i]);
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      changeBpm(60000 / avg);
+    }
+  };
+
+  // Keyboard: Space play/stop, T tap, ↑/↓ ±1 (Shift ±5). Ignored while typing in a field.
+  const keyHandler = React.useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandler.current = (e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('input:not([type="range"]), textarea, select, [contenteditable]')) return;
+    if (e.code === "Space") {
+      e.preventDefault(); // also stops a focused button from being "clicked" by Space
+      toggle();
+    } else if (e.code === "KeyT") {
+      tap();
+    } else if ((e.code === "ArrowUp" || e.code === "ArrowDown") && target?.getAttribute("type") !== "range") {
+      e.preventDefault();
+      changeBpm(bpm + (e.code === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 5 : 1));
+    }
+  };
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyHandler.current(e);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, handleTapTempo]);
+  }, []);
 
-  // ── Pendulum derived values ────────────────────────────────────────────────
+  // ── Beat lights ────────────────────────────────────────────────────────────
+  // Simple meters: one light per beat. Compound meters: one per eighth, grouped in threes.
+  const lightCount = meter.compound ? meter.pulses * 3 : meter.pulses;
+  const activeLight =
+    position === null
+      ? -1
+      : meter.compound
+      ? position.countIn
+        ? position.pulseIdx * 3
+        : Math.floor((position.step * 3) / subdiv)
+      : position.pulseIdx;
+  const activeSub = position && !position.countIn && !meter.compound && subdiv > 1 ? position.step % subdiv : -1;
 
-  const swingDuration = isPlaying ? (60000 / bpm) : 0; // one tick = one direction
-  const pendulumAngle = isPlaying ? pendulumDir * 28 : 0; // degrees
-
-  const bpmPercent = ((bpm - 40) / (240 - 40)) * 100;
-  const tempoName  = getTempoName(bpm);
-
-  // ── Shared sub-components ─────────────────────────────────────────────────
-
-  const BeatDots = (
-    <div className="flex items-center justify-center gap-3">
-      {Array.from({ length: timeSignature.beats }).map((_, idx) => {
-        const isActive = isPlaying && currentBeat === idx;
-        const isAccent = idx === 0;
-        return (
-          <div key={idx}
-            className="flex flex-col items-center gap-1.5 transition-all duration-100"
-            style={{ transform: isActive ? "scale(1.2)" : "scale(1)" }}>
-            <div className="font-Inter text-[10px] tracking-[1px] uppercase"
-              style={{ color: isActive ? (isAccent ? "#1BD79E" : "#38DBE5") : "#3f3f46" }}>
-              {idx + 1}
-            </div>
-            <div className="w-3 h-3 rounded-full transition-all duration-75"
-              style={{
-                background: isActive
-                  ? isAccent ? "#1BD79E" : "#38DBE5"
-                  : "#1a1a1a",
-                boxShadow: isActive
-                  ? `0 0 12px ${isAccent ? "#1BD79E" : "#38DBE5"}`
-                  : "none",
-                border: isActive ? "none" : "1px solid #2a2a2a",
-              }} />
-          </div>
-        );
-      })}
-    </div>
-  );
-
-  const PlayStopButton = ({ large = false }: { large?: boolean }) => (
-    <button onClick={toggleMetronome}
-      className={`rounded-full flex items-center justify-center font-Space-Grotesk font-bold transition-all active:scale-95 hover:scale-105 ${large ? "w-20 h-20 text-[28px]" : "w-14 h-14 text-[20px]"}`}
-      style={{
-        background: isPlaying
-          ? "rgba(239,68,68,0.12)"
-          : "linear-gradient(135deg, #1BD79E 0%, #15c48e 100%)",
-        color: isPlaying ? "#ef4444" : "black",
-        border: isPlaying ? "1px solid rgba(239,68,68,0.3)" : "none",
-        boxShadow: isPlaying ? "none" : "0 0 24px rgba(27,215,158,0.3)",
-      }}>
-      {isPlaying ? "■" : "▶"}
-    </button>
-  );
-
-  const BpmSlider = (
-    <div className="flex flex-col gap-2">
-      <input type="range" min="40" max="240" value={bpm}
-        onChange={e => setBpm(Number(e.target.value))}
-        className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-        style={{
-          background: `linear-gradient(to right, #1BD79E 0%, #1BD79E ${bpmPercent}%, #1a1a1a ${bpmPercent}%, #1a1a1a 100%)`
-        }}
-      />
-      <div className="flex justify-between font-Inter text-[10px] text-[#3f3f46]">
-        <span>40</span><span>100</span><span>160</span><span>240</span>
-      </div>
-    </div>
-  );
-
-  const BpmNudge = (
-    <div className="flex items-center gap-2">
-      {[
-        { label: "−5", delta: -5 },
-        { label: "−1", delta: -1 },
-        { label: "+1", delta: 1 },
-        { label: "+5", delta: 5 },
-      ].map(({ label, delta }) => (
-        <button key={label}
-          onClick={() => setBpm(b => Math.min(240, Math.max(40, b + delta)))}
-          className="flex-1 py-2 rounded-xl font-Space-Grotesk font-bold text-[13px] bg-[#131313] border border-white/5 text-white hover:bg-[#1a1a1a] hover:border-white/10 transition-all active:scale-95">
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-
-  const QuickBpms = (
-    <div className="flex gap-2 flex-wrap">
-      {QUICK_BPMS.map(t => (
-        <button key={t} onClick={() => setBpm(t)}
-          className="flex-1 min-w-[48px] py-2.5 rounded-xl font-Space-Grotesk font-bold text-[13px] transition-all active:scale-95"
-          style={{
-            background: bpm === t ? "#1BD79E" : "#131313",
-            color: bpm === t ? "black" : "#71717a",
-            border: bpm === t ? "none" : "1px solid rgba(255,255,255,0.05)",
-          }}>
-          {t}
-        </button>
-      ))}
-    </div>
-  );
-
-  const TimeSig = (
-    <div className="flex gap-2">
-      {TIME_SIGNATURES.map(ts => (
-        <button key={ts.name}
-          onClick={() => { setTimeSignature(ts); if (isPlaying) stopMetronome(); }}
-          className="flex-1 py-3 rounded-xl font-Space-Grotesk font-bold text-[14px] transition-all active:scale-95"
-          style={{
-            background: timeSignature.name === ts.name ? "#1BD79E" : "#131313",
-            color: timeSignature.name === ts.name ? "black" : "#71717a",
-            border: timeSignature.name === ts.name ? "none" : "1px solid rgba(255,255,255,0.05)",
-          }}>
-          {ts.name}
-        </button>
-      ))}
-    </div>
-  );
-
-  const TapButton = (
-    <button onClick={handleTapTempo}
-      className="w-full py-4 rounded-xl font-Space-Grotesk font-bold text-[16px] bg-[#131313] border border-white/5 text-white hover:bg-[#1a1a1a] transition-all active:scale-95 relative overflow-hidden">
-      <span className="relative z-10">TAP TEMPO</span>
-      <span className="absolute right-4 top-1/2 -translate-y-1/2 font-Inter text-[10px] text-[#3f3f46] uppercase tracking-wider">or T</span>
-    </button>
-  );
-
-  const TempoGuide = (
-    <div className="bg-[#0b0b0b] rounded-2xl p-5 border border-[#1a1a1a] flex flex-col gap-3">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="w-5 h-0.5 bg-[#1BD79E]" />
-        <h3 className="font-Space-Grotesk font-bold text-[14px] text-white">Tempo Guide</h3>
-      </div>
-      {TEMPO_MARKS.map(m => {
-        const active = bpm >= m.min && bpm <= m.max;
-        return (
-          <button key={m.name} onClick={() => setBpm(Math.round((m.min + m.max) / 2))}
-            className="flex items-center justify-between hover:bg-white/3 rounded-lg px-2 py-1 transition-colors">
-            <span className={`font-Manrope font-semibold text-[13px] ${active ? "text-[#1BD79E]" : "text-[#52525b]"}`}>{m.name}</span>
-            <span className="font-Inter text-[11px] text-[#3f3f46]">{m.range}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  // ── Pendulum visual ───────────────────────────────────────────────────────
-
-  const PendulumVisual = (
-    <div className="flex flex-col items-center gap-4">
-      {/* SVG pendulum */}
-      <div className="relative w-48 h-52 flex items-start justify-center">
-        {/* Pivot */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-[#1BD79E]/20 border border-[#1BD79E]/40 z-10" />
-
-        {/* Pendulum arm */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-0.5 h-40 origin-top flex flex-col items-center"
-          style={{
-            transform: `translateX(-50%) rotate(${pendulumAngle}deg)`,
-            transition: isPlaying ? `transform ${swingDuration}ms ease-in-out` : "transform 500ms ease-out",
-            transformOrigin: "top center",
-          }}>
-          {/* Rod */}
-          <div className="flex-1 w-0.5 rounded-full"
-            style={{ background: "linear-gradient(to bottom, #1BD79E, rgba(27,215,158,0.3))" }} />
-          {/* Bob */}
-          <div className="w-10 h-10 rounded-full mt-[-2px] flex items-center justify-center"
-            style={{
-              background: isPlaying ? "#1BD79E" : "#1a1a1a",
-              border: isPlaying ? "none" : "2px solid #2a2a2a",
-              boxShadow: isPlaying ? "0 0 20px rgba(27,215,158,0.6), 0 0 40px rgba(27,215,158,0.2)" : "none",
-              transition: "background 300ms, box-shadow 300ms",
-            }} />
-        </div>
-
-        {/* Arc guide */}
-        <svg className="absolute inset-0" viewBox="0 0 192 208" fill="none">
-          <path d="M 40 8 Q 96 200 152 8" stroke="#1BD79E" strokeWidth="0.5" strokeOpacity="0.12" strokeDasharray="3 4"/>
-        </svg>
-      </div>
-    </div>
-  );
-
-  // ── MOBILE VIEW ───────────────────────────────────────────────────────────
-
-  const MobileView = (
-    <div className="max-w-[430px] mx-auto px-5 py-5 flex flex-col gap-6">
-
-      {/* BPM + Pendulum card */}
-      <div className="bg-[#0b0b0b] rounded-3xl border border-[#1a1a1a] p-6 flex flex-col items-center gap-6">
-        {PendulumVisual}
-
-        {/* Beat dots */}
-        {BeatDots}
-
-        {/* BPM display */}
-        <div className="text-center">
-          <div className="font-Space-Grotesk font-bold leading-none text-white"
-            style={{ fontSize: "clamp(64px, 18vw, 88px)", letterSpacing: "-3px" }}>
-            {bpm}
-          </div>
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <span className="font-Inter text-[12px] text-[#3f3f46] uppercase tracking-[2px]">BPM</span>
-            <span className="font-Space-Grotesk font-bold text-[12px] text-[#1BD79E]">— {tempoName}</span>
-          </div>
-        </div>
-
-        {/* Slider */}
-        {BpmSlider}
-
-        {/* Play + nudge */}
-        <div className="flex items-center gap-4 w-full">
-          <div className="flex-1">{BpmNudge}</div>
-          <PlayStopButton large />
-        </div>
-      </div>
-
-      {/* Quick BPM */}
-      <div className="bg-[#0b0b0b] rounded-2xl border border-[#1a1a1a] p-5 flex flex-col gap-3">
-        <p className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">QUICK BPM</p>
-        {QuickBpms}
-      </div>
-
-      {/* Time sig + Tap */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-[#0b0b0b] rounded-2xl border border-[#1a1a1a] p-5 flex flex-col gap-3">
-          <p className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">TIME SIG</p>
-          <div className="flex flex-col gap-2">
-            {TIME_SIGNATURES.map(ts => (
-              <button key={ts.name}
-                onClick={() => { setTimeSignature(ts); if (isPlaying) stopMetronome(); }}
-                className="py-2.5 rounded-xl font-Space-Grotesk font-bold text-[13px] transition-all"
-                style={{
-                  background: timeSignature.name === ts.name ? "#1BD79E" : "#131313",
-                  color: timeSignature.name === ts.name ? "black" : "#71717a",
-                  border: timeSignature.name === ts.name ? "none" : "1px solid rgba(255,255,255,0.05)",
-                }}>
-                {ts.name}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="bg-[#0b0b0b] rounded-2xl border border-[#1a1a1a] p-5 flex flex-col gap-3">
-          <p className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">TAP</p>
-          <button onClick={handleTapTempo}
-            className="flex-1 rounded-xl font-Space-Grotesk font-bold text-[22px] bg-[#131313] border border-white/5 text-white hover:bg-[#1a1a1a] transition-all active:scale-95"
-            style={{ minHeight: "80px" }}>
-            TAP
-          </button>
-          <p className="font-Inter text-[10px] text-[#3f3f46] text-center">press T</p>
-          {tapTimes.length >= 2 && (
-            <p className="font-Inter text-[10px] text-[#1BD79E] text-center">{tapTimes.length} taps</p>
-          )}
-        </div>
-      </div>
-
-      {TempoGuide}
-
-      {/* Keyboard hint */}
-      <div className="flex items-center justify-center gap-4 pb-2">
-        <div className="flex items-center gap-2">
-          <span className="font-Inter text-[10px] bg-[#131313] border border-white/5 px-2 py-1 rounded text-[#555]">Space</span>
-          <span className="font-Inter text-[10px] text-[#3f3f46]">Play/Stop</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-Inter text-[10px] bg-[#131313] border border-white/5 px-2 py-1 rounded text-[#555]">T</span>
-          <span className="font-Inter text-[10px] text-[#3f3f46]">Tap Tempo</span>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── DESKTOP VIEW ──────────────────────────────────────────────────────────
-
-  const DesktopView = (
-    <div className="px-8 pt-6 pb-16">
-
-      {/* Hero */}
-      <div className="flex items-end justify-between mb-8">
-        <div>
-          <h1 className="font-Space-Grotesk font-bold text-[64px] leading-none tracking-[-2px] text-white">Metronome</h1>
-          <p className="font-Inter text-[#adaaaa] text-[13px] tracking-[1.4px] uppercase mt-2">KEEP PERFECT TIME WHILE YOU PLAY</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="font-Inter text-[11px] bg-[#131313] border border-white/5 px-3 py-1.5 rounded-full text-[#555]">Space — Play/Stop</span>
-          <span className="font-Inter text-[11px] bg-[#131313] border border-white/5 px-3 py-1.5 rounded-full text-[#555]">T — Tap</span>
-        </div>
-      </div>
-
-      {/* Bento grid */}
-      <div className="grid grid-cols-12 gap-6">
-
-        {/* ── LEFT: Pendulum + BPM ── (5 cols) */}
-        <div className="col-span-5 flex flex-col gap-6">
-
-          {/* Pendulum card */}
-          <div className="bg-[#0b0b0b] rounded-3xl border border-[#1a1a1a] p-8 flex flex-col items-center gap-6">
-            {/* BPM display */}
-            <div className="text-center w-full">
-              <div className="font-Space-Grotesk font-bold text-[96px] leading-none tracking-[-4px] text-white">
-                {bpm}
-              </div>
-              <div className="flex items-center justify-center gap-3 mt-2">
-                <span className="font-Inter text-[12px] text-[#3f3f46] uppercase tracking-[2.5px]">BPM</span>
-                <div className="w-px h-3 bg-[#2a2a2a]" />
-                <span className="font-Space-Grotesk font-bold text-[#1BD79E] text-[13px]">{tempoName}</span>
-                <div className="w-px h-3 bg-[#2a2a2a]" />
-                <span className="font-Manrope text-[#52525b] text-[12px]">{timeSignature.name}</span>
-              </div>
-            </div>
-
-            {/* Pendulum */}
-            <div className="relative w-52 h-56 flex items-start justify-center my-2">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full z-10"
-                style={{ background: "#0b0b0b", border: "2px solid #1BD79E", boxShadow: "0 0 12px rgba(27,215,158,0.4)" }} />
-
-              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-0.5 h-44 flex flex-col items-center"
-                style={{
-                  transform: `translateX(-50%) rotate(${pendulumAngle}deg)`,
-                  transition: isPlaying ? `transform ${swingDuration}ms ease-in-out` : "transform 600ms ease-out",
-                  transformOrigin: "top center",
-                }}>
-                <div className="flex-1 w-0.5"
-                  style={{ background: "linear-gradient(to bottom, #1BD79E 0%, rgba(27,215,158,0.15) 100%)" }} />
-                <div className="w-12 h-12 rounded-full mt-[-2px] flex items-center justify-center"
-                  style={{
-                    background: isPlaying ? "radial-gradient(circle at 35% 35%, #22f3b4, #0fad7a)" : "#131313",
-                    border: isPlaying ? "none" : "2px solid #222",
-                    boxShadow: isPlaying ? "0 0 28px rgba(27,215,158,0.7), 0 0 56px rgba(27,215,158,0.25)" : "none",
-                    transition: "all 300ms",
-                  }}>
-                  {isPlaying && (
-                    <div className="w-3 h-3 rounded-full bg-white/30" />
-                  )}
-                </div>
-              </div>
-
-              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 208 224" fill="none">
-                <path d="M 40 10 Q 104 210 168 10" stroke="#1BD79E" strokeWidth="0.5" strokeOpacity="0.1" strokeDasharray="3 5"/>
-                <path d="M 60 10 Q 104 175 148 10" stroke="#1BD79E" strokeWidth="0.5" strokeOpacity="0.07" strokeDasharray="2 4"/>
-              </svg>
-            </div>
-
-            {/* Beat dots */}
-            {BeatDots}
-
-            {/* Play button */}
-            <PlayStopButton large />
-          </div>
-
-          {/* Tempo guide */}
-          {TempoGuide}
-        </div>
-
-        {/* ── RIGHT: Controls bento ── (7 cols) */}
-        <div className="col-span-7 flex flex-col gap-6">
-
-          {/* BPM controls card */}
-          <div className="bg-[#0b0b0b] rounded-3xl border border-[#1a1a1a] p-6 flex flex-col gap-5">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-0.5 bg-[#1BD79E]" />
-              <h3 className="font-Space-Grotesk font-bold text-white text-[15px]">BPM Control</h3>
-            </div>
-
-            {/* Slider */}
-            {BpmSlider}
-
-            {/* Nudge buttons */}
-            {BpmNudge}
-
-            {/* Quick BPM presets */}
-            <div className="flex flex-col gap-2">
-              <p className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">PRESETS</p>
-              {QuickBpms}
-            </div>
-          </div>
-
-          {/* Time signature + Tap grid */}
-          <div className="grid grid-cols-2 gap-6">
-
-            {/* Time signature */}
-            <div className="bg-[#0b0b0b] rounded-3xl border border-[#1a1a1a] p-6 flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-0.5 bg-[#38DBE5]" />
-                <h3 className="font-Space-Grotesk font-bold text-white text-[15px]">Time Signature</h3>
-              </div>
-              {TimeSig}
-              <p className="font-Manrope text-[#3f3f46] text-[12px]">
-                Stops metronome when changed
-              </p>
-            </div>
-
-            {/* Tap tempo */}
-            <div className="bg-[#0b0b0b] rounded-3xl border border-[#1a1a1a] p-6 flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-0.5 bg-[#f59e0b]" />
-                <h3 className="font-Space-Grotesk font-bold text-white text-[15px]">Tap Tempo</h3>
-              </div>
-              {TapButton}
-              {tapTimes.length >= 2 && (
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#1BD79E] animate-pulse" />
-                  <p className="font-Inter text-[12px] text-[#1BD79E]">{tapTimes.length} taps detected</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Pro tips card */}
-          <div className="rounded-3xl p-6 border border-white/5 flex flex-col gap-4"
-            style={{ background: "rgba(27,215,158,0.03)", backdropFilter: "blur(20px)" }}>
-            <div className="flex items-center gap-2">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1BD79E" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="3"/></svg>
-              <span className="font-Space-Grotesk font-bold text-[#1BD79E] text-[13px] tracking-wider">PRACTICE TIPS</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ["Start slow", "Begin at 60–70% of target speed. Accuracy before speed."],
-                ["Accent the 1", "Feel the first beat strongly — everything else follows."],
-                ["Use tap tempo", "Match a song's tempo by tapping along to find the BPM."],
-                ["Build gradually", "Increase BPM by 5 only when you're comfortable."],
-              ].map(([title, desc]) => (
-                <div key={title} className="flex flex-col gap-1">
-                  <div className="w-1 h-1 rounded-full bg-[#1BD79E]" />
-                  <span className="font-Manrope font-semibold text-[13px] text-white">{title}</span>
-                  <span className="font-Manrope text-[12px] text-[#52525b] leading-relaxed">{desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const bpmPercent = ((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)) * 100;
 
   return (
-    <>
-      <div className="lg:hidden">{MobileView}</div>
-      <div className="hidden lg:block">{DesktopView}</div>
-    </>
+    <div className="max-w-3xl mx-auto text-white">
+      <div className="text-center">
+        <h1 className="font-Lora text-3xl md:text-4xl">Metronome</h1>
+        <p className="font-Inter text-sm text-gray-400 mt-1">Keep time with clicks you can hear over a guitar.</p>
+      </div>
+
+      {/* ── Main card ── */}
+      <section className="mt-6 rounded-3xl bg-[#0f0f0f] border border-white/5 px-5 md:px-10 py-6 md:py-8" aria-label="Tempo">
+        {/* Beat lights */}
+        <div className="flex items-center justify-center gap-4 min-h-[28px]" aria-hidden>
+          {Array.from({ length: lightCount }, (_, i) => {
+            const isGroupStart = meter.compound ? i % 3 === 0 : true;
+            const isBarStart = i === 0;
+            const lit = i === activeLight;
+            const size = isBarStart ? "h-5 w-5" : isGroupStart ? "h-4 w-4" : "h-3 w-3";
+            return (
+              <span
+                key={i}
+                className={`${size} rounded-full transition-all duration-75 ${meter.compound && i > 0 && i % 3 === 0 ? "ml-3" : ""}`}
+                style={{
+                  background: lit ? (position?.countIn ? "#f59e0b" : isBarStart && accent ? "#1BD79E" : "#e5e7eb") : "#262626",
+                  boxShadow: lit ? `0 0 14px ${position?.countIn ? "#f59e0b" : "#1BD79E"}` : "none",
+                  transform: lit ? "scale(1.2)" : "scale(1)",
+                }}
+              />
+            );
+          })}
+        </div>
+        <div className="h-4 mt-2 flex items-center justify-center gap-1.5" aria-hidden>
+          {position?.countIn ? (
+            <span className="font-Inter text-[11px] font-semibold uppercase tracking-wider text-[#f59e0b]">Count-in</span>
+          ) : (
+            !meter.compound &&
+            subdiv > 1 &&
+            Array.from({ length: subdiv }, (_, i) => (
+              <span key={i} className={`h-1 w-4 rounded-full ${i === activeSub ? "bg-[#1BD79E]" : "bg-[#262626]"}`} />
+            ))
+          )}
+        </div>
+
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto] items-center gap-6">
+          <div>
+            {/* BPM readout with −/+ */}
+            <div className="flex items-center justify-center gap-4 md:gap-6">
+              <button
+                type="button"
+                onClick={() => changeBpm(bpm - 1)}
+                aria-label="Slower by 1 BPM"
+                className="h-12 w-12 rounded-full bg-[#161616] text-2xl text-gray-200 hover:bg-[#222] focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+              >
+                −
+              </button>
+              <div className="text-center min-w-[150px]">
+                <div className="font-Lora leading-none tabular-nums" style={{ fontSize: "clamp(64px, 16vw, 104px)" }} aria-live="polite">
+                  {bpm}
+                </div>
+                <div className="mt-1 font-Inter text-sm text-gray-400">
+                  BPM · <span className="text-[#1BD79E] font-semibold">{tempoName(bpm)}</span>
+                  {meter.compound && <span className="text-gray-500"> · per dotted quarter</span>}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => changeBpm(bpm + 1)}
+                aria-label="Faster by 1 BPM"
+                className="h-12 w-12 rounded-full bg-[#161616] text-2xl text-gray-200 hover:bg-[#222] focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+              >
+                +
+              </button>
+            </div>
+
+            <input
+              type="range"
+              min={MIN_BPM}
+              max={MAX_BPM}
+              value={bpm}
+              onChange={(e) => changeBpm(Number(e.target.value))}
+              aria-label="Tempo in BPM"
+              className="metronome-range mt-6 w-full"
+              style={{ background: `linear-gradient(to right, #1BD79E ${bpmPercent}%, #262626 ${bpmPercent}%)` }}
+            />
+
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={toggle}
+                aria-label={playing ? "Stop metronome" : "Start metronome"}
+                className={`h-16 w-16 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-[#1BD79E] focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
+                  playing ? "bg-white text-black" : "bg-[#1BD79E] text-black"
+                }`}
+              >
+                {playing ? (
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden>
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-7 w-7 ml-1" fill="currentColor" aria-hidden>
+                    <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z" />
+                  </svg>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={tap}
+                className="h-12 px-5 rounded-full border border-white/15 font-Inter text-sm font-semibold text-gray-200 hover:border-[#1BD79E]/60 active:scale-95 transition focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+              >
+                Tap tempo
+              </button>
+            </div>
+            <p className="mt-2 h-4 text-center font-Inter text-xs text-gray-500">
+              {taps.length === 1 ? "Keep tapping…" : taps.length > 1 ? `Measured from ${taps.length} taps` : ""}
+            </p>
+          </div>
+
+          {/* Pendulum: pivot at the bottom like a wind-up metronome */}
+          <svg viewBox="0 0 120 150" className="hidden md:block w-[120px] h-[150px]" aria-hidden>
+            <path d="M 20 140 L 60 10 L 100 140 Z" fill="#141414" stroke="#262626" />
+            <g ref={pendulumRef} style={{ transformOrigin: "60px 132px" }}>
+              <line x1="60" y1="132" x2="60" y2="22" stroke={playing ? "#1BD79E" : "#52525b"} strokeWidth="3" strokeLinecap="round" />
+              <rect x="50" y={36 + ((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)) * 70} width="20" height="12" rx="3" fill={playing ? "#1BD79E" : "#3f3f46"} />
+            </g>
+            <circle cx="60" cy="132" r="4" fill="#3f3f46" />
+          </svg>
+        </div>
+      </section>
+
+      {/* ── Settings ── */}
+      <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4" aria-label="Settings">
+        <div className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5">
+          <h2 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Time signature</h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {METERS.map((m, i) => (
+              <Chip key={m.name} active={i === meterIdx} onClick={() => selectMeter(i)}>
+                {m.name}
+              </Chip>
+            ))}
+          </div>
+          <h2 className="mt-5 font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Subdivision</h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {subdivOptions.map((o) => (
+              <Chip key={o.value} active={o.value === subdiv} onClick={() => setSubdiv(o.value)}>
+                {o.label}
+              </Chip>
+            ))}
+          </div>
+          <p className="mt-3 font-Inter text-xs text-gray-500">Changes apply on the next beat, without stopping.</p>
+        </div>
+
+        <div className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5 flex flex-col gap-4">
+          <h2 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Sound</h2>
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-Inter text-sm text-gray-200">Accent the first beat</span>
+            <Toggle checked={accent} onChange={setAccent} label="Accent the first beat" />
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="font-Inter text-sm text-gray-200 shrink-0">Volume</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(volume * 100)}
+              onChange={(e) => setVolume(Number(e.target.value) / 100)}
+              aria-label="Click volume"
+              className="metronome-range flex-1"
+              style={{ background: `linear-gradient(to right, #1BD79E ${volume * 100}%, #262626 ${volume * 100}%)` }}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-Inter text-sm text-gray-200">One-bar count-in</span>
+            <Toggle checked={countIn} onChange={setCountIn} label="One-bar count-in" />
+          </div>
+        </div>
+
+        <div className="md:col-span-2 rounded-2xl bg-[#0f0f0f] border border-white/5 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Speed trainer</h2>
+              <p className="font-Inter text-sm text-gray-400 mt-1">Speeds up automatically while you play.</p>
+            </div>
+            <Toggle checked={trainer.enabled} onChange={(v) => setTrainer((t) => ({ ...t, enabled: v }))} label="Speed trainer" />
+          </div>
+          <div className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 font-Inter text-sm text-gray-300 ${trainer.enabled ? "" : "opacity-50"}`}>
+            <span>Add</span>
+            <NumberField label="BPM to add" value={trainer.step} min={1} max={20} onChange={(v) => setTrainer((t) => ({ ...t, step: v }))} suffix="BPM" />
+            <span>every</span>
+            <NumberField label="Bars between increases" value={trainer.everyBars} min={1} max={32} onChange={(v) => setTrainer((t) => ({ ...t, everyBars: v }))} suffix="bars" />
+            <span>until</span>
+            <NumberField label="Target BPM" value={trainer.target} min={MIN_BPM} max={MAX_BPM} onChange={(v) => setTrainer((t) => ({ ...t, target: v }))} suffix="BPM" />
+          </div>
+        </div>
+      </section>
+
+      <p className="mt-5 hidden md:block text-center font-Inter text-xs text-gray-500">
+        <kbd className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-300">Space</kbd> start/stop ·{" "}
+        <kbd className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-300">T</kbd> tap tempo ·{" "}
+        <kbd className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-300">↑</kbd>
+        <kbd className="ml-0.5 px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-300">↓</kbd> ±1 BPM (Shift ±5)
+      </p>
+    </div>
   );
 }
