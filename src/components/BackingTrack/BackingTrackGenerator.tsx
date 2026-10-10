@@ -1,5 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useRouter } from "next/router";
 import { createBackingTrack, disposeBackingTrack, Genre, BackingTrack } from "@/utils/backingTrackEngine";
+import {
+  buildJamShareUrl,
+  loadJamSession,
+  majorScaleNotes,
+  pentatonicScaleNotes,
+  playCountIn,
+  saveJamSession,
+} from "@/utils/jamPracticeHelpers";
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -62,7 +71,33 @@ function transposeChord(chord: string, fromKey: string, toKey: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function BackingTrackGenerator() {
+const VALID_GENRES = new Set<Genre>(["rock", "blues", "jazz", "pop", "funk", "reggae", "country"]);
+const PLAYBACK_SPEEDS = [0.75, 1, 1.25] as const;
+const LOOP_OPTIONS = [
+  { value: 0, label: "∞" },
+  { value: 1, label: "1×" },
+  { value: 2, label: "2×" },
+  { value: 4, label: "4×" },
+  { value: 8, label: "8×" },
+];
+
+export interface BackingTrackGeneratorProps {
+  practiceKey?: string;
+  onPracticeKeyChange?: (key: string) => void;
+  practiceScaleId?: string;
+  onSuggestScale?: (genre: Genre) => void;
+  onOpenScales?: () => void;
+}
+
+export default function BackingTrackGenerator({
+  practiceKey,
+  onPracticeKeyChange,
+  practiceScaleId,
+  onSuggestScale,
+  onOpenScales,
+}: BackingTrackGeneratorProps = {} as BackingTrackGeneratorProps) {
+  const router = useRouter();
+  const studioMode = practiceKey !== undefined;
   const [selectedGenre, setSelectedGenre]   = useState<Genre>("rock");
   const [selectedKey, setSelectedKey]       = useState("C");
   const [bpm, setBpm]                       = useState(100);
@@ -70,50 +105,203 @@ export default function BackingTrackGenerator() {
   const [selectedPreset, setSelectedPreset] = useState(0);
   const [currentBeat, setCurrentBeat]       = useState(0);
   const [currentChordIndex, setCurrentChordIndex] = useState(-1);
+  const [playbackSpeed, setPlaybackSpeed]   = useState(1);
+  const [loopLimit, setLoopLimit]           = useState(0);
+  const [countIn, setCountIn]               = useState(true);
+  const [customChordsText, setCustomChordsText] = useState("");
+  const [shareCopied, setShareCopied]       = useState(false);
+  const [loopsDone, setLoopsDone]           = useState(0);
 
   const [volumes, setVolumes] = useState({ drums: 80, bass: 70, rhythm: 50 });
   const [muted, setMuted]     = useState({ drums: false, bass: false, rhythm: false });
 
   const trackRef = useRef<BackingTrack | null>(null);
   const beatRef  = useRef<NodeJS.Timeout | null>(null);
+  const lastChordIdxRef = useRef(-1);
+  const loopsCompletedRef = useRef(0);
+  const sessionHydratedRef = useRef(false);
 
   useEffect(() => { return () => { disposeBackingTrack(); }; }, []);
 
   useEffect(() => {
+    if (!router.isReady || sessionHydratedRef.current) return;
+    sessionHydratedRef.current = true;
+
+    const saved = loadJamSession();
+    if (saved) {
+      if (KEYS.includes(saved.key)) setSelectedKey(saved.key);
+      if (VALID_GENRES.has(saved.genre as Genre)) setSelectedGenre(saved.genre as Genre);
+      if (saved.bpm >= 60 && saved.bpm <= 180) setBpm(saved.bpm);
+      if (saved.preset >= 0 && saved.preset < PRESET_PROGRESSIONS.length) setSelectedPreset(saved.preset);
+      if (saved.playbackSpeed) setPlaybackSpeed(saved.playbackSpeed);
+      if (saved.loopLimit !== undefined) setLoopLimit(saved.loopLimit);
+      if (saved.countIn !== undefined) setCountIn(saved.countIn);
+      if (saved.customChords) setCustomChordsText(saved.customChords);
+    }
+
+    const { key, genre, bpm: bpmParam, preset, speed, loops, countin, chords } = router.query;
+    if (typeof key === "string" && KEYS.includes(key)) setSelectedKey(key);
+    if (typeof genre === "string" && VALID_GENRES.has(genre as Genre)) {
+      setSelectedGenre(genre as Genre);
+    }
+    if (typeof bpmParam === "string") {
+      const n = parseInt(bpmParam, 10);
+      if (!Number.isNaN(n) && n >= 60 && n <= 180) setBpm(n);
+    }
+    if (typeof preset === "string") {
+      const idx = parseInt(preset, 10);
+      if (!Number.isNaN(idx) && idx >= 0 && idx < PRESET_PROGRESSIONS.length) {
+        setSelectedPreset(idx);
+      }
+    }
+    if (typeof speed === "string") {
+      const s = parseFloat(speed);
+      if (PLAYBACK_SPEEDS.includes(s as typeof PLAYBACK_SPEEDS[number])) setPlaybackSpeed(s);
+    }
+    if (typeof loops === "string") {
+      const n = parseInt(loops, 10);
+      if (!Number.isNaN(n) && n >= 0) setLoopLimit(n);
+    }
+    if (countin === "1") setCountIn(true);
+    if (typeof chords === "string") setCustomChordsText(chords);
+  }, [router.isReady, router.query]);
+
+  useEffect(() => {
+    if (!studioMode || !practiceKey) return;
+    if (KEYS.includes(practiceKey)) setSelectedKey(practiceKey);
+  }, [studioMode, practiceKey]);
+
+  useEffect(() => {
+    saveJamSession({
+      key: selectedKey,
+      genre: selectedGenre,
+      bpm,
+      preset: selectedPreset,
+      playbackSpeed,
+      loopLimit,
+      countIn,
+      customChords: customChordsText.trim() || undefined,
+      scale: practiceScaleId,
+      lastTab: "jam",
+    });
+  }, [selectedKey, selectedGenre, bpm, selectedPreset, playbackSpeed, loopLimit, countIn, customChordsText, practiceScaleId]);
+
+  const setJamKey = (key: string) => {
+    setSelectedKey(key);
+    onPracticeKeyChange?.(key);
+  };
+
+  const effectiveBpm = Math.round(bpm * playbackSpeed);
+
+  const chords = useMemo(() => {
+    const custom = customChordsText.trim();
+    if (custom) {
+      return custom.split(/[,→|/]+/).map(s => s.trim()).filter(Boolean);
+    }
+    return PRESET_PROGRESSIONS[selectedPreset].chords.map(c => transposeChord(c, "C", selectedKey));
+  }, [customChordsText, selectedPreset, selectedKey]);
+
+  const pentatonic = useMemo(() => pentatonicScaleNotes(selectedKey), [selectedKey]);
+  const majorScale = useMemo(() => majorScaleNotes(selectedKey), [selectedKey]);
+
+  const stopSession = useCallback(() => {
+    if (trackRef.current) {
+      try { trackRef.current.stop(); } catch { /* ignore */ }
+      trackRef.current = null;
+    }
+    setIsPlaying(false);
+    setCurrentBeat(0);
+    setCurrentChordIndex(-1);
+    lastChordIdxRef.current = -1;
+    loopsCompletedRef.current = 0;
+    setLoopsDone(0);
+  }, []);
+
+  useEffect(() => {
     if (beatRef.current) clearInterval(beatRef.current);
     if (isPlaying) {
-      beatRef.current = setInterval(() => setCurrentBeat(p => (p + 1) % 4), (60 / bpm) * 1000);
+      beatRef.current = setInterval(
+        () => setCurrentBeat(p => (p + 1) % 4),
+        (60 / effectiveBpm) * 1000,
+      );
     }
     return () => { if (beatRef.current) clearInterval(beatRef.current); };
-  }, [isPlaying, bpm]);
-
-  const chords = PRESET_PROGRESSIONS[selectedPreset].chords.map(c => transposeChord(c, "C", selectedKey));
+  }, [isPlaying, effectiveBpm]);
 
   const handlePlay = async () => {
     if (isPlaying && trackRef.current) {
-      try { trackRef.current.stop(); } catch { /* ignore */ }
-      trackRef.current = null;
-      setIsPlaying(false);
-      setCurrentBeat(0);
-      setCurrentChordIndex(-1);
-    } else if (!isPlaying) {
-      const track = await createBackingTrack({
-        key: selectedKey, bpm, genre: selectedGenre,
-        chordProgression: chords, measures: chords.length,
-        onChordChange: setCurrentChordIndex,
-      });
-      trackRef.current = track;
-      track.setVolume("drums",  muted.drums  ? 0 : volumes.drums);
-      track.setVolume("bass",   muted.bass   ? 0 : volumes.bass);
-      track.setVolume("rhythm", muted.rhythm ? 0 : volumes.rhythm);
-      track.start();
-      setIsPlaying(true);
+      stopSession();
+      return;
     }
+    if (!chords.length) return;
+
+    if (countIn) {
+      await playCountIn(effectiveBpm);
+    }
+
+    const track = await createBackingTrack({
+      key: selectedKey,
+      bpm: effectiveBpm,
+      genre: selectedGenre,
+      chordProgression: chords,
+      measures: chords.length,
+      onChordChange: (idx) => {
+        setCurrentChordIndex(idx);
+        const len = chords.length;
+        if (loopLimit > 0 && lastChordIdxRef.current === len - 1 && idx === 0) {
+          loopsCompletedRef.current += 1;
+          setLoopsDone(loopsCompletedRef.current);
+          if (loopsCompletedRef.current >= loopLimit) {
+            stopSession();
+            return;
+          }
+        }
+        lastChordIdxRef.current = idx;
+      },
+    });
+    trackRef.current = track;
+    track.setVolume("drums",  muted.drums  ? 0 : volumes.drums);
+    track.setVolume("bass",   muted.bass   ? 0 : volumes.bass);
+    track.setVolume("rhythm", muted.rhythm ? 0 : volumes.rhythm);
+    track.start();
+    setIsPlaying(true);
+    lastChordIdxRef.current = 0;
+    loopsCompletedRef.current = 0;
+    setLoopsDone(0);
   };
 
   const handleBpmChange = (v: number) => {
     setBpm(v);
-    trackRef.current?.setBpm(v);
+    trackRef.current?.setBpm(Math.round(v * playbackSpeed));
+  };
+
+  const handlePlaybackSpeed = (speed: number) => {
+    setPlaybackSpeed(speed);
+    if (isPlaying) trackRef.current?.setBpm(Math.round(bpm * speed));
+  };
+
+  const applySoloGuitarPreset = () => {
+    setMuted({ drums: false, bass: false, rhythm: true });
+    setVolumes({ drums: 88, bass: 78, rhythm: 45 });
+    trackRef.current?.setVolume("drums", 88);
+    trackRef.current?.setVolume("bass", 78);
+    trackRef.current?.setVolume("rhythm", 0);
+  };
+
+  const copyShareLink = async () => {
+    const url = buildJamShareUrl("/jam", {
+      key: selectedKey,
+      genre: selectedGenre,
+      bpm,
+      preset: selectedPreset,
+      playbackSpeed,
+      loopLimit,
+      countIn,
+      customChords: customChordsText.trim() || undefined,
+    });
+    await navigator.clipboard.writeText(url);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
   };
 
   const handleVolumeChange = (inst: "drums" | "bass" | "rhythm", v: number) => {
@@ -158,8 +346,11 @@ export default function BackingTrackGenerator() {
       {/* Key selector */}
       <div className="flex flex-col gap-2 min-w-[100px]">
         <label className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">KEY</label>
-        <select value={selectedKey} onChange={e => setSelectedKey(e.target.value)}
-          className="bg-[#131313] border border-white/5 text-white font-Space-Grotesk font-bold text-[16px] rounded-xl px-4 py-3 focus:outline-none appearance-none cursor-pointer">
+        <select value={selectedKey} onChange={e => setJamKey(e.target.value)}
+          disabled={studioMode}
+          className="bg-[#131313] border border-white/5 text-white font-Space-Grotesk font-bold text-[16px] rounded-xl px-4 py-3 focus:outline-none appearance-none cursor-pointer disabled:opacity-60"
+          title={studioMode ? "Change key in Practice studio bar above" : undefined}
+        >
           {KEYS.map(k => <option key={k} value={k}>{k}</option>)}
         </select>
       </div>
@@ -178,6 +369,134 @@ export default function BackingTrackGenerator() {
         <div className="flex justify-between font-Inter text-[10px] text-[#3f3f46]">
           <span>60</span><span>120</span><span>180</span>
         </div>
+        {playbackSpeed !== 1 && (
+          <p className="font-Inter text-[10px] text-[#52525b]">
+            Playing at {effectiveBpm} BPM ({Math.round(playbackSpeed * 100)}% speed)
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  const PracticeTools = (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px] w-full sm:w-auto">Speed</span>
+        {PLAYBACK_SPEEDS.map(s => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => handlePlaybackSpeed(s)}
+            className="px-3 py-1.5 rounded-lg font-Space-Grotesk font-bold text-[12px] transition-all"
+            style={{
+              background: playbackSpeed === s ? "rgba(27,215,158,0.15)" : "#131313",
+              color: playbackSpeed === s ? "#1BD79E" : "#52525b",
+              border: playbackSpeed === s ? "1px solid rgba(27,215,158,0.35)" : "1px solid rgba(255,255,255,0.05)",
+            }}
+          >
+            {Math.round(s * 100)}%
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px] w-full sm:w-auto">Loop</span>
+        {LOOP_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setLoopLimit(opt.value)}
+            className="px-3 py-1.5 rounded-lg font-Space-Grotesk font-bold text-[12px] transition-all"
+            style={{
+              background: loopLimit === opt.value ? "rgba(56,219,229,0.12)" : "#131313",
+              color: loopLimit === opt.value ? "#38DBE5" : "#52525b",
+              border: loopLimit === opt.value ? "1px solid rgba(56,219,229,0.35)" : "1px solid rgba(255,255,255,0.05)",
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+        {isPlaying && loopLimit > 0 && (
+          <span className="font-Inter text-[11px] text-[#52525b] ml-1">
+            {loopsDone}/{loopLimit} loops
+          </span>
+        )}
+      </div>
+
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={countIn}
+          onChange={e => setCountIn(e.target.checked)}
+          className="w-4 h-4 rounded accent-[#1BD79E]"
+        />
+        <span className="font-Manrope text-[13px] text-[#adaaaa]">4-beat count-in before playback</span>
+      </label>
+
+      <div className="flex flex-col gap-2">
+        <label className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">
+          Custom progression (optional)
+        </label>
+        <input
+          type="text"
+          value={customChordsText}
+          onChange={e => setCustomChordsText(e.target.value)}
+          placeholder="e.g. Am, F, C, G or Dm|G|C"
+          className="bg-[#131313] border border-white/5 text-white font-Manrope text-[13px] rounded-xl px-4 py-3 focus:outline-none focus:border-[#1BD79E]/40 placeholder:text-[#3f3f46]"
+        />
+        {customChordsText.trim() && (
+          <p className="font-Inter text-[10px] text-[#52525b]">Preset picker ignored while custom chords are set.</p>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-white/5 bg-[#131313] p-4 flex flex-col gap-2">
+        <p className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">Scale hints ({selectedKey})</p>
+        <p className="font-Manrope text-[12px] text-[#adaaaa]">
+          <span className="text-[#1BD79E] font-semibold">Pentatonic:</span> {pentatonic.join(" · ")}
+        </p>
+        <p className="font-Manrope text-[12px] text-[#52525b]">
+          <span className="text-white/70 font-semibold">Major:</span> {majorScale.join(" · ")}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {onOpenScales && (
+          <button
+            type="button"
+            onClick={onOpenScales}
+            className="px-4 py-2.5 rounded-xl font-Space-Grotesk font-bold text-[12px] text-[#38DBE5] bg-[#131313] border border-[#38DBE5]/30 hover:border-[#38DBE5]/50 transition-all"
+          >
+            Open scale fretboard
+          </button>
+        )}
+        {onSuggestScale && (
+          <button
+            type="button"
+            onClick={() => onSuggestScale(selectedGenre)}
+            className="px-4 py-2.5 rounded-xl font-Space-Grotesk font-bold text-[12px] text-white bg-[#131313] border border-white/10 hover:border-[#1BD79E]/40 transition-all"
+          >
+            Suggested scale for {selectedGenre}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={applySoloGuitarPreset}
+          className="px-4 py-2.5 rounded-xl font-Space-Grotesk font-bold text-[12px] text-white bg-[#131313] border border-white/10 hover:border-[#8b5cf6]/40 transition-all"
+        >
+          Solo guitar preset
+        </button>
+        <button
+          type="button"
+          onClick={copyShareLink}
+          className="px-4 py-2.5 rounded-xl font-Space-Grotesk font-bold text-[12px] transition-all"
+          style={{
+            background: shareCopied ? "rgba(27,215,158,0.2)" : "#131313",
+            color: shareCopied ? "#1BD79E" : "white",
+            border: shareCopied ? "1px solid rgba(27,215,158,0.4)" : "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
+          {shareCopied ? "Link copied!" : "Copy share link"}
+        </button>
       </div>
     </div>
   );
@@ -188,7 +507,7 @@ export default function BackingTrackGenerator() {
         const preview = prog.chords.slice(0, 4).map(c => transposeChord(c, "C", selectedKey));
         const active  = selectedPreset === idx;
         return (
-          <button key={idx} onClick={() => setSelectedPreset(idx)}
+          <button key={idx} onClick={() => { setSelectedPreset(idx); setCustomChordsText(""); }}
             className="flex flex-col gap-1 p-3.5 rounded-xl text-left transition-all active:scale-95"
             style={{
               background: active ? "rgba(27,215,158,0.08)" : "#131313",
@@ -356,8 +675,9 @@ export default function BackingTrackGenerator() {
       </div>
 
       {/* Key + BPM */}
-      <div className="bg-[#0b0b0b] rounded-2xl border border-[#1a1a1a] p-5">
+      <div className="bg-[#0b0b0b] rounded-2xl border border-[#1a1a1a] p-5 flex flex-col gap-5">
         {KeyBpmRow}
+        {PracticeTools}
       </div>
 
       {/* Active chord + play */}
@@ -400,8 +720,12 @@ export default function BackingTrackGenerator() {
       {/* Hero */}
       <div className="flex items-end justify-between mb-8">
         <div>
-          <h2 className="font-Space-Grotesk font-bold text-[64px] leading-none tracking-[-2px] text-white">Jam Session</h2>
-          <p className="font-Inter text-[#adaaaa] text-[13px] tracking-[1.4px] uppercase mt-2">AI BACKING TRACKS FOR GUITAR PRACTICE</p>
+          <h2 className="font-Space-Grotesk font-bold text-[64px] leading-none tracking-[-2px] text-white">
+            {studioMode ? "Backing track" : "Jam Session"}
+          </h2>
+          <p className="font-Inter text-[#adaaaa] text-[13px] tracking-[1.4px] uppercase mt-2">
+            {studioMode ? "PART OF PRACTICE STUDIO" : "AI BACKING TRACKS FOR GUITAR PRACTICE"}
+          </p>
         </div>
         {PlayButton}
       </div>
@@ -449,6 +773,7 @@ export default function BackingTrackGenerator() {
               <h3 className="font-Space-Grotesk font-bold text-white text-[15px]">Session Settings</h3>
             </div>
             {KeyBpmRow}
+            {PracticeTools}
           </div>
 
           {/* Mixer card */}
@@ -490,7 +815,9 @@ export default function BackingTrackGenerator() {
                 </div>
                 <div className="flex flex-col">
                   <span className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">BPM</span>
-                  <span className="font-Space-Grotesk font-bold text-white text-[28px]">{bpm}</span>
+                  <span className="font-Space-Grotesk font-bold text-white text-[28px]">
+                    {isPlaying ? effectiveBpm : bpm}
+                  </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="font-Inter text-[10px] text-[#3f3f46] uppercase tracking-[2px]">GENRE</span>

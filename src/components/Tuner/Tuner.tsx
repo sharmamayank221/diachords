@@ -1,646 +1,585 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import * as Tone from "tone";
+import React from "react";
+import { initAudio, playNote } from "@/utils/audioUtils";
+import { detectPitchYin } from "@/utils/pitch";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Tunings ──────────────────────────────────────────────────────────────────
+// Notes are listed low string (6) → high string (1).
 
-const GUITAR_STRINGS = [
-  { note: "E2", label: "E", frequency: 82.41,  string: 6 },
-  { note: "A2", label: "A", frequency: 110.0,  string: 5 },
-  { note: "D3", label: "D", frequency: 146.83, string: 4 },
-  { note: "G3", label: "G", frequency: 196.0,  string: 3 },
-  { note: "B3", label: "B", frequency: 246.94, string: 2 },
-  { note: "E4", label: "e", frequency: 329.63, string: 1 },
+const TUNINGS = [
+  { label: "Standard", notes: ["E2", "A2", "D3", "G3", "B3", "E4"] },
+  { label: "Drop D", notes: ["D2", "A2", "D3", "G3", "B3", "E4"] },
+  { label: "Open G", notes: ["D2", "G2", "D3", "G3", "B3", "D4"] },
+  { label: "Half-step down", notes: ["Eb2", "Ab2", "Db3", "Gb3", "Bb3", "Eb4"] },
+  { label: "DADGAD", notes: ["D2", "A2", "D3", "G3", "A3", "D4"] },
 ];
 
-const TUNING_MODES = [
-  { label: "Standard E",  notes: ["E2","A2","D3","G3","B3","E4"] },
-  { label: "Drop D",      notes: ["D2","A2","D3","G3","B3","E4"] },
-  { label: "Open G",      notes: ["D2","G2","D3","G3","B3","D4"] },
-  { label: "Half-step ♭", notes: ["Eb2","Ab2","Db3","Gb3","Bb3","Eb4"] },
-  { label: "DADGAD",      notes: ["D2","A2","D3","G3","A3","D4"] },
-];
+const SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const FLATS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const LETTER: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 
-const ALL_NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+function noteToMidi(note: string): number {
+  const m = note.match(/^([A-G])(#|b)?(\d)$/)!;
+  return (Number(m[3]) + 1) * 12 + LETTER[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0);
+}
+const midiToFreq = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
+const centsBetween = (freq: number, target: number) => 1200 * Math.log2(freq / target);
 
-// ── Pitch detection ───────────────────────────────────────────────────────────
+// ── Detection tuning knobs ───────────────────────────────────────────────────
 
-function autoCorrelate(buffer: Float32Array, sampleRate: number): number | null {
-  const SIZE = buffer.length;
-  const MAX_SAMPLES = Math.floor(SIZE / 2);
-  let bestOffset = -1, bestCorrelation = 0, lastCorrelation = 1;
-  let rms = 0;
-  for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i];
-  rms = Math.sqrt(rms / SIZE);
-  if (rms < 0.01) return null;
+const IN_TUNE_CENTS = 5;
+const HOLD_TO_MARK_MS = 500; // stay in tune this long to tick the string off
+const SILENCE_RESET_MS = 700; // go back to "play a string" after this much quiet
+const DETECT_EVERY_MS = 50;
+// YIN is level-independent, so this only needs to reject silence/hiss. Without the browser's
+// auto-gain, an interface or laptop mic can be quiet, so keep it low (≈ −56 dBFS).
+const MIN_RMS = 0.0015;
+const QUIET_HINT_MS = 2500; // show "no sound" help after this long under the gate
+const CLIP_LEVEL = 0.98;
+const DEVICE_KEY = "tuner-input-device";
+const SWITCH_MARGIN_CENTS = 150; // auto mode: hysteresis before jumping to another string
 
-  for (let offset = 0; offset < MAX_SAMPLES; offset++) {
-    let corr = 0;
-    for (let i = 0; i < MAX_SAMPLES; i++) corr += Math.abs(buffer[i] - buffer[i + offset]);
-    corr = 1 - corr / MAX_SAMPLES;
-    if (corr > 0.9 && corr > lastCorrelation && corr > bestCorrelation) {
-      bestCorrelation = corr;
-      bestOffset = offset;
-    }
-    lastCorrelation = corr;
-  }
-  return bestCorrelation > 0.01 && bestOffset > 0 ? sampleRate / bestOffset : null;
+interface Reading {
+  freq: number;
+  name: string; // detected note, e.g. "G#"
+  octave: number;
+  targetIdx: number;
+  cents: number; // vs the target string, smoothed
 }
 
-function frequencyToNote(freq: number): { note: string; octave: number; cents: number } {
-  const semitones = 12 * Math.log2(freq / 440);
-  const rounded = Math.round(semitones);
-  const cents = Math.round((semitones - rounded) * 100);
-  const noteIndex = ((rounded % 12) + 12 + 9) % 12;
-  const octave = Math.floor((rounded + 9) / 12) + 4;
-  return { note: ALL_NOTES[noteIndex], octave, cents };
-}
+type MicError = "denied" | "notfound" | "unsupported" | "other";
 
-function findClosestString(freq: number) {
-  return GUITAR_STRINGS.reduce((best, s) =>
-    Math.abs(freq - s.frequency) < Math.abs(freq - best.frequency) ? s : best
-  , GUITAR_STRINGS[0]);
-}
-
-function getTuningStatus(cents: number): "perfect" | "flat" | "sharp" | "idle" {
-  if (Math.abs(cents) <= 5) return "perfect";
-  if (cents < -5) return "flat";
-  return "sharp";
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  perfect: "#10feb0", flat: "#ef4444", sharp: "#f59e0b", idle: "#adaaaa",
-};
-const STATUS_LABEL: Record<string, string> = {
-  perfect: "IN TUNE", flat: "TOO FLAT", sharp: "TOO SHARP", idle: "LISTENING...",
+const MIC_ERROR_TEXT: Record<MicError, string> = {
+  denied: "Microphone access is blocked. Allow it in your browser’s site settings, then try again.",
+  notfound: "No microphone found. Plug one in or use a device with a built-in mic.",
+  unsupported: "This browser can’t use the microphone here. Try Chrome, Safari or Firefox over https.",
+  other: "Couldn’t start the microphone. Check that no other app is using it and try again.",
 };
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
-function MicIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="18" height="20" viewBox="0 0 18 22" fill="none" stroke={active ? "#10feb0" : "#adaaaa"} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="5" y="1" width="8" height="13" rx="4" />
-      <path d="M1 10s0 8 8 8 8-8 8-8" /><line x1="9" y1="18" x2="9" y2="22" />
-    </svg>
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
+const MicIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+  </svg>
+);
 
 export default function Tuner() {
-  const [isListening, setIsListening] = useState(false);
-  const [detectedNote, setDetectedNote] = useState<string | null>(null);
-  const [detectedFreq, setDetectedFreq] = useState<number | null>(null);
-  const [cents, setCents] = useState(0);
-  const [closestString, setClosestString] = useState<typeof GUITAR_STRINGS[0] | null>(null);
-  const [activeStringIdx, setActiveStringIdx] = useState(0);
-  const [tuningMode, setTuningMode] = useState(0);
-  const [autoTune, setAutoTune] = useState(true);
-  const [playingRef, setPlayingRef] = useState<number | null>(null);
-  const [stringTuneStatus, setStringTuneStatus] = useState<Record<number, "perfect" | "flat" | "sharp" | "idle">>({});
-  const [waveformBars, setWaveformBars] = useState<number[]>(Array(20).fill(0.1));
+  const [tuningIdx, setTuningIdx] = React.useState(0);
+  const [autoDetect, setAutoDetect] = React.useState(true);
+  const [lockedIdx, setLockedIdx] = React.useState(0);
+  const [listening, setListening] = React.useState(false);
+  const [micError, setMicError] = React.useState<MicError | null>(null);
+  const [reading, setReading] = React.useState<Reading | null>(null);
+  const [tuned, setTuned] = React.useState<Set<number>>(new Set());
+  const [playingRef, setPlayingRef] = React.useState<number | null>(null);
+  const [levelDb, setLevelDb] = React.useState(-100);
+  const [inputHint, setInputHint] = React.useState<"quiet" | "clipping" | null>(null);
+  const [devices, setDevices] = React.useState<MediaDeviceInfo[]>([]);
+  const [deviceId, setDeviceId] = React.useState<string>("");
 
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const samplerRef = useRef<Tone.Sampler | null>(null);
+  const tuning = TUNINGS[tuningIdx];
+  const preferFlats = tuning.notes.some((n) => n.includes("b"));
+  const strings = React.useMemo(
+    () =>
+      tuning.notes.map((n, i) => {
+        const midi = noteToMidi(n);
+        return { idx: i, stringNumber: 6 - i, note: n, name: n.replace(/\d/, ""), midi, freq: midiToFreq(midi) };
+      }),
+    [tuning]
+  );
 
-  useEffect(() => {
-    samplerRef.current = new Tone.Sampler({
-      urls: { A2:"A2.mp3", A3:"A3.mp3", A4:"A4.mp3", C3:"C3.mp3", C4:"C4.mp3", C5:"C5.mp3",
-              D3:"D3.mp3", D4:"D4.mp3", E2:"E2.mp3", E3:"E3.mp3", E4:"E4.mp3",
-              G2:"G2.mp3", G3:"G3.mp3", G4:"G4.mp3" },
-      baseUrl: "/guitar-acoustic/",
-    }).toDestination();
-    return () => { samplerRef.current?.dispose(); };
+  // Latest settings for the detection loop, which outlives renders
+  const live = React.useRef({ strings, autoDetect, lockedIdx, preferFlats });
+  live.current = { strings, autoDetect, lockedIdx, preferFlats };
+
+  const audio = React.useRef<{
+    ctx: AudioContext;
+    stream: MediaStream;
+    analysers: AnalyserNode[]; // one per input channel
+    buf: Float32Array;
+    scratch: Float32Array;
+    timer: ReturnType<typeof setInterval>;
+  } | null>(null);
+  const history = React.useRef<number[]>([]);
+  const smoothed = React.useRef<{ targetIdx: number; cents: number } | null>(null);
+  const lastHeard = React.useRef(0);
+  const inTuneSince = React.useRef<{ idx: number; at: number } | null>(null);
+  const muteUntil = React.useRef(0); // ignore the mic while our own reference note rings
+  const quietSince = React.useRef(0);
+  const clipUntil = React.useRef(0);
+
+  const tick = React.useCallback(() => {
+    const a = audio.current;
+    if (!a) return;
+    const now = performance.now();
+    // 2-in interfaces (e.g. Scarlett Solo: mic on input 1, guitar on input 2) put each
+    // input on its own channel, so measure every channel and analyse the loudest one.
+    let rms = 0;
+    let peak = 0;
+    for (const analyser of a.analysers) {
+      analyser.getFloatTimeDomainData(a.scratch);
+      let sum = 0;
+      let p = 0;
+      for (let i = 0; i < a.scratch.length; i++) {
+        const v = a.scratch[i];
+        sum += v * v;
+        if (Math.abs(v) > p) p = Math.abs(v);
+      }
+      const chRms = Math.sqrt(sum / a.scratch.length);
+      if (chRms > rms) {
+        rms = chRms;
+        peak = p;
+        a.buf.set(a.scratch);
+      }
+    }
+
+    // input meter + "is anything arriving?" diagnostics
+    const db = rms > 0 ? Math.max(-100, Math.round(20 * Math.log10(rms))) : -100;
+    setLevelDb((prev) => (Math.abs(prev - db) >= 1 ? db : prev));
+    if (peak >= CLIP_LEVEL) clipUntil.current = now + 1500;
+    if (rms >= MIN_RMS) quietSince.current = now;
+    const hint = now < clipUntil.current ? "clipping" : now - quietSince.current > QUIET_HINT_MS ? "quiet" : null;
+    setInputHint((prev) => (prev === hint ? prev : hint));
+
+    const pitch = now > muteUntil.current && rms > MIN_RMS ? detectPitchYin(a.buf, a.ctx.sampleRate) : null;
+    if (!pitch || pitch < 60 || pitch > 1000) {
+      if (now - lastHeard.current > SILENCE_RESET_MS) {
+        history.current = [];
+        smoothed.current = null;
+        inTuneSince.current = null;
+        setReading((r) => (r ? null : r));
+      }
+      return;
+    }
+    lastHeard.current = now;
+
+    // median of the last few readings knocks out single-frame octave glitches
+    history.current = [...history.current.slice(-4), pitch];
+    const freq = [...history.current].sort((x, y) => x - y)[Math.floor(history.current.length / 2)];
+
+    const { strings: s, autoDetect: auto, lockedIdx: locked, preferFlats: flats } = live.current;
+    let targetIdx = locked;
+    if (auto) {
+      const distances = s.map((str) => Math.abs(centsBetween(freq, str.freq)));
+      const best = distances.indexOf(Math.min(...distances));
+      const current = smoothed.current?.targetIdx;
+      targetIdx =
+        current !== undefined && current !== best && distances[current] - distances[best] < SWITCH_MARGIN_CENTS
+          ? current
+          : best;
+    }
+
+    const raw = centsBetween(freq, s[targetIdx].freq);
+    const prev = smoothed.current;
+    const cents = prev && prev.targetIdx === targetIdx ? prev.cents * 0.55 + raw * 0.45 : raw;
+    smoothed.current = { targetIdx, cents };
+
+    if (Math.abs(cents) <= IN_TUNE_CENTS) {
+      if (inTuneSince.current?.idx !== targetIdx) inTuneSince.current = { idx: targetIdx, at: now };
+      else if (now - inTuneSince.current.at > HOLD_TO_MARK_MS) {
+        setTuned((t) => (t.has(targetIdx) ? t : new Set(t).add(targetIdx)));
+      }
+    } else {
+      inTuneSince.current = null;
+    }
+
+    const midi = Math.round(69 + 12 * Math.log2(freq / 440));
+    setReading({
+      freq,
+      name: (flats ? FLATS : SHARPS)[((midi % 12) + 12) % 12],
+      octave: Math.floor(midi / 12) - 1,
+      targetIdx,
+      cents,
+    });
   }, []);
 
-  const startListening = useCallback(async () => {
+  const stop = React.useCallback(() => {
+    const a = audio.current;
+    if (a) {
+      clearInterval(a.timer);
+      a.stream.getTracks().forEach((t) => t.stop());
+      a.ctx.close().catch(() => {});
+    }
+    audio.current = null;
+    history.current = [];
+    smoothed.current = null;
+    setListening(false);
+    setReading(null);
+  }, []);
+
+  const refreshDevices = React.useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      audioCtxRef.current = new AudioContext();
-      analyserRef.current = audioCtxRef.current.createAnalyser();
-      analyserRef.current.fftSize = 4096;
-      audioCtxRef.current.createMediaStreamSource(stream).connect(analyserRef.current);
-      setIsListening(true);
-
-      const detect = () => {
-        if (!analyserRef.current || !audioCtxRef.current || audioCtxRef.current.state === "closed") return;
-        const buf = new Float32Array(analyserRef.current.fftSize);
-        analyserRef.current.getFloatTimeDomainData(buf);
-        const freq = autoCorrelate(buf, audioCtxRef.current.sampleRate);
-        if (freq && freq > 60 && freq < 1000) {
-          const { note, octave, cents: c } = frequencyToNote(freq);
-          const cs = findClosestString(freq);
-          setDetectedNote(`${note}${octave}`);
-          setDetectedFreq(freq);
-          setCents(c);
-          setClosestString(cs);
-          const status = getTuningStatus(c);
-          setStringTuneStatus(prev => ({ ...prev, [cs.string]: status }));
-          if (autoTune) setActiveStringIdx(GUITAR_STRINGS.findIndex(s => s.string === cs.string));
-        }
-        // Waveform bars from frequency domain
-        const fftBuf = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(fftBuf);
-        const step = Math.floor(fftBuf.length / 20);
-        setWaveformBars(Array.from({ length: 20 }, (_, i) => fftBuf[i * step] / 255));
-        rafRef.current = requestAnimationFrame(detect);
-      };
-      detect();
+      const all = await navigator.mediaDevices.enumerateDevices();
+      setDevices(all.filter((d) => d.kind === "audioinput" && d.deviceId));
     } catch {
-      alert("Could not access microphone. Please check permissions.");
+      setDevices([]);
     }
-  }, [autoTune]);
-
-  const stopListening = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-      audioCtxRef.current.close().catch(() => {});
-    }
-    audioCtxRef.current = null;
-    analyserRef.current = null;
-    setIsListening(false);
-    setDetectedNote(null);
-    setDetectedFreq(null);
-    setCents(0);
-    setClosestString(null);
   }, []);
 
-  useEffect(() => () => stopListening(), [stopListening]);
-
-  const playRefNote = async (idx: number) => {
-    await Tone.start();
-    setPlayingRef(idx);
-    samplerRef.current?.triggerAttackRelease(GUITAR_STRINGS[idx].note, 3);
-    setTimeout(() => setPlayingRef(null), 3000);
+  const start = async (requestedId?: string) => {
+    setMicError(null);
+    let preferred = requestedId;
+    if (preferred === undefined) {
+      try {
+        preferred = localStorage.getItem(DEVICE_KEY) ?? undefined;
+      } catch {
+        preferred = undefined;
+      }
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicError("unsupported");
+      return;
+    }
+    try {
+      // the browser's voice-call processing distorts pitch, so switch it all off
+      // ask for both channels: Chrome otherwise may keep only input 1 of a 2-in interface
+      const processingOff = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: { ideal: 2 },
+      };
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: preferred ? { ...processingOff, deviceId: { exact: preferred } } : processingOff,
+        });
+      } catch (err: any) {
+        // a remembered interface that's been unplugged: fall back to the default input
+        if (!preferred || (err?.name !== "OverconstrainedError" && err?.name !== "NotFoundError")) throw err;
+        stream = await navigator.mediaDevices.getUserMedia({ audio: processingOff });
+      }
+      const activeId = stream.getAudioTracks()[0]?.getSettings().deviceId ?? "";
+      setDeviceId(activeId);
+      refreshDevices();
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx: AudioContext = new Ctx();
+      await ctx.resume();
+      const source = ctx.createMediaStreamSource(stream);
+      // always split two ways: a mono input just leaves channel 2 silent
+      const channels = 2;
+      const splitter = ctx.createChannelSplitter(channels);
+      source.connect(splitter);
+      const analysers = Array.from({ length: channels }, (_, ch) => {
+        const an = ctx.createAnalyser();
+        an.fftSize = 4096; // ≥2 periods of a low D (73 Hz)
+        splitter.connect(an, ch);
+        return an;
+      });
+      audio.current = {
+        ctx,
+        stream,
+        analysers,
+        buf: new Float32Array(4096),
+        scratch: new Float32Array(4096),
+        timer: setInterval(tick, DETECT_EVERY_MS),
+      };
+      quietSince.current = performance.now();
+      setInputHint(null);
+      setListening(true);
+    } catch (e: any) {
+      setMicError(
+        e?.name === "NotAllowedError" || e?.name === "SecurityError"
+          ? "denied"
+          : e?.name === "NotFoundError" || e?.name === "OverconstrainedError"
+          ? "notfound"
+          : "other"
+      );
+    }
   };
 
-  const status = isListening && detectedNote ? getTuningStatus(cents) : "idle";
-  const needleAngle = Math.max(-45, Math.min(45, (cents / 50) * 45));
-  const statusColor = STATUS_COLOR[status];
-  const noteName = detectedNote ? detectedNote.replace(/\d/, "") : "—";
+  React.useEffect(() => stop, [stop]);
 
-  // ── SHARED GAUGE (used in both layouts) ──────────────────────────────────────
-  const Gauge = (
-    <div className="relative w-full" style={{ aspectRatio: "2/1" }}>
-      {/* Arc background */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="xMidYMax meet">
-        {/* Background arc */}
-        <path d="M 20 200 A 180 180 0 0 1 380 200" fill="none" stroke="rgba(72,72,71,0.3)" strokeWidth="1.5" />
-        {/* Colored arc based on status */}
-        {isListening && detectedNote && (
-          <path
-            d="M 20 200 A 180 180 0 0 1 380 200"
-            fill="none"
-            stroke={statusColor}
-            strokeWidth="1.5"
-            strokeOpacity="0.4"
-          />
-        )}
-        {/* Scale tick marks */}
-        {[-50, -20, 0, 20, 50].map((val) => {
-          const angle = (val / 50) * 80; // ±80 degrees from top
-          const rad = ((angle - 90) * Math.PI) / 180;
-          const r = 175;
-          const cx = 200 + r * Math.cos(rad);
-          const cy = 200 + r * Math.sin(rad);
-          const isCenter = val === 0;
-          return (
-            <line
-              key={val}
-              x1={cx}
-              y1={cy}
-              x2={200 + (r - (isCenter ? 18 : 10)) * Math.cos(rad)}
-              y2={200 + (r - (isCenter ? 18 : 10)) * Math.sin(rad)}
-              stroke={isCenter ? "#10feb0" : "rgba(255,255,255,0.3)"}
-              strokeWidth={isCenter ? 2 : 1}
-            />
-          );
-        })}
-        {/* Needle */}
-        <g transform={`rotate(${needleAngle}, 200, 200)`}>
-          <line
-            x1="200" y1="200"
-            x2="200" y2="20"
-            stroke={isListening && detectedNote ? "#aeffd4" : "rgba(255,255,255,0.15)"}
-            strokeWidth="3"
-            strokeLinecap="round"
-            style={{
-              filter: isListening && detectedNote
-                ? "drop-shadow(0 0 8px rgba(174,255,212,0.6))"
-                : "none",
-              transition: "transform 0.15s ease-out",
-            }}
-          />
-          <circle cx="200" cy="200" r="5" fill={isListening && detectedNote ? "#aeffd4" : "#333"} />
-        </g>
-      </svg>
+  // plugging an interface in or out updates the input list
+  React.useEffect(() => {
+    if (!listening || !navigator.mediaDevices?.addEventListener) return;
+    navigator.mediaDevices.addEventListener("devicechange", refreshDevices);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", refreshDevices);
+  }, [listening, refreshDevices]);
 
-      {/* Center note display */}
-      <div className="absolute inset-x-0 bottom-4 flex flex-col items-center">
-        <span
-          className="font-Space-Grotesk font-bold leading-none tracking-tight transition-all duration-300"
-          style={{
-            fontSize: "clamp(48px, 12vw, 96px)",
-            color: status === "perfect" ? "#14FFB1"
-              : isListening && detectedNote ? "#00eea5"
-              : "#333",
-            filter: status === "perfect"
-              ? "drop-shadow(0 0 40px rgba(20,255,177,0.9)) drop-shadow(0 0 15px rgba(20,255,177,1))"
-              : isListening && detectedNote
-              ? "drop-shadow(0 0 20px rgba(0,238,165,0.4))"
-              : "none",
-          }}
-        >
-          {noteName}
-        </span>
-        <span className="font-Inter font-medium text-[clamp(11px,2.5vw,14px)] mt-1"
-          style={{ color: isListening && detectedNote ? "rgba(16,254,176,0.7)" : "#555" }}>
-          {detectedFreq ? `${detectedFreq.toFixed(2)} Hz` : "— Hz"}
-        </span>
-      </div>
+  const changeDevice = async (id: string) => {
+    try {
+      localStorage.setItem(DEVICE_KEY, id);
+    } catch {
+      // storage unavailable: the choice just won't be remembered
+    }
+    stop();
+    await start(id);
+  };
 
-      {/* Scale labels */}
-      <div className="absolute bottom-8 left-0 right-0 flex justify-between px-[12%] opacity-40">
-        {["-50", "-20", "", "+20", "+50"].map((l, i) => (
-          <span key={i} className="font-Inter text-[10px] text-white">{l}</span>
-        ))}
-      </div>
-      {/* Center divider */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-px h-4 bg-[#10feb0]" />
-    </div>
-  );
+  // a new tuning means new targets: progress starts over
+  React.useEffect(() => {
+    setTuned(new Set());
+    smoothed.current = null;
+    inTuneSince.current = null;
+  }, [tuningIdx]);
 
-  // ── STRING BUTTONS ────────────────────────────────────────────────────────────
-  const StringButtons = ({ compact = false }: { compact?: boolean }) => (
-    <div className={`grid grid-cols-6 gap-3 ${compact ? "" : ""}`}>
-      {GUITAR_STRINGS.map((s, i) => {
-        const isActive = i === activeStringIdx;
-        const tuneStatus = stringTuneStatus[s.string];
-        return (
-          <div key={i} className="flex flex-col items-center gap-3">
-            {/* Indicator bar */}
-            <div className="w-full h-1 rounded-full overflow-hidden bg-[rgba(72,72,71,0.2)]">
-              {isActive && (
-                <div className="h-full bg-[#aeffd4] w-full"
-                  style={{ boxShadow: "0 0 10px rgba(16,254,176,0.6)" }} />
-              )}
-            </div>
-            {/* String button */}
-            <button
-              onClick={() => { setActiveStringIdx(i); playRefNote(i); }}
-              className="relative flex items-center justify-center rounded-xl transition-all duration-200"
-              style={{
-                width: compact ? 40 : 48,
-                height: compact ? 40 : 48,
-                background: isActive ? "#10feb0" : "#20201f",
-                boxShadow: isActive ? "0 8px 8px rgba(16,254,176,0.2)" : "none",
-              }}
-            >
-              {playingRef === i && (
-                <span className="absolute inset-0 rounded-xl animate-ping opacity-30 bg-[#10feb0]" />
-              )}
-              <span
-                className="font-Space-Grotesk font-bold relative z-10"
-                style={{
-                  fontSize: compact ? 16 : 20,
-                  color: isActive ? "#005c3d" : tuneStatus === "perfect" ? "#aeffd4" : tuneStatus === "flat" ? "#ef4444" : tuneStatus === "sharp" ? "#f59e0b" : "#adaaaa",
-                }}
-              >
-                {s.label}
-              </span>
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
+  const selectString = (idx: number) => {
+    setAutoDetect(false);
+    setLockedIdx(idx);
+  };
 
-  // ── PRECISION CARD ───────────────────────────────────────────────────────────
-  const PrecisionCard = (
-    <div className="bg-[#131313] rounded-2xl flex items-center justify-between px-6 py-5">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[rgba(130,233,255,0.1)]">
-          <MicIcon active={isListening} />
-        </div>
-        <div>
-          <p className="font-Space-Grotesk font-bold text-white text-base">Input Sensitivity</p>
-          <p className="font-Manrope text-[#adaaaa] text-[12px] mt-0.5">
-            {isListening ? "High precision mic active" : "Microphone inactive"}
-          </p>
-        </div>
-      </div>
-      <div className="text-right">
-        <p className="font-Space-Grotesk font-bold text-[16px]" style={{ color: statusColor }}>
-          {isListening && detectedNote ? (cents >= 0 ? "+" : "") + cents : "—"}
-        </p>
-        <p className="font-Inter text-[10px] uppercase text-[#adaaaa]">CENTS</p>
-      </div>
-    </div>
-  );
+  const playReference = async (idx: number) => {
+    await initAudio();
+    muteUntil.current = performance.now() + 2200;
+    history.current = [];
+    smoothed.current = null;
+    setPlayingRef(idx);
+    playNote(strings[idx].midi);
+    setTimeout(() => setPlayingRef((p) => (p === idx ? null : p)), 2000);
+  };
 
-  // ── STATUS BADGE ─────────────────────────────────────────────────────────────
-  const StatusBadge = (
-    <div className="flex items-center justify-center gap-3">
-      {isListening && detectedNote && (
-        <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: statusColor }} />
-      )}
-      <span className="font-Inter font-medium text-sm tracking-widest uppercase" style={{ color: statusColor }}>
-        {STATUS_LABEL[status]}
-      </span>
-    </div>
-  );
+  // ── Derived display ────────────────────────────────────────────────────────
+  const targetIdx = reading?.targetIdx ?? (autoDetect ? null : lockedIdx);
+  const target = targetIdx !== null ? strings[targetIdx] : null;
+  const cents = reading?.cents ?? 0;
+  const inTune = !!reading && Math.abs(cents) <= IN_TUNE_CENTS;
+  const semis = Math.round(Math.abs(cents) / 100);
+  const status = !listening
+    ? null
+    : !reading
+    ? { text: target ? `Play the ${target.name} string` : "Play any string", tone: "idle" as const }
+    : inTune
+    ? { text: "In tune", tone: "good" as const }
+    : {
+        text: `${cents < 0 ? "Tighten ↑" : "Loosen ↓"}  ${
+          semis >= 1 ? `${semis} semitone${semis > 1 ? "s" : ""} ${cents < 0 ? "flat" : "sharp"}` : `${Math.abs(Math.round(cents))}¢ ${cents < 0 ? "flat" : "sharp"}`
+        }`,
+        tone: "off" as const,
+      };
+  const accent = inTune ? "#1BD79E" : reading ? "#f59e0b" : "#3f3f46";
 
-  // ── MOBILE LAYOUT ─────────────────────────────────────────────────────────────
-  const MobileLayout = (
-    <div className="max-w-[430px] mx-auto px-6 py-6 flex flex-col gap-6">
-        {/* Mode & Toggle */}
-        <div className="flex items-center justify-between pt-2">
-          <div>
-            <p className="font-Inter text-[12px] text-[#adaaaa] tracking-[2.4px] uppercase">MODE</p>
-            <p className="font-Space-Grotesk font-bold text-white text-[20px]">
-              {TUNING_MODES[tuningMode].label}
-            </p>
-          </div>
-          <button
-            onClick={() => setAutoTune(!autoTune)}
-            className="flex items-center gap-4 bg-[#20201f] rounded-full px-4 py-2"
-          >
-            <span className="font-Inter font-semibold text-[12px] text-[#adaaaa]">AUTO-TUNE</span>
-            <div className={`relative w-12 h-6 rounded-full transition-colors ${autoTune ? "bg-[#10feb0]" : "bg-[#333]"}`}>
-              <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${autoTune ? "right-1 bg-[#005c3d]" : "left-1 bg-[#777]"}`} />
-            </div>
-          </button>
-        </div>
-
-        {/* Gauge */}
-        {Gauge}
-
-        {/* Status badge */}
-        {StatusBadge}
-
-        {/* Start/Stop */}
-        <button
-          onClick={isListening ? stopListening : startListening}
-          className="w-full py-4 rounded-full font-Space-Grotesk font-bold text-[16px] transition-all"
-          style={{
-            background: isListening
-              ? "rgba(239,68,68,0.15)"
-              : "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)",
-            color: isListening ? "#ef4444" : "#005c3d",
-            border: isListening ? "1px solid rgba(239,68,68,0.3)" : "none",
-          }}
-        >
-          {isListening ? "Stop Tuning" : "Start Tuning"}
-        </button>
-
-        {/* String Selectors */}
-        <StringButtons />
-
-        {/* Precision Card */}
-        {PrecisionCard}
-    </div>
-  );
-
-  // ── DESKTOP LAYOUT (Stitch: Web Tuning Studio) ───────────────────────────────
-  const DesktopLayout = (
-    <div className="flex flex-col min-h-full">
-
-      {/* ── Tuner header tabs ── */}
-      <div className="flex items-center gap-8 px-12 pt-6 pb-0">
-        {TUNING_MODES.map((m, i) => (
-          <button key={i} onClick={() => setTuningMode(i)}
-            className="font-Manrope font-semibold text-[14px] pb-1 transition-colors"
-            style={i === tuningMode
-              ? { color: "#14FFB1", borderBottom: "2px solid #14FFB1" }
-              : { color: "rgba(255,255,255,0.4)" }
-            }>
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Main tuner canvas ── */}
-      <section className="flex-1 flex flex-col items-center justify-center px-12 py-8 relative overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
-          style={{ background: "rgba(20,255,177,0.04)", filter: "blur(80px)" }} />
-
-        <div className="relative w-full max-w-3xl flex flex-col items-center">
-
-          {/* Needle area */}
-          <div className="relative w-full flex items-end justify-center" style={{ height: 360 }}>
-            {/* Semicircle arc */}
-            <div className="absolute bottom-0 w-full rounded-full pointer-events-none"
-              style={{
-                height: "100%",
-                border: "1px solid rgba(72,72,71,0.2)",
-                clipPath: "ellipse(100% 100% at 50% 100%)",
-              }} />
-
-            {/* Cents labels */}
-            <div className="absolute bottom-4 w-full flex justify-between px-12 font-Inter text-[10px] uppercase tracking-widest"
-              style={{ color: "#adaaaa" }}>
-              <span>-50 Cents</span>
-              <span style={{ color: "rgba(20,255,177,0.5)" }}>Perfect</span>
-              <span>+50 Cents</span>
-            </div>
-
-            {/* Note name + frequency */}
-            <div className="flex flex-col items-center z-10 mb-16">
-              <span className="font-Space-Grotesk font-black leading-none tracking-tighter transition-all duration-300"
-                style={{
-                  fontSize: "9rem",
-                  color: status === "perfect" ? "#14FFB1"
-                    : isListening && detectedNote ? "#ffffff"
-                    : "#222",
-                  filter: status === "perfect"
-                    ? "drop-shadow(0 0 60px rgba(20,255,177,0.8)) drop-shadow(0 0 20px rgba(20,255,177,0.9))"
-                    : isListening && detectedNote
-                    ? `drop-shadow(0 0 30px ${statusColor}50)`
-                    : "none",
-                }}>
-                {noteName}
-              </span>
-              <span className="font-Space-Grotesk font-medium tracking-[0.4em] -mt-2"
-                style={{ fontSize: "1.4rem", color: isListening && detectedNote ? "#14FFB1" : "#333" }}>
-                {detectedFreq ? `${detectedFreq.toFixed(2)}` : "—"}{" "}
-                <span className="font-Inter font-normal text-[14px] tracking-normal opacity-60">Hz</span>
-              </span>
-            </div>
-
-            {/* Glowing needle */}
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 origin-bottom transition-transform duration-75"
-              style={{ transform: `translateX(-50%) rotate(${needleAngle}deg)`, height: "100%", width: 2 }}>
-              <div className="w-full h-full"
-                style={{
-                  background: "linear-gradient(to top, transparent 0%, #14FFB1 100%)",
-                  boxShadow: isListening && detectedNote ? "0 0 20px rgba(20,255,177,0.6)" : "none",
-                  opacity: isListening && detectedNote ? 1 : 0.15,
-                }} />
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full"
-                style={{ background: "#14FFB1", filter: "blur(4px)", opacity: isListening && detectedNote ? 1 : 0 }} />
-            </div>
-
-            {/* Static center line */}
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 h-full w-px"
-              style={{ background: "rgba(255,255,255,0.07)" }} />
-          </div>
-
-          {/* String selector pill */}
-          <div className="flex items-center gap-3 p-2 rounded-full mt-4"
-            style={{ background: "#131313" }}>
-            {GUITAR_STRINGS.map((s, i) => {
-              const isActive = i === activeStringIdx;
-              return (
-                <button key={i}
-                  onClick={() => { setActiveStringIdx(i); playRefNote(i); }}
-                  className="w-14 h-14 rounded-full flex items-center justify-center font-Space-Grotesk font-bold text-[20px] transition-all relative"
-                  style={isActive
-                    ? { background: "#14FFB1", color: "#005c3d", boxShadow: "0 0 20px rgba(20,255,177,0.3)" }
-                    : { color: "#adaaaa" }
-                  }>
-                  {playingRef === i && <span className="absolute inset-0 rounded-full animate-ping opacity-20 bg-[#14FFB1]" />}
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Auto-Tune / Manual pill */}
-          <div className="flex items-center p-1 rounded-full mt-6 border"
-            style={{ background: "#000", borderColor: "rgba(72,72,71,0.2)" }}>
-            <button onClick={() => setAutoTune(true)}
-              className="px-8 py-2.5 rounded-full font-Space-Grotesk font-bold text-[11px] uppercase tracking-widest transition-all"
-              style={autoTune
-                ? { background: "#262626", color: "#fff" }
-                : { color: "#adaaaa" }}>
-              Auto-Tune
-            </button>
-            <button onClick={() => setAutoTune(false)}
-              className="px-8 py-2.5 rounded-full font-Space-Grotesk font-bold text-[11px] uppercase tracking-widest transition-all"
-              style={!autoTune
-                ? { background: "#262626", color: "#fff" }
-                : { color: "#adaaaa" }}>
-              Manual
-            </button>
-          </div>
-
-          {/* Start / Stop */}
-          <button onClick={isListening ? stopListening : startListening}
-            className="mt-6 flex items-center gap-3 px-10 py-3.5 rounded-full font-Space-Grotesk font-bold text-[14px] transition-all"
-            style={isListening
-              ? { background: "rgba(239,68,68,0.12)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }
-              : { background: "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)", color: "#005c3d" }}>
-            <MicIcon active={isListening} />
-            {isListening ? "Stop Tuning" : "Start Tuning"}
-          </button>
-        </div>
-      </section>
-
-      {/* ── Bottom panel ── */}
-      <section className="grid grid-cols-12 gap-5 px-12 pb-10"
-        style={{ background: "#131313", borderTop: "1px solid rgba(255,255,255,0.04)", padding: "24px 48px" }}>
-
-        {/* Waveform */}
-        <div className="col-span-8 rounded-xl p-5 flex flex-col justify-between overflow-hidden relative"
-          style={{ background: "#0a0a0a" }}>
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="font-Space-Grotesk font-bold text-[11px] uppercase tracking-widest" style={{ color: "#14FFB1" }}>
-                Input Waveform
-              </h3>
-              <p className="font-Inter text-[10px] uppercase mt-0.5 tracking-widest" style={{ color: "#adaaaa" }}>
-                Real-time Audio Analysis
-              </p>
-            </div>
-            <span className="font-Inter text-[10px] px-2 py-0.5 rounded tracking-tighter"
-              style={{ color: "#14FFB1", background: "rgba(20,255,177,0.1)" }}>
-              {isListening ? "LIVE" : "OFFLINE"}
-            </span>
-          </div>
-          <div className="flex items-end gap-1 h-16">
-            {waveformBars.map((h, i) => (
-              <div key={i} className="flex-1 rounded-t-sm transition-all duration-75"
-                style={{
-                  height: `${Math.max(4, h * 100)}%`,
-                  background: h > 0.6
-                    ? "#14FFB1"
-                    : `rgba(20,255,177,${0.2 + h * 0.6})`,
-                  boxShadow: h > 0.6 ? "0 0 8px rgba(20,255,177,0.3)" : "none",
-                }} />
-            ))}
-          </div>
-        </div>
-
-        {/* Input settings */}
-        <div className="col-span-4 rounded-xl p-5 flex flex-col gap-4"
-          style={{ background: "#1a1a1a" }}>
-          <div className="flex items-center justify-between">
-            <h3 className="font-Space-Grotesk font-bold text-[11px] uppercase tracking-widest text-white">
-              Input Settings
-            </h3>
-          </div>
-
-          {/* Sensitivity */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex justify-between font-Inter text-[10px] uppercase tracking-widest" style={{ color: "#adaaaa" }}>
-              <span>Sensitivity</span>
-              <span className="text-white">78%</span>
-            </div>
-            <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "#000" }}>
-              <div className="h-full rounded-full" style={{ width: "78%", background: "#14FFB1", boxShadow: "0 0 8px rgba(20,255,177,0.4)" }} />
-            </div>
-          </div>
-
-          {/* Status */}
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isListening ? "animate-pulse" : ""}`}
-                style={{ background: isListening ? "#14FFB1" : "#484847" }} />
-              <span className="font-Inter text-[10px] uppercase tracking-widest" style={{ color: "#adaaaa" }}>
-                {isListening ? "Active" : "Ready"}
-              </span>
-            </div>
-            <button onClick={isListening ? stopListening : startListening}
-              className="font-Space-Grotesk font-bold text-[10px] uppercase tracking-widest hover:underline"
-              style={{ color: "#14FFB1" }}>
-              {isListening ? "Stop" : "Calibrate"}
-            </button>
-          </div>
-
-          {/* String status mini */}
-          <div className="flex gap-2 flex-wrap pt-1">
-            {GUITAR_STRINGS.map((s, i) => {
-              const st = stringTuneStatus[s.string];
-              return (
-                <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-full"
-                  style={{ background: "#262626" }}>
-                  <div className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: st ? STATUS_COLOR[st] : "#484847" }} />
-                  <span className="font-Space-Grotesk font-bold text-[11px]"
-                    style={{ color: st === "perfect" ? "#14FFB1" : "#adaaaa" }}>{s.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-    </div>
-  );
+  // gauge geometry: ±50 cents maps to ±70°
+  const angle = Math.max(-70, Math.min(70, (cents / 50) * 70));
+  const polar = (deg: number, r: number) => {
+    const rad = ((deg - 90) * Math.PI) / 180;
+    return [150 + r * Math.cos(rad), 160 + r * Math.sin(rad)];
+  };
+  const [gx1, gy1] = polar(-7, 130);
+  const [gx2, gy2] = polar(7, 130);
 
   return (
-    <>
-      <div className="lg:hidden">{MobileLayout}</div>
-      <div className="hidden lg:block">{DesktopLayout}</div>
-    </>
+    <div className="max-w-2xl mx-auto text-white">
+      {/* Tuning picker */}
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 md:justify-center" role="radiogroup" aria-label="Tuning">
+        {TUNINGS.map((t, i) => {
+          const active = i === tuningIdx;
+          return (
+            <button
+              key={t.label}
+              role="radio"
+              aria-checked={active}
+              onClick={() => setTuningIdx(i)}
+              className={`shrink-0 h-9 px-4 rounded-full font-Inter text-sm transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+                active ? "bg-[#1BD79E] text-black font-semibold" : "bg-[#161616] text-gray-300 hover:bg-[#222]"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-center font-Inter text-xs text-gray-500 tracking-wide">
+        {tuning.notes.map((n) => n.replace(/\d/, "")).join(" · ")}
+      </p>
+
+      {/* Gauge card */}
+      <div className="relative mt-5 rounded-3xl bg-[#0f0f0f] border border-white/5 px-4 md:px-8 pt-6 pb-6">
+        <svg viewBox="0 0 300 175" className="w-full max-w-md mx-auto block" aria-hidden>
+          {/* scale */}
+          <path d={`M ${polar(-70, 130).join(" ")} A 130 130 0 0 1 ${polar(70, 130).join(" ")}`} fill="none" stroke="#262626" strokeWidth={10} strokeLinecap="round" />
+          <path d={`M ${gx1} ${gy1} A 130 130 0 0 1 ${gx2} ${gy2}`} fill="none" stroke="#1BD79E" strokeOpacity={inTune ? 1 : 0.45} strokeWidth={10} />
+          {Array.from({ length: 11 }, (_, i) => {
+            const c = -50 + i * 10;
+            const deg = (c / 50) * 70;
+            const major = c % 50 === 0;
+            const [x1, y1] = polar(deg, 112);
+            const [x2, y2] = polar(deg, major ? 100 : 106);
+            return <line key={c} x1={x1} y1={y1} x2={x2} y2={y2} stroke={c === 0 ? "#1BD79E" : "#52525b"} strokeWidth={major ? 2 : 1} />;
+          })}
+          {[-50, 0, 50].map((c) => {
+            const [x, y] = polar((c / 50) * 70, 88);
+            return (
+              <text key={c} x={x} y={y + 3} textAnchor="middle" fontSize={9} fill="#71717a" fontFamily="Inter, sans-serif">
+                {c === 0 ? "0" : c > 0 ? `+${c}` : `−${-c}`}
+              </text>
+            );
+          })}
+          {/* needle */}
+          <g style={{ transform: `rotate(${angle}deg)`, transformOrigin: "150px 160px", transition: "transform 120ms ease-out" }}>
+            <line x1={150} y1={160} x2={150} y2={38} stroke={reading ? accent : "#3f3f46"} strokeWidth={3} strokeLinecap="round" />
+          </g>
+          <circle cx={150} cy={160} r={6} fill={reading ? accent : "#3f3f46"} />
+        </svg>
+
+        {/* Note + instruction */}
+        <div className="text-center -mt-2">
+          <div className="font-Lora leading-none transition-colors" style={{ fontSize: "clamp(56px, 14vw, 88px)", color: reading ? (inTune ? "#1BD79E" : "#fff") : "#3f3f46" }}>
+            {reading ? reading.name : target ? target.name : "—"}
+            {reading && <span className="font-Inter text-2xl align-top text-gray-500 ml-1">{reading.octave}</span>}
+          </div>
+          <p
+            role="status"
+            aria-live="polite"
+            className={`mt-3 h-7 font-Inter text-lg font-semibold ${
+              status?.tone === "good" ? "text-[#1BD79E]" : status?.tone === "off" ? "text-[#f59e0b]" : "text-gray-400"
+            }`}
+          >
+            {status?.tone === "good" && "✓ "}
+            {status?.text}
+          </p>
+          <p className="mt-1 h-5 font-Inter text-xs text-gray-500">
+            {target &&
+              listening &&
+              `Target ${target.note} · ${target.freq.toFixed(1)} Hz${reading ? ` · hearing ${reading.freq.toFixed(1)} Hz` : ""}`}
+          </p>
+        </div>
+
+        {/* Start / stop */}
+        <div className="mt-5 flex flex-col items-center gap-3">
+          {listening ? (
+            <button
+              onClick={stop}
+              className="h-11 px-6 rounded-full border border-white/15 text-gray-300 font-Inter text-sm font-semibold hover:border-white/40 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+            >
+              Stop listening
+            </button>
+          ) : (
+            <button
+              onClick={() => start()}
+              className="h-14 px-8 rounded-full bg-[#1BD79E] text-black font-Inter text-base font-semibold inline-flex items-center gap-2 transition-transform hover:scale-[1.02] active:scale-95 focus-visible:ring-2 focus-visible:ring-[#1BD79E] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
+              <MicIcon />
+              Start tuning
+            </button>
+          )}
+          {!listening && !micError && (
+            <p className="font-Inter text-xs text-gray-500 text-center max-w-xs">
+              Uses your microphone to hear each string. Nothing is recorded or sent anywhere.
+            </p>
+          )}
+          {micError && (
+            <p role="alert" className="font-Inter text-sm text-[#f59e0b] text-center max-w-sm">
+              {MIC_ERROR_TEXT[micError]}
+            </p>
+          )}
+        </div>
+
+        {/* Input: which device, how loud, and help when nothing arrives */}
+        {listening && (
+          <div className="mt-6 pt-5 border-t border-white/5 flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <label htmlFor="tuner-input" className="font-Inter text-xs uppercase tracking-wider text-gray-500 shrink-0">
+                Input
+              </label>
+              <select
+                id="tuner-input"
+                value={deviceId}
+                onChange={(e) => changeDevice(e.target.value)}
+                className="flex-1 min-w-0 h-10 rounded-lg bg-[#161616] border border-white/10 px-3 font-Inter text-sm text-white focus-visible:ring-2 focus-visible:ring-[#1BD79E] outline-none"
+              >
+                {devices.length === 0 && <option value={deviceId}>Default microphone</option>}
+                {devices.map((d, i) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Input ${i + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3" aria-label={`Input level ${levelDb} decibels`}>
+              <span className="font-Inter text-xs uppercase tracking-wider text-gray-500 shrink-0 w-10">Level</span>
+              <div className="relative flex-1 h-2 rounded-full bg-[#1f1f1f] overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-75"
+                  style={{
+                    width: `${Math.max(0, Math.min(100, ((levelDb + 60) / 60) * 100))}%`,
+                    background: inputHint === "clipping" ? "#f59e0b" : levelDb > 20 * Math.log10(MIN_RMS) ? "#1BD79E" : "#52525b",
+                  }}
+                />
+              </div>
+              <span className="font-Inter text-xs tabular-nums text-gray-400 w-14 text-right">
+                {levelDb <= -100 ? "—" : `${levelDb} dB`}
+              </span>
+            </div>
+
+            {inputHint === "quiet" && (
+              <p role="alert" className="font-Inter text-sm text-[#f59e0b] leading-relaxed">
+                No sound is reaching the tuner. If your guitar is plugged into an audio interface or amp
+                USB, pick it under <strong className="font-semibold">Input</strong> and turn its gain up. An
+                unplugged electric is very quiet, so play close to the mic.
+              </p>
+            )}
+            {inputHint === "clipping" && (
+              <p role="alert" className="font-Inter text-sm text-[#f59e0b] leading-relaxed">
+                The input is clipping. Turn the gain down on your interface (or the guitar volume a little)
+                for a steadier reading. Use a clean sound, as distortion confuses pitch detection.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Strings */}
+      <div className="mt-6">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoDetect}
+              onClick={() => setAutoDetect((a) => !a)}
+              className={`relative h-6 w-11 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${autoDetect ? "bg-[#1BD79E]" : "bg-[#333]"}`}
+            >
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${autoDetect ? "left-6" : "left-1"}`} />
+            </button>
+            <span className="font-Inter text-sm text-gray-300">
+              {autoDetect ? "Detect string automatically" : `Locked to ${strings[lockedIdx].name} (string ${strings[lockedIdx].stringNumber})`}
+            </span>
+          </label>
+          <span className="font-Inter text-sm text-gray-400 shrink-0">
+            <span className={tuned.size === 6 ? "text-[#1BD79E] font-semibold" : "text-white font-semibold"}>{tuned.size}</span> of 6 in tune
+          </span>
+        </div>
+
+        <div className="grid grid-cols-6 gap-2">
+          {strings.map((s) => {
+            const isTarget = targetIdx === s.idx;
+            const done = tuned.has(s.idx);
+            return (
+              <div key={s.idx} className="flex flex-col items-center gap-1.5">
+                <button
+                  onClick={() => selectString(s.idx)}
+                  aria-pressed={!autoDetect && lockedIdx === s.idx}
+                  aria-label={`Tune string ${s.stringNumber}, ${s.name}${done ? ", in tune" : ""}`}
+                  className={`relative w-full h-14 rounded-xl flex flex-col items-center justify-center transition-all focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+                    isTarget ? "bg-[#1BD79E] text-black" : done ? "bg-[#1BD79E]/10 text-[#1BD79E] border border-[#1BD79E]/40" : "bg-[#161616] text-white hover:bg-[#222]"
+                  }`}
+                >
+                  <span className="font-Lora text-xl leading-none">{s.name}</span>
+                  <span className={`font-Inter text-[10px] mt-1 ${isTarget ? "text-black/60" : "text-gray-500"}`}>
+                    {done ? "✓ tuned" : `string ${s.stringNumber}`}
+                  </span>
+                </button>
+                <button
+                  onClick={() => playReference(s.idx)}
+                  aria-label={`Play reference ${s.note}`}
+                  title={`Hear ${s.note}`}
+                  className={`h-9 w-9 rounded-full flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+                    playingRef === s.idx ? "bg-[#1BD79E] text-black" : "text-gray-400 bg-[#161616] hover:text-[#1BD79E]"
+                  }`}
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+                    <path d="M3 10v4h4l5 4V6L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-center font-Inter text-xs text-gray-500">
+          Tap a string to lock onto it · tap the speaker to hear its reference note
+        </p>
+      </div>
+    </div>
   );
 }

@@ -1,7 +1,6 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import SEO, { createWebPageSchema, createHowToSchema } from "@/components/SEO";
-import AppShell from "@/components/Navigation/AppShell";
 
 // Dynamic import to avoid SSR issues with Tone.js
 const Metronome = dynamic(
@@ -20,11 +19,11 @@ function MetronomePage() {
       "How to Use a Metronome for Guitar Practice",
       "Use this free online metronome to improve your timing",
       [
-        "Set your desired tempo (BPM) using the slider or quick buttons",
-        "Choose a time signature (4/4, 3/4, 6/8, or 2/4)",
+        "Set your tempo with the slider, the − and + buttons, or the arrow keys",
+        "Choose a time signature (2/4, 3/4, 4/4, 6/8 or 12/8) and a subdivision",
         "Press the play button or hit Space to start",
         "Practice along with the beat, keeping your strumming in time",
-        "Use Tap Tempo to match the tempo of a song",
+        "Use Tap Tempo to match the tempo of a song, or the speed trainer to build up gradually",
       ]
     ),
   ];
@@ -33,7 +32,7 @@ function MetronomePage() {
     <>
       <SEO
         title="Free Online Metronome - Guitar Practice Tool"
-        description="Free online metronome for guitar practice. Adjustable tempo from 40-240 BPM, multiple time signatures, tap tempo, and visual beat indicator. Perfect for improving your timing."
+        description="Free online metronome for guitar practice: 30–260 BPM, 2/4 to 12/8, subdivisions (eighths, triplets, 16ths), tap tempo, count-in and a speed trainer."
         canonical="/metronome"
         keywords={[
           "metronome",
@@ -47,13 +46,12 @@ function MetronomePage() {
         ]}
         jsonLd={jsonLd}
       />
-      <Metronome />
+      <div className="max-w-6xl mx-auto px-4 md:px-6 pt-4 pb-12">
+        <Metronome />
+      </div>
     </>
   );
 }
 
-MetronomePage.getLayout = (page: React.ReactElement) => (
-  <AppShell mobileTitle="Metronome">{page}</AppShell>
-);
 export default MetronomePage;
 

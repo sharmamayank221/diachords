@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import {
@@ -15,6 +15,8 @@ import {
 import { initAudio, playNote, playChord, playProgressionWithDrums, ProgressionChord } from "@/utils/audioUtils";
 import ChordTooltip from "./ChordTooltip";
 import { usePitchDetection } from "@/hooks/usePitchDetection";
+import { jamKeyToRootIndex, rootIndexToJamKey } from "@/utils/practiceKeySync";
+import { loadJamSession, saveJamSession } from "@/utils/jamPracticeHelpers";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,10 +33,7 @@ interface ScaleNote {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STRING_HEIGHTS = ["1px", "2px", "3px", "3.5px", "4px", "5px"];
-const FRET_WIDTH_PX = 96; // width of each fret column
-const FRETBOARD_OVERHEAD_PX = 24 + 50 + 8 + 40; // string labels + open zone + nut + padding
-const MAX_FRETS = 24;
-const MIN_FRETS = 12;
+const NUM_FRETS = 24;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FretboardNote — DO NOT MODIFY (user-approved look)
@@ -74,8 +73,23 @@ FretboardNote.displayName = "FretboardNote";
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function ScaleFretboard() {
+export interface ScaleFretboardProps {
+  practiceKey?: string;
+  onPracticeKeyChange?: (key: string) => void;
+  practiceScaleId?: string;
+  onPracticeScaleChange?: (scaleId: string) => void;
+  onOpenJam?: () => void;
+}
+
+export default function ScaleFretboard({
+  practiceKey,
+  onPracticeKeyChange,
+  practiceScaleId,
+  onPracticeScaleChange,
+  onOpenJam,
+}: ScaleFretboardProps = {} as ScaleFretboardProps) {
   const router = useRouter();
+  const studioMode = practiceKey !== undefined;
 
   const [selectedScale, setSelectedScale] = useState<string>("major");
   const [selectedRoot, setSelectedRoot]   = useState<number>(0);
@@ -90,12 +104,37 @@ export default function ScaleFretboard() {
   const [bpm, setBpm]                     = useState<number>(90);
   const [loopCount, setLoopCount]         = useState<number>(1);
   const [stopProgression, setStopProgression] = useState<(() => void) | null>(null);
-  const [numFrets, setNumFrets]           = useState<number>(MIN_FRETS);
-  const fretboardContainerRef             = useRef<HTMLDivElement>(null);
 
-  // Apply ?scale= and ?root= URL params on mount / navigation
   useEffect(() => {
-    if (!router.isReady) return;
+    if (!studioMode || !practiceKey) return;
+    setSelectedRoot(jamKeyToRootIndex(practiceKey));
+  }, [studioMode, practiceKey]);
+
+  useEffect(() => {
+    if (!studioMode || !practiceScaleId || !SCALES[practiceScaleId]) return;
+    setSelectedScale(practiceScaleId);
+  }, [studioMode, practiceScaleId]);
+
+  useEffect(() => {
+    if (!studioMode) return;
+    const saved = loadJamSession();
+    saveJamSession({
+      key: practiceKey ?? saved?.key ?? "C",
+      genre: saved?.genre ?? "rock",
+      bpm: saved?.bpm ?? 100,
+      preset: saved?.preset ?? 0,
+      playbackSpeed: saved?.playbackSpeed ?? 1,
+      loopLimit: saved?.loopLimit ?? 0,
+      countIn: saved?.countIn ?? true,
+      customChords: saved?.customChords,
+      scale: practiceScaleId ?? selectedScale,
+      lastTab: "scales",
+    });
+  }, [studioMode, practiceKey, practiceScaleId, selectedScale]);
+
+  // Apply ?scale= and ?root= URL params on mount / navigation (standalone /scales)
+  useEffect(() => {
+    if (studioMode || !router.isReady) return;
     const scaleParam = router.query.scale as string | undefined;
     const rootParam  = router.query.root  as string | undefined;
     if (scaleParam && SCALES[scaleParam]) setSelectedScale(scaleParam);
@@ -103,7 +142,27 @@ export default function ScaleFretboard() {
       const rootIdx = parseInt(rootParam, 10);
       if (!isNaN(rootIdx) && rootIdx >= 0 && rootIdx < ROOT_NOTES.length) setSelectedRoot(rootIdx);
     }
-  }, [router.isReady, router.query.scale, router.query.root]);
+  }, [studioMode, router.isReady, router.query.scale, router.query.root]);
+
+  const handleRootSelect = (idx: number) => {
+    setSelectedRoot(idx);
+    onPracticeKeyChange?.(rootIndexToJamKey(idx));
+  };
+
+  const handleScaleSelect = (id: string) => {
+    setSelectedScale(id);
+    onPracticeScaleChange?.(id);
+  };
+
+  const JamCta = onOpenJam ? (
+    <button
+      type="button"
+      onClick={onOpenJam}
+      className="flex items-center justify-center gap-2 px-4 py-3 rounded-full font-Space-Grotesk font-bold text-[13px] border border-[#1BD79E]/40 text-[#1BD79E] bg-[#1BD79E]/5 hover:bg-[#1BD79E]/10 transition-all"
+    >
+      Jam with backing track →
+    </button>
+  ) : null;
 
   const { isListening, startListening, stopListening, detectedMidi, detectedNote } = usePitchDetection();
 
@@ -114,24 +173,9 @@ export default function ScaleFretboard() {
 
   useEffect(() => { initAudio(); }, []);
 
-  // Dynamically fit as many frets as the container can show without scrolling
   useEffect(() => {
-    const el = fretboardContainerRef.current;
-    if (!el) return;
-    const measure = () => {
-      const available = el.clientWidth - FRETBOARD_OVERHEAD_PX;
-      const frets = Math.min(MAX_FRETS, Math.max(MIN_FRETS, Math.floor(available / FRET_WIDTH_PX)));
-      setNumFrets(frets);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    setScaleNotes(getScaleNotesOnFretboard(selectedRoot, scale, numFrets));
-  }, [selectedScale, selectedRoot, scale, numFrets]);
+    setScaleNotes(getScaleNotesOnFretboard(selectedRoot, scale, NUM_FRETS));
+  }, [selectedScale, selectedRoot, scale]);
 
   const handleNoteClick = (note: ScaleNote) => {
     setPlayingNote(note.midiNote);
@@ -184,18 +228,18 @@ export default function ScaleFretboard() {
   };
 
   const getNoteAtPosition = (s: number, f: number) => scaleNotes.find(n => n.string === s && n.fret === f);
-  const hasFretMarker   = (f: number) => [3,5,7,9].includes(f);
-  const hasDoubleMark   = (f: number) => f === 12;
+  const hasFretMarker   = (f: number) => [3,5,7,9,15,17,19,21].includes(f);
+  const hasDoubleMark   = (f: number) => f === 12 || f === 24;
   const detectedInScale = detectedNote && scaleNotes.some(n => n.note === detectedNote);
 
   // ─────────────────────────────────────────────────────────────────────────
   // THE FRETBOARD
   // ─────────────────────────────────────────────────────────────────────────
   const STRING_NAMES = ["E", "B", "G", "D", "A", "E"]; // strings 1–6
-  const FRET_COLS    = Array.from({ length: numFrets }, (_, i) => i + 1);
+  const FRET_COLS    = Array.from({ length: NUM_FRETS }, (_, i) => i + 1);
 
   const Fretboard = (
-    <div className="overflow-x-auto w-full" ref={fretboardContainerRef}>
+    <div className="overflow-x-auto w-full">
       <div className="flex" style={{ minWidth: "max-content" }}>
 
         {/* ── String name labels (left gutter) ── */}
@@ -253,7 +297,7 @@ export default function ScaleFretboard() {
           <div className="h-[199px] md:h-[279px] w-[6px] md:w-[8px] rounded-sm" style={{ background: "#e8e8e8" }} />
         </div>
 
-        {/* ── Fret columns 1–12 ── */}
+        {/* ── Fret columns 1–24 ── */}
         {FRET_COLS.map(fretNum => (
           <div key={fretNum} className="flex flex-col items-center">
             {/* Fret number label */}
@@ -317,19 +361,23 @@ export default function ScaleFretboard() {
         <div className="flex gap-3">
           <div className="flex-1">
             <label className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px] block mb-1">Root</label>
-            <select value={selectedRoot} onChange={e => setSelectedRoot(Number(e.target.value))}
-              className="w-full bg-[#131313] border border-white/5 rounded-xl px-4 py-3 font-Space-Grotesk font-bold text-white text-[15px] focus:outline-none appearance-none">
+            <select value={selectedRoot} onChange={e => handleRootSelect(Number(e.target.value))}
+              disabled={studioMode}
+              className="w-full bg-[#131313] border border-white/5 rounded-xl px-4 py-3 font-Space-Grotesk font-bold text-white text-[15px] focus:outline-none appearance-none disabled:opacity-60">
               {ROOT_NOTES.map((r, idx) => <option key={r.name} value={idx}>{r.name}</option>)}
             </select>
           </div>
           <div className="flex-[2]">
             <label className="font-Inter text-[11px] text-[#adaaaa] uppercase tracking-[1.2px] block mb-1">Scale</label>
-            <select value={selectedScale} onChange={e => setSelectedScale(e.target.value)}
-              className="w-full bg-[#131313] border border-white/5 rounded-xl px-4 py-3 font-Space-Grotesk font-bold text-white text-[15px] focus:outline-none appearance-none">
+            <select value={selectedScale} onChange={e => handleScaleSelect(e.target.value)}
+              disabled={studioMode}
+              className="w-full bg-[#131313] border border-white/5 rounded-xl px-4 py-3 font-Space-Grotesk font-bold text-white text-[15px] focus:outline-none appearance-none disabled:opacity-60">
               {Object.entries(SCALES).map(([key, s]) => <option key={key} value={key}>{s.name}</option>)}
             </select>
           </div>
         </div>
+
+        {JamCta}
 
         {/* Display toggle */}
         <div className="flex gap-1 bg-[#131313] rounded-full p-1">
@@ -463,7 +511,9 @@ export default function ScaleFretboard() {
       {/* ── Session header ── */}
       <div className="flex items-center gap-8 flex-shrink-0">
         <div className="flex-1">
-          <p className="font-Inter text-[11px] text-gray-500 tracking-[2.5px] uppercase mb-1">CURRENT SESSION</p>
+          <p className="font-Inter text-[11px] text-gray-500 tracking-[2.5px] uppercase mb-1">
+            {studioMode ? "PRACTICE STUDIO · SCALES" : "CURRENT SESSION"}
+          </p>
           <h2 className="font-Space-Grotesk font-bold text-[40px] leading-none tracking-[-2px] text-white">
             {rootNote.name.split("/")[0]} <span className="text-[#1BD79E]">{scale.name}</span>
           </h2>
@@ -487,18 +537,21 @@ export default function ScaleFretboard() {
       <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
         <div className="flex items-center gap-2 bg-[#111] border border-[#222] rounded-xl px-3 py-2">
           <span className="font-Inter text-[10px] text-gray-500 uppercase tracking-wider">Root</span>
-          <select value={selectedRoot} onChange={e => setSelectedRoot(Number(e.target.value))}
-            className="bg-transparent font-Space-Grotesk font-bold text-white text-[14px] focus:outline-none appearance-none cursor-pointer pr-2">
+          <select value={selectedRoot} onChange={e => handleRootSelect(Number(e.target.value))}
+            disabled={studioMode}
+            className="bg-transparent font-Space-Grotesk font-bold text-white text-[14px] focus:outline-none appearance-none cursor-pointer pr-2 disabled:opacity-60">
             {ROOT_NOTES.map((r, idx) => <option key={r.name} value={idx}>{r.name}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2 bg-[#111] border border-[#222] rounded-xl px-3 py-2">
           <span className="font-Inter text-[10px] text-gray-500 uppercase tracking-wider">Scale</span>
-          <select value={selectedScale} onChange={e => setSelectedScale(e.target.value)}
-            className="bg-transparent font-Space-Grotesk font-bold text-white text-[14px] focus:outline-none appearance-none cursor-pointer pr-2">
+          <select value={selectedScale} onChange={e => handleScaleSelect(e.target.value)}
+            disabled={studioMode}
+            className="bg-transparent font-Space-Grotesk font-bold text-white text-[14px] focus:outline-none appearance-none cursor-pointer pr-2 disabled:opacity-60">
             {Object.entries(SCALES).map(([key, s]) => <option key={key} value={key}>{s.name}</option>)}
           </select>
         </div>
+        {JamCta}
         <div className="flex gap-1 bg-[#111] border border-[#222] rounded-xl p-1">
           {[{label:"Notes",val:false},{label:"Intervals",val:true}].map(({label,val}) => (
             <button key={label} onClick={() => setShowIntervals(val)}

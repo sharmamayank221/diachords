@@ -1,7 +1,6 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import SEO, { createWebPageSchema, createHowToSchema } from "@/components/SEO";
-import AppShell from "@/components/Navigation/AppShell";
 
 const EarTraining = dynamic(
   () => import("@/components/EarTraining/EarTraining"),
@@ -53,8 +52,5 @@ function EarTrainingPage() {
   );
 }
 
-EarTrainingPage.getLayout = (page: React.ReactElement) => (
-  <AppShell mobileTitle="Ear Training">{page}</AppShell>
-);
 export default EarTrainingPage;
 

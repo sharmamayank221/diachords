@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import AppShell from "@/components/Navigation/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import chordsData from "@/chrods.json";
@@ -32,17 +31,21 @@ function matchesFilter(suffix: string, filter: Filter) {
   return true;
 }
 
+// Chord page ids spell "#" as "sharp" (c#minor → csharpminor). Favourites saved before that
+// change still hold the old form, so normalise when reading.
+const normalizeChordId = (id: string) => id.toLowerCase().replace(/#/g, "sharp");
+
 // Build chord lookup map: chord_id -> first position data
 const chordMap: Record<string, { frets: number[]; fingers: number[]; baseFret: number }> = {};
 Object.values((chordsData as any).chords).forEach((chords: any) => {
   chords.forEach((ch: any) => {
-    const id = (ch.key + ch.suffix).toLowerCase().replace("/", "");
+    const id = normalizeChordId((ch.key + ch.suffix).replace("/", ""));
     if (ch.positions?.[0]) chordMap[id] = ch.positions[0];
   });
 });
 
 function RealFretboard({ chordId }: { chordId: string }) {
-  const pos = chordMap[chordId];
+  const pos = chordMap[normalizeChordId(chordId)];
   if (!pos) return null;
 
   const { frets, fingers, baseFret } = pos;
@@ -146,7 +149,7 @@ function ChordCard({ fav, onRemove }: { fav: Favorite; onRemove: (id: string) =>
   }
 
   return (
-    <Link href={`/chords/${fav.chord_id}`}
+    <Link href={`/chords/${normalizeChordId(fav.chord_id)}`}
       className="group relative flex flex-col p-6 rounded-xl border border-transparent hover:border-white/10 transition-all duration-300"
       style={{ background: "#131313" }}
     >
@@ -270,7 +273,7 @@ export default function LibraryPage() {
           </div>
           <h2 className="font-Space-Grotesk font-bold text-white text-[28px] mb-2">No saved chords yet</h2>
           <p className="font-Manrope text-[#52525b] text-[14px] mb-8">Hit &quot;Save Chord&quot; on any chord page to add it here.</p>
-          <Link href="/chords/cmajor"
+          <Link href="/chords"
             className="px-6 py-3 rounded-full font-Space-Grotesk font-bold text-[13px] transition-all hover:opacity-90"
             style={{ background: "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)", color: "#006644" }}
           >
@@ -307,7 +310,7 @@ export default function LibraryPage() {
                     </p>
                   </div>
                   <div className="mt-8 flex gap-3 flex-wrap">
-                    <Link href="/chords/cmajor"
+                    <Link href="/chords"
                       className="px-6 py-2.5 rounded-full font-Space-Grotesk font-bold text-[13px]"
                       style={{ background: "linear-gradient(135deg, #aeffd4 0%, #10feb0 100%)", color: "#006644" }}>
                       Explore Guide
@@ -336,7 +339,7 @@ export default function LibraryPage() {
                 <h4 className="font-Space-Grotesk font-bold text-white text-[18px]">Can&apos;t find a chord?</h4>
                 <p className="font-Manrope text-[#52525b] text-[13px] mt-0.5">Browse the full chord library to discover more.</p>
               </div>
-              <Link href="/chords/cmajor"
+              <Link href="/chords"
                 className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
                 style={{ background: "#1a1a1a", color: "#1BD79E" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -356,6 +359,3 @@ export default function LibraryPage() {
   );
 }
 
-LibraryPage.getLayout = (page: React.ReactElement) => (
-  <AppShell mobileTitle="My Library">{page}</AppShell>
-);

@@ -1,13 +1,12 @@
 import React from "react";
 import SEO, { createWebPageSchema } from "@/components/SEO";
-import BackingTrackGenerator from "@/components/BackingTrack/BackingTrackGenerator";
-import AppShell from "@/components/Navigation/AppShell";
+import PracticeStudio from "@/components/Practice/PracticeStudio";
 
 function JamPage() {
   const jsonLd = createWebPageSchema(
     "AI Backing Track Generator",
     "Generate custom backing tracks to practice guitar",
-    "/jam"
+    "/jam",
   );
 
   return (
@@ -28,14 +27,11 @@ function JamPage() {
         ]}
         jsonLd={jsonLd}
       />
-      <main className="bg-gradient-to-b from-[#0a0a0a] to-[#111] py-8">
-        <BackingTrackGenerator />
+      <main className="bg-gradient-to-b from-[#0a0a0a] to-[#111] min-h-screen">
+        <PracticeStudio defaultTab="jam" />
       </main>
     </>
   );
 }
 
-JamPage.getLayout = (page: React.ReactElement) => (
-  <AppShell mobileTitle="Jam Session">{page}</AppShell>
-);
 export default JamPage;

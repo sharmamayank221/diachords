@@ -1,70 +1,42 @@
-import { GetServerSideProps } from "next";
+import type { GetServerSideProps } from "next";
 import getIDs from "@/helpers/getIDs";
 
 const SITE_URL = "https://chordsofguitar.com";
 
-function generateSiteMap(chordIds: string[]) {
-  const currentDate = new Date().toISOString().split("T")[0];
+// Most-wanted pages first, with higher priority, so crawlers find the tools quickly
+const STATIC_PAGES: { path: string; priority: number; changefreq: string }[] = [
+  { path: "/", priority: 1.0, changefreq: "weekly" },
+  { path: "/chords", priority: 0.9, changefreq: "weekly" },
+  { path: "/tuner", priority: 0.9, changefreq: "monthly" },
+  { path: "/metronome", priority: 0.9, changefreq: "monthly" },
+  { path: "/scales", priority: 0.8, changefreq: "monthly" },
+  { path: "/practice", priority: 0.8, changefreq: "monthly" },
+  { path: "/jam", priority: 0.8, changefreq: "weekly" },
+  { path: "/ear-training", priority: 0.8, changefreq: "monthly" },
+  { path: "/chord-recognition", priority: 0.8, changefreq: "monthly" },
+];
 
-  // Static pages
-  const staticPages = [
-    { url: "/", priority: "1.0", changefreq: "weekly" },
-    { url: "/scales", priority: "0.9", changefreq: "weekly" },
-    { url: "/tuner", priority: "0.9", changefreq: "monthly" },
-    { url: "/chord-recognition", priority: "0.9", changefreq: "monthly" },
-    { url: "/metronome", priority: "0.9", changefreq: "monthly" },
-    { url: "/ear-training", priority: "0.9", changefreq: "monthly" },
-    { url: "/jam", priority: "0.9", changefreq: "weekly" },
+function buildSitemap(chordIds: string[]): string {
+  const urls = [
+    ...STATIC_PAGES.map(
+      (p) => `<url><loc>${SITE_URL}${p.path}</loc><changefreq>${p.changefreq}</changefreq><priority>${p.priority.toFixed(1)}</priority></url>`
+    ),
+    ...chordIds.map(
+      (id) => `<url><loc>${SITE_URL}/chords/${encodeURIComponent(id)}</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`
+    ),
   ];
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-  ${staticPages
-    .map(
-      (page) => `
-  <url>
-    <loc>${SITE_URL}${page.url}</loc>
-    <lastmod>${currentDate}</lastmod>
-    <changefreq>${page.changefreq}</changefreq>
-    <priority>${page.priority}</priority>
-  </url>`
-    )
-    .join("")}
-  ${chordIds
-    .map(
-      (id) => `
-  <url>
-    <loc>${SITE_URL}/chords/${id}</loc>
-    <lastmod>${currentDate}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>`
-    )
-    .join("")}
-</urlset>`;
-}
-
-function SiteMap() {
-  // Empty component - getServerSideProps handles the response
-  return null;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>`;
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
-  // Get all chord IDs
-  const chordIds = await getIDs();
-  const sitemap = generateSiteMap(chordIds);
-
-  res.setHeader("Content-Type", "text/xml");
+  const ids: string[] = await getIDs();
+  res.setHeader("Content-Type", "application/xml");
   res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate");
-  res.write(sitemap);
+  res.write(buildSitemap(ids));
   res.end();
-
-  return {
-    props: {},
-  };
+  return { props: {} };
 };
 
-export default SiteMap;
+export default function Sitemap() {
+  return null;
+}

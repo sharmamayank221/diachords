@@ -1,19 +1,13 @@
 import React from "react";
-import dynamic from "next/dynamic";
 import SEO, { createWebPageSchema, createHowToSchema } from "@/components/SEO";
-import AppShell from "@/components/Navigation/AppShell";
-
-const ScaleFretboard = dynamic(
-  () => import("@/components/Scale/ScaleFretboard"),
-  { ssr: false }
-);
+import PracticeStudio from "@/components/Practice/PracticeStudio";
 
 function ScalesPage() {
   const jsonLd = [
     createWebPageSchema(
       "Guitar Scale Explorer",
       "Learn and practice guitar scales with interactive fretboard",
-      "/scales"
+      "/scales",
     ),
     createHowToSchema(
       "How to Learn Guitar Scales",
@@ -23,8 +17,8 @@ function ScalesPage() {
         "Choose a scale type (Major, Minor, Pentatonic, Blues, etc.)",
         "View the scale pattern on the fretboard",
         "Click on notes to hear them",
-        "Practice chord progressions for each scale",
-      ]
+        "Switch to backing tracks to jam in the same key",
+      ],
     ),
   ];
 
@@ -32,7 +26,7 @@ function ScalesPage() {
     <>
       <SEO
         title="Guitar Scale Explorer - Learn Major, Minor, Pentatonic Scales"
-        description="Master guitar scales with our interactive fretboard. Learn major, minor, pentatonic, blues, and modal scales. See patterns, hear notes, and practice chord progressions."
+        description="Master guitar scales with our interactive fretboard. Learn major, minor, pentatonic, blues, and modal scales. Pair with AI backing tracks in the Practice Studio."
         canonical="/scales"
         keywords={[
           "guitar scales",
@@ -46,12 +40,11 @@ function ScalesPage() {
         ]}
         jsonLd={jsonLd}
       />
-      <ScaleFretboard />
+      <main className="bg-gradient-to-b from-[#0a0a0a] to-[#111] min-h-screen">
+        <PracticeStudio defaultTab="scales" />
+      </main>
     </>
   );
 }
 
-ScalesPage.getLayout = (page: React.ReactElement) => (
-  <AppShell mobileTitle="Scale Explorer">{page}</AppShell>
-);
 export default ScalesPage;

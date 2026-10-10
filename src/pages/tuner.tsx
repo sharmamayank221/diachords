@@ -1,7 +1,9 @@
 import React from "react";
 import SEO, { createWebPageSchema, createHowToSchema } from "@/components/SEO";
-import Tuner from "@/components/Tuner/Tuner";
-import AppShell from "@/components/Navigation/AppShell";
+import dynamic from "next/dynamic";
+
+// Microphone + Tone.js only exist in the browser
+const Tuner = dynamic(() => import("@/components/Tuner/Tuner"), { ssr: false });
 
 function TunerPage() {
   const jsonLd = [
@@ -41,12 +43,15 @@ function TunerPage() {
         ]}
         jsonLd={jsonLd}
       />
-      <Tuner />
+      <div className="max-w-6xl mx-auto px-4 md:px-6 pt-6 pb-12">
+        <h1 className="font-Lora text-3xl md:text-4xl text-white text-center">Guitar tuner</h1>
+        <p className="font-Inter text-sm text-gray-400 mt-1 mb-5 text-center">
+          Pick a tuning, press Start and play a string. Works with acoustic and electric guitars.
+        </p>
+        <Tuner />
+      </div>
     </>
   );
 }
 
-TunerPage.getLayout = (page: React.ReactElement) => (
-  <AppShell mobileTitle="Guitar Tuner">{page}</AppShell>
-);
 export default TunerPage;

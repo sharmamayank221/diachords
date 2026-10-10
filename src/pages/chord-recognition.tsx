@@ -1,7 +1,6 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import Head from "next/head";
-import AppShell from "@/components/Navigation/AppShell";
 
 const ChordRecognition = dynamic(
   () => import("@/components/ChordRecognition/ChordRecognition"),
@@ -26,8 +25,5 @@ function ChordRecognitionPage() {
   );
 }
 
-ChordRecognitionPage.getLayout = (page: React.ReactElement) => (
-  <AppShell mobileTitle="Chord Detect">{page}</AppShell>
-);
 export default ChordRecognitionPage;
 
