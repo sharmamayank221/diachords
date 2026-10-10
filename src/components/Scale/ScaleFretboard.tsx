@@ -4,6 +4,7 @@ import { SCALES, GUITAR_STRINGS, getIntervalName, getChordMidiNotes } from "@/da
 import { initAudio, playNote, playProgressionWithDrums, setProgressionBpm, ProgressionChord } from "@/utils/audioUtils";
 import { jamKeyToRootIndex } from "@/utils/practiceKeySync";
 import { spellScale } from "@/helpers/scaleSpelling";
+import { getScalePositions, type PositionSystem } from "@/helpers/scalePositions";
 import { findChord } from "@/helpers/chordSearch";
 import { getChordStringNotes } from "@/helpers/chordNotes";
 import { useNoteListener, LISTEN_ERROR_TEXT } from "@/hooks/useNoteListener";
@@ -89,6 +90,7 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
 
   const [showIntervals, setShowIntervals] = useState(false);
   const [position, setPosition] = useState<number | null>(null); // null = all notes
+  const [system, setSystem] = useState<PositionSystem>("positions");
   const [playingNote, setPlayingNote] = useState<number | null>(null);
   const [scalePlaying, setScalePlaying] = useState(false);
   const [progIdx, setProgIdx] = useState(0);
@@ -130,20 +132,8 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
     return m;
   }, [notes]);
 
-  // Positions: a 5-fret window starting just below each scale note on the low E string,
-  // beginning at the root — the familiar "boxes" (5 for pentatonic, 7 for seven-note scales).
-  const positions = useMemo(() => {
-    const lowE = 40;
-    const rootFret = (rootPc - (lowE % 12) + 12) % 12;
-    const starts = notes
-      .filter((n) => n.string === 6 && n.fret >= rootFret && n.fret < rootFret + 12)
-      .map((n) => n.fret)
-      .sort((a, b) => a - b);
-    return starts.map((f) => {
-      const from = Math.max(0, f - 1);
-      return { from, to: from + 4 };
-    });
-  }, [notes, rootPc]);
+  // Positions (one window per scale note on low E) or the five CAGED shapes — see scalePositions.ts
+  const positions = useMemo(() => getScalePositions(rootPc, scale.intervals, system), [rootPc, scale, system]);
   const win = position !== null ? positions[position] : null;
   const inWindow = (fret: number) => !win || (fret >= win.from && fret <= win.to);
 
@@ -152,6 +142,7 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
     setPosition(null);
     setProgIdx(0);
   }, [rootPc, scaleId]);
+  useEffect(() => setPosition(null), [system]);
 
   // bring the chosen position (or the first root) into view — matters most on phones
   useEffect(() => {
@@ -199,7 +190,7 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
     const sequence = [...run, ...run.slice(0, -1).reverse()];
     const id = ++scaleRun.current;
     setScalePlaying(true);
-    track("scale_play", { key: spelled.rootName, scale: scaleId, position: position === null ? "all" : position + 1 });
+    track("scale_play", { key: spelled.rootName, scale: scaleId, system, position: position === null ? "all" : positions[position].label });
     for (const midi of sequence) {
       if (scaleRun.current !== id) return;
       playNote(midi);
@@ -365,8 +356,18 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
           ))}
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar" role="group" aria-label="Scale position">
-          <span className="font-Inter text-xs uppercase tracking-wider text-gray-500 mr-1 shrink-0">Position</span>
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar" role="group" aria-label="Scale shapes">
+          <label htmlFor="shape-system" className="sr-only">Shape system</label>
+          <select
+            id="shape-system"
+            value={system}
+            onChange={(e) => setSystem(e.target.value as PositionSystem)}
+            title="How the neck is divided into shapes"
+            className="shrink-0 h-8 rounded-full bg-[#161616] border border-white/10 pl-3 pr-7 font-Inter text-sm text-gray-200 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] cursor-pointer"
+          >
+            <option value="positions">Positions</option>
+            <option value="caged">CAGED</option>
+          </select>
           {[null, ...positions.map((_, i) => i)].map((p) => {
             const active = position === p;
             return (
@@ -375,10 +376,15 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
                 type="button"
                 onClick={() => setPosition(p)}
                 aria-pressed={active}
-                title={p === null ? "Show every note" : `Frets ${positions[p].from}–${positions[p].to}`}
+                title={
+                  p === null
+                    ? "Show every note"
+                    : `${system === "caged" ? `${positions[p].label} shape` : `Position ${positions[p].label}`}, frets ${positions[p].from}–${positions[p].to}`
+                }
+                aria-label={p === null ? "All notes" : system === "caged" ? `${positions[p].label} shape` : `Position ${positions[p].label}`}
                 className={`shrink-0 h-8 min-w-[32px] px-2.5 rounded-full font-Inter text-sm transition-colors ${active ? "bg-[#1BD79E] text-black font-semibold" : "bg-[#161616] text-gray-300 hover:bg-[#222]"}`}
               >
-                {p === null ? "All" : p + 1}
+                {p === null ? "All" : positions[p].label}
               </button>
             );
           })}
