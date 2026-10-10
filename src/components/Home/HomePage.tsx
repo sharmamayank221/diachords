@@ -9,6 +9,35 @@ import { initAudio } from "@/utils/audioUtils";
 import { playProgression, strum } from "@/utils/strum";
 
 const HERO_CHORDS = ["G", "C", "D", "Em", "Am", "F"];
+const TOOLS = [
+  {
+    href: "/tuner",
+    title: "Guitar tuner",
+    desc: "Play a string and watch the needle. Uses your microphone, nothing to install.",
+    cta: "Tune up",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+        <path d="M4 16a8 8 0 1 1 16 0" />
+        <path d="M12 16l4-6" />
+        <circle cx="12" cy="16" r="1.4" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    href: "/metronome",
+    title: "Metronome",
+    desc: "40–240 BPM, 4/4, 3/4 and 6/8, tap tempo and accented downbeats.",
+    cta: "Keep time",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M9 3h6l4 18H5L9 3z" />
+        <path d="M12 15l5-8" />
+        <path d="M7.5 15h9" />
+      </svg>
+    ),
+  },
+];
+
 const POPULAR_CHORDS = ["C", "G", "D", "A", "E", "F", "Am", "Em", "Dm", "G7", "C7", "Cmaj7"];
 
 const JAM_PRESETS = [
@@ -257,6 +286,12 @@ export default function HomePage() {
                 Start a backing track
               </Link>
             </div>
+            <p className="mt-5 font-Inter text-sm text-gray-500">
+              Free tools:{" "}
+              <Link href="/tuner" className="text-gray-300 hover:text-[#1BD79E] underline-offset-4 hover:underline">Guitar tuner</Link>
+              {" · "}
+              <Link href="/metronome" className="text-gray-300 hover:text-[#1BD79E] underline-offset-4 hover:underline">Metronome</Link>
+            </p>
           </div>
 
           <HeroChordCard />
@@ -282,6 +317,34 @@ export default function HomePage() {
               >
                 <ChordDiagram position={c.positions[0]} size={92} showFingers={false} title={`${c.display} chord`} />
                 <span className="font-Lora text-lg text-white group-hover:text-[#1BD79E] transition-colors mt-1">{c.display}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Practice tools ── */}
+        <section className="mb-16 md:mb-24" aria-labelledby="tools-heading">
+          <div className="mb-5">
+            <h2 id="tools-heading" className="font-Lora text-2xl md:text-3xl">Tune up &amp; keep time</h2>
+            <p className="font-Inter text-sm text-gray-400 mt-1">Free practice tools that work right in your browser.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {TOOLS.map((tool) => (
+              <Link
+                key={tool.href}
+                href={tool.href}
+                className="group rounded-2xl bg-[#111] border border-white/5 hover:border-[#1BD79E]/40 p-5 md:p-6 flex items-start gap-4 transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+              >
+                <span className="h-12 w-12 shrink-0 rounded-xl bg-[#1BD79E]/10 text-[#1BD79E] flex items-center justify-center">
+                  {tool.icon}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-Lora text-xl text-white">{tool.title}</span>
+                  <span className="block font-Inter text-sm text-gray-400 mt-1 leading-relaxed">{tool.desc}</span>
+                  <span className="inline-block mt-3 font-Inter text-sm font-semibold text-[#1BD79E] group-hover:underline underline-offset-4">
+                    {tool.cta} →
+                  </span>
+                </span>
               </Link>
             ))}
           </div>

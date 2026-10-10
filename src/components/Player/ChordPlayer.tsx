@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
 import { initAudio, playNote } from "@/utils/audioUtils";
 import type { ChordStringNote } from "@/helpers/chordNotes";
 
@@ -184,7 +185,10 @@ export default function ChordPlayer({
       <p className="hidden md:block mt-4 font-Inter text-[11px] text-gray-600">
         <kbd className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-400">Space</kbd> strum ·{" "}
         <kbd className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-400">1</kbd>–
-        <kbd className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-400">6</kbd> play a string · tap any dot on the fretboard
+        <kbd className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-400">6</kbd> play a string · tap any dot on the fretboard ·{" "}
+        <Link href="/tuner" className="text-gray-400 hover:text-[#1BD79E] underline-offset-2 hover:underline">
+          Sounds off? Tune up first
+        </Link>
       </p>
     </section>
   );

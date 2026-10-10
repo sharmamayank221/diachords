@@ -10,6 +10,8 @@ const NAV = [
   { href: "/chords", label: "Chords", match: (p: string) => p.startsWith("/chords") },
   { href: "/scales", label: "Scales", match: (p: string) => p.startsWith("/scales") },
   { href: "/practice", label: "Practice", match: (p: string) => p.startsWith("/practice") || p.startsWith("/jam") },
+  { href: "/tuner", label: "Tuner", match: (p: string) => p.startsWith("/tuner") },
+  { href: "/metronome", label: "Metronome", match: (p: string) => p.startsWith("/metronome") },
 ];
 
 export default function Header() {
@@ -47,8 +49,8 @@ export default function Header() {
         <Link href="/" aria-label="Chords of Guitar home" className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-[#1BD79E]">
           <Image src="/Logo.svg" alt="" width={40} height={40} />
         </Link>
-        <nav aria-label="Main" className="hidden md:flex items-center gap-1">
-          {navLinks("px-3.5 py-2")}
+        <nav aria-label="Main" className="hidden md:flex items-center gap-0.5 lg:gap-1">
+          {navLinks("px-2.5 lg:px-3.5 py-2")}
         </nav>
         <div className="flex-1 min-w-0">
           <Searchbar />

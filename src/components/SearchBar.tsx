@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import {
   CATEGORY_ORDER,
   searchChords,
-  type ChordSearchItem,
+  searchTools,
 } from "@/helpers/chordSearch";
 
 const EXAMPLES = ["Am", "G7", "F#m7", "Cmaj7", "D/F#"];
@@ -18,6 +18,7 @@ export default function Searchbar() {
   const listRef = React.useRef<HTMLDivElement>(null);
 
   const result = React.useMemo(() => searchChords(query), [query]);
+  const tools = React.useMemo(() => searchTools(query), [query]);
 
   // Visual groups; flat order (used for keyboard nav) follows the rendered order
   const groups = React.useMemo(() => {
@@ -27,7 +28,11 @@ export default function Searchbar() {
       items: result.items.filter((i) => i.category === cat),
     })).filter((g) => g.items.length > 0);
   }, [result]);
-  const flatItems = React.useMemo(() => groups.flatMap((g) => g.items), [groups]);
+  // tools render first, so they come first in keyboard order too
+  const flatItems = React.useMemo<{ href: string }[]>(
+    () => [...tools, ...groups.flatMap((g) => g.items)],
+    [tools, groups]
+  );
 
   React.useEffect(() => setActiveIndex(0), [query]);
 
@@ -66,7 +71,7 @@ export default function Searchbar() {
     inputRef.current?.blur();
   };
 
-  const go = (item: ChordSearchItem) => {
+  const go = (item: { href: string }) => {
     setQuery("");
     close();
     if (router.asPath !== item.href) router.push(item.href);
@@ -133,10 +138,10 @@ export default function Searchbar() {
           aria-autocomplete="list"
           autoComplete="off"
           spellCheck={false}
-          className={`h-[48px] md:h-[60px] w-full rounded-full border border-transparent bg-[#2D2D2D] pl-11 pr-20 font-Lora text-base md:text-lg text-white placeholder:text-gray-500 outline-none transition-colors focus:border-[#1BD79E]/60 ${
+          className={`h-[48px] md:h-[60px] w-full rounded-full border border-transparent bg-[#2D2D2D] pl-11 pr-10 md:pr-20 font-Lora text-base md:text-lg text-white placeholder:text-gray-500 outline-none transition-colors focus:border-[#1BD79E]/60 ${
             open ? "bg-[#1f1f1f]" : ""
           }`}
-          placeholder="Search chords"
+          placeholder="Search chords & tools"
           value={query}
           onChange={(e) => {
             setQuery(e.currentTarget.value);
@@ -170,10 +175,10 @@ export default function Searchbar() {
             id="chord-search-results"
             ref={listRef}
             role="listbox"
-            aria-label="Chord results"
+            aria-label="Search results"
             className="fixed inset-x-4 top-20 md:absolute md:inset-x-0 md:top-full mt-3 max-h-[70vh] overflow-y-auto rounded-[20px] border border-[#333] bg-[#1a1a1a] p-4 md:p-5 shadow-2xl shadow-black/60"
           >
-            {result.mode === "none" ? (
+            {result.mode === "none" && tools.length === 0 ? (
               <div className="py-6 text-center">
                 <p className="font-Lora text-white text-lg">
                   No chord matches &ldquo;{query.trim()}&rdquo;
@@ -197,11 +202,45 @@ export default function Searchbar() {
               </div>
             ) : (
               <>
+                {tools.length > 0 && (
+                  <div className={result.mode === "none" ? "" : "mb-5"}>
+                    <p className="mb-2 font-Inter text-[11px] font-semibold uppercase tracking-wider text-gray-400">Tools</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {tools.map((tool) => {
+                        runningIndex += 1;
+                        const index = runningIndex;
+                        const isActive = index === activeIndex;
+                        return (
+                          <button
+                            key={tool.href}
+                            id={`chord-opt-${index}`}
+                            data-index={index}
+                            type="button"
+                            role="option"
+                            aria-selected={isActive}
+                            onMouseEnter={() => setActiveIndex(index)}
+                            onClick={() => go(tool)}
+                            className={`rounded-xl px-4 py-2.5 text-left transition-colors ${
+                              isActive ? "bg-[#1BD79E] text-black" : "bg-[#262626] text-white hover:bg-[#303030]"
+                            }`}
+                          >
+                            <span className="block font-Lora text-[15px]">{tool.display}</span>
+                            <span className={`block font-Inter text-xs ${isActive ? "text-black/70" : "text-gray-400"}`}>
+                              {tool.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {result.mode !== "none" && (
                 <p className="mb-3 font-Inter text-xs uppercase tracking-wider text-gray-500">
                   {result.mode === "browse"
                     ? `Chords in ${result.rootLabel} · ${result.items.length}`
-                    : `${result.items.length} match${result.items.length === 1 ? "" : "es"}`}
+                    : `${result.items.length} chord match${result.items.length === 1 ? "" : "es"}`}
                 </p>
+                )}
                 <div className="flex flex-col gap-4">
                   {groups.map((group) => (
                     <div key={group.title ?? "matches"}>

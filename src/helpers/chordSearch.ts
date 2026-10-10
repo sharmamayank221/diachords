@@ -151,3 +151,26 @@ export function searchChords(input: string, limit = 30): SearchResult {
 export function findChord(name: string): ChordSearchItem | undefined {
   return searchChords(name, 1).items[0];
 }
+
+// Non-chord pages people look for from the search box ("tuner", "bpm", "backing track"…)
+export interface ToolSearchItem {
+  href: string;
+  display: string;
+  description: string;
+  keywords: string[];
+}
+
+export const TOOL_INDEX: ToolSearchItem[] = [
+  { href: "/tuner", display: "Guitar tuner", description: "Tune with your microphone", keywords: ["tuner", "tune", "tuning", "guitar tuner", "pitch", "standard tuning"] },
+  { href: "/metronome", display: "Metronome", description: "Tempo, time signatures, tap tempo", keywords: ["metronome", "tempo", "bpm", "tap tempo", "click", "beat", "timing"] },
+  { href: "/scales", display: "Scale explorer", description: "Scale patterns on the fretboard", keywords: ["scales", "scale", "modes", "pentatonic", "blues scale", "fretboard"] },
+  { href: "/practice", display: "Backing tracks", description: "Jam with drums and bass", keywords: ["backing track", "backing", "jam", "practice", "drums", "bass", "play along"] },
+  { href: "/chords", display: "Chord library", description: "Every chord in every key", keywords: ["chords", "chord library", "library", "all chords"] },
+];
+
+export function searchTools(input: string): ToolSearchItem[] {
+  const q = input.trim().toLowerCase();
+  // two letters minimum so single-note chord searches ("a", "b") stay chord-only
+  if (q.length < 2) return [];
+  return TOOL_INDEX.filter((t) => t.keywords.some((k) => k.startsWith(q) || (q.length >= 4 && k.includes(q))));
+}
