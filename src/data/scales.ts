@@ -363,7 +363,10 @@ export function getProgressionChords(
     
     const chordName = `${chordRoot}${suffix}`;
     // Create search-friendly ID (lowercase, no special chars)
-    const searchId = `${chordRoot.toLowerCase().replace("#", "sharp")}${searchSuffix}`;
+    // chord pages only exist for C#/F# as sharps; the other black keys are stored as flats
+    const pageRoot = ({ "D#": "eb", "G#": "ab", "A#": "bb" } as Record<string, string>)[chordRoot]
+      ?? chordRoot.toLowerCase().replace("#", "sharp");
+    const searchId = `${pageRoot}${searchSuffix}`;
     
     // Generate MIDI notes for the chord
     const midiNotes = getChordMidiNotes(chordRootSemitone, quality);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import {
@@ -33,10 +33,7 @@ interface ScaleNote {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STRING_HEIGHTS = ["1px", "2px", "3px", "3.5px", "4px", "5px"];
-const FRET_WIDTH_PX = 96; // width of each fret column
-const FRETBOARD_OVERHEAD_PX = 24 + 50 + 8 + 40; // string labels + open zone + nut + padding
-const MAX_FRETS = 24;
-const MIN_FRETS = 12;
+const NUM_FRETS = 24;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FretboardNote — DO NOT MODIFY (user-approved look)
@@ -107,8 +104,6 @@ export default function ScaleFretboard({
   const [bpm, setBpm]                     = useState<number>(90);
   const [loopCount, setLoopCount]         = useState<number>(1);
   const [stopProgression, setStopProgression] = useState<(() => void) | null>(null);
-  const [numFrets, setNumFrets]           = useState<number>(MIN_FRETS);
-  const fretboardContainerRef             = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!studioMode || !practiceKey) return;
@@ -178,24 +173,9 @@ export default function ScaleFretboard({
 
   useEffect(() => { initAudio(); }, []);
 
-  // Dynamically fit as many frets as the container can show without scrolling
   useEffect(() => {
-    const el = fretboardContainerRef.current;
-    if (!el) return;
-    const measure = () => {
-      const available = el.clientWidth - FRETBOARD_OVERHEAD_PX;
-      const frets = Math.min(MAX_FRETS, Math.max(MIN_FRETS, Math.floor(available / FRET_WIDTH_PX)));
-      setNumFrets(frets);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    setScaleNotes(getScaleNotesOnFretboard(selectedRoot, scale, numFrets));
-  }, [selectedScale, selectedRoot, scale, numFrets]);
+    setScaleNotes(getScaleNotesOnFretboard(selectedRoot, scale, NUM_FRETS));
+  }, [selectedScale, selectedRoot, scale]);
 
   const handleNoteClick = (note: ScaleNote) => {
     setPlayingNote(note.midiNote);
@@ -248,18 +228,18 @@ export default function ScaleFretboard({
   };
 
   const getNoteAtPosition = (s: number, f: number) => scaleNotes.find(n => n.string === s && n.fret === f);
-  const hasFretMarker   = (f: number) => [3,5,7,9].includes(f);
-  const hasDoubleMark   = (f: number) => f === 12;
+  const hasFretMarker   = (f: number) => [3,5,7,9,15,17,19,21].includes(f);
+  const hasDoubleMark   = (f: number) => f === 12 || f === 24;
   const detectedInScale = detectedNote && scaleNotes.some(n => n.note === detectedNote);
 
   // ─────────────────────────────────────────────────────────────────────────
   // THE FRETBOARD
   // ─────────────────────────────────────────────────────────────────────────
   const STRING_NAMES = ["E", "B", "G", "D", "A", "E"]; // strings 1–6
-  const FRET_COLS    = Array.from({ length: numFrets }, (_, i) => i + 1);
+  const FRET_COLS    = Array.from({ length: NUM_FRETS }, (_, i) => i + 1);
 
   const Fretboard = (
-    <div className="overflow-x-auto w-full" ref={fretboardContainerRef}>
+    <div className="overflow-x-auto w-full">
       <div className="flex" style={{ minWidth: "max-content" }}>
 
         {/* ── String name labels (left gutter) ── */}
@@ -317,7 +297,7 @@ export default function ScaleFretboard({
           <div className="h-[199px] md:h-[279px] w-[6px] md:w-[8px] rounded-sm" style={{ background: "#e8e8e8" }} />
         </div>
 
-        {/* ── Fret columns 1–12 ── */}
+        {/* ── Fret columns 1–24 ── */}
         {FRET_COLS.map(fretNum => (
           <div key={fretNum} className="flex flex-col items-center">
             {/* Fret number label */}

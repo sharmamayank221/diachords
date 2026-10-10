@@ -3,7 +3,8 @@ import React from "react";
 import Image from "next/image";
 import Switch from "react-switch";
 import { A } from "@/types/chord.types";
-import AudioPlayer from "./Player/AudioPlayer";
+import ChordPlayer from "./Player/ChordPlayer";
+import { formatChordName, getChordStringNotes } from "@/helpers/chordNotes";
 import useGetStringNumAndFretNum from "@/helpers/getStringNumAndFretNum";
 
 interface IPositionsToBePlaced {
@@ -103,18 +104,15 @@ export default function Guitar({ data }: IGuitar) {
     }
   }, [data?.positions?.length, position]);
 
-  const [midiNotes, setMidiNotes] = React.useState<number[]>([]);
-
-  React.useEffect(() => {
-    if (fretsToUse) {
-      const notes = fretsToUse.map((fret, index) => {
-        if (fret === -1) return -1;
-        const baseNote = [40, 45, 50, 55, 59, 64][index];
-        return baseNote + fret;
-      }).filter(note => note !== -1);
-      setMidiNotes(notes);
-    }
-  }, [fretsToUse]);
+  const baseFret: number = base?.[0]?.baseFret ?? 1;
+  const chordNotes = React.useMemo(
+    () => getChordStringNotes(fretsToUse, baseFret, data?.key),
+    [fretsToUse, baseFret, data?.key]
+  );
+  const mutedStrings = chordNotes.filter((n) => n.midi === null).map((n) => n.stringNumber);
+  const [playingStrings, setPlayingStrings] = React.useState<number[]>([]);
+  const chordPlayerRef = React.useRef<((stringNum: number) => void) | null>(null);
+  const isBarre = (data?.positions?.[position]?.barres?.length ?? 0) > 0;
 
   return (
     <>
@@ -150,7 +148,7 @@ export default function Guitar({ data }: IGuitar) {
       
       <div className="flex justify-center mb-4">
         <label className="text-white font-Lora text-xl md:text-3xl flex items-center">
-          <h4>Capo : {capo ? "On" : "Off"}</h4>
+          <h4>{isBarre ? "Barre" : "Capo"} : {capo ? "On" : "Off"}</h4>
           <Switch
             onChange={handleCapoChange}
             checked={capo}
@@ -166,19 +164,27 @@ export default function Guitar({ data }: IGuitar) {
       </div>
 
       <div className="frets z-20 -mt-2 relative">
-        <div className="overflow-x-scroll flex h-[276px] md:h-[350px] w-[600px] sm:w-[700px] md:w-[1000px] lg:w-[1536px] overflow-y-hidden">
+        {baseFret > 1 && (
+          <p className="text-center font-Inter text-xs uppercase tracking-wider text-gray-500 mb-2">
+            Starts at fret {baseFret}
+          </p>
+        )}
+        <div className="overflow-x-auto flex h-[276px] md:h-[350px] w-full max-w-[1536px] mx-auto pl-6 overflow-y-hidden">
           {fretObjects.map((fret, idx) => {
             const isCapoFret = fret.fretNum === capoFret;
             return (
-              <div key={fret.fretId} className="relative">
+              <div key={fret.fretNum} className="relative">
                 <Fret
                   fretsToUse={
                     (fret.fretId === fret.fretNum && fretsToUse) as number[]
                   }
                   fingersToUse={fingersToUse}
                   fretId={fret.fretId}
-                  baseFret={base?.[0]?.baseFret}
+                  baseFret={baseFret}
                   fretIndex={fret.fretNum}
+                  mutedStrings={mutedStrings}
+                  playingStrings={playingStrings}
+                  onStringClick={(stringNum) => chordPlayerRef.current?.(stringNum)}
                 />
                 {isCapoFret && capo && (
                   <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none">
@@ -195,15 +201,18 @@ export default function Guitar({ data }: IGuitar) {
             );
           })}
         </div>
-
-        <div className="hole w-[400px] h-[400px] bg-[#2D2D2D] rounded-full absolute -right-[50px] -top-[20px] z-[-1] hidden md:block"></div>
       </div>
 
-      <div className="relative w-full h-full md:pt-14 flex items-center justify-center container mx-auto">
-      </div>
-      
-      <div className="mt-4 flex justify-center">
-        <AudioPlayer midiNotes={midiNotes} individualNotes={midiNotes}/>
+      <div className="mt-2 mb-8">
+        <ChordPlayer
+          chordName={formatChordName(data?.key, data?.suffix)}
+          variation={position + 1}
+          totalVariations={data?.positions?.length ?? 1}
+          notes={chordNotes}
+          playingStrings={playingStrings}
+          onPlayingStringsChange={setPlayingStrings}
+          playStringRef={chordPlayerRef}
+        />
       </div>
     </>
   );

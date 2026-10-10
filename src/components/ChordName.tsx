@@ -40,9 +40,7 @@ export default function ChordName({ singleDatafromDynamicPage }: IChordName) {
       if (nextChordIndex < chordData.length - 1) {
         setCurrentChordIndex(nextChordIndex + 1);
         const nextChord = chordData[nextChordIndex + 1];
-        const nextChordUrl = `/chords/${nextChord.key.toLowerCase()}${
-          nextChord.suffix
-        }`;
+        const nextChordUrl = `/chords/${nextChord.id}`;
         router.push(nextChordUrl);
       }
     }
@@ -51,9 +49,7 @@ export default function ChordName({ singleDatafromDynamicPage }: IChordName) {
     if (currentChordIndex > 0) {
       setCurrentChordIndex(currentChordIndex - 1);
       const previousChord = chordData[currentChordIndex - 1];
-      const previousChordUrl = `/chords/${previousChord?.key?.toLowerCase()}${
-        previousChord?.suffix
-      }`;
+      const previousChordUrl = `/chords/${previousChord?.id}`;
       router.push(previousChordUrl);
     }
   };
