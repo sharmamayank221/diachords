@@ -1298,6 +1298,11 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
+"@opendaw/nam-wasm@1.2.0":
+  version "1.2.0"
+  resolved "https://registry.npmjs.org/@opendaw/nam-wasm/-/nam-wasm-1.2.0.tgz"
+  integrity sha512-j8NoRtVfpqBhdYlifN4EWGHGs3D938znVVq/DxB6CvzOPJ5eFH/KW+Quy/m8ODPkR71XBGSxT+g6afx30HjePw==
+
 "@pkgr/utils@^2.3.1":
   version "2.3.1"
   resolved "https://registry.npmjs.org/@pkgr/utils/-/utils-2.3.1.tgz"

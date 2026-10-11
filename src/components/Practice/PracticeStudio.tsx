@@ -12,7 +12,7 @@ import {
   rootIndexToJamKey,
   suggestedScaleForJam,
 } from "@/utils/practiceKeySync";
-import type { Genre } from "@/utils/backingTrackEngine";
+import { STYLE_BY_ID } from "@/jam/styles";
 import type { BackingTrackGeneratorProps } from "@/components/BackingTrack/BackingTrackGenerator";
 import type { ScaleFretboardProps } from "@/components/Scale/ScaleFretboard";
 
@@ -26,7 +26,6 @@ const ScaleFretboard = dynamic(
   { ssr: false },
 ) as React.ComponentType<ScaleFretboardProps>;
 
-const VALID_GENRES = new Set<Genre>(["rock", "blues", "jazz", "pop", "funk", "reggae", "country"]);
 
 function tabFromQuery(value: unknown, fallback: PracticeTab): PracticeTab {
   return value === "scales" ? "scales" : value === "jam" ? "jam" : fallback;
@@ -117,8 +116,8 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
     persistStudio({ scale: scaleId });
   };
 
-  const suggestScaleFromJam = (genre: Genre) => {
-    const id = suggestedScaleForJam(genre, practiceKey);
+  const suggestScaleFromJam = (style: string, mode: "major" | "minor") => {
+    const id = suggestedScaleForJam(style, practiceKey, mode);
     setScale(id);
     setTab("scales");
   };
@@ -218,8 +217,8 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
           practiceKey={practiceKey}
           onPracticeKeyChange={setKey}
           practiceScaleId={practiceScale}
-          onSuggestScale={genre => {
-            if (VALID_GENRES.has(genre)) suggestScaleFromJam(genre);
+          onSuggestScale={(style, mode) => {
+            if (STYLE_BY_ID[style]) suggestScaleFromJam(style, mode);
           }}
           onOpenScales={() => setTab("scales")}
         />

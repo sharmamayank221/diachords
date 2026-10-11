@@ -1,0 +1,155 @@
+{
+ "version": 1,
+ "name": "Acoustic guitar (University of Iowa MIS, via tonejs-instruments)",
+ "license": "CC-BY 3.0",
+ "regions": [
+  {
+   "url": "D2.wav",
+   "root": 38
+  },
+  {
+   "url": "Ds2.wav",
+   "root": 39
+  },
+  {
+   "url": "E2.wav",
+   "root": 40
+  },
+  {
+   "url": "F2.wav",
+   "root": 41
+  },
+  {
+   "url": "Fs2.wav",
+   "root": 42
+  },
+  {
+   "url": "G2.wav",
+   "root": 43
+  },
+  {
+   "url": "Gs2.wav",
+   "root": 44
+  },
+  {
+   "url": "A2.wav",
+   "root": 45
+  },
+  {
+   "url": "As2.wav",
+   "root": 46
+  },
+  {
+   "url": "B2.wav",
+   "root": 47
+  },
+  {
+   "url": "C3.wav",
+   "root": 48
+  },
+  {
+   "url": "Cs3.wav",
+   "root": 49
+  },
+  {
+   "url": "D3.wav",
+   "root": 50
+  },
+  {
+   "url": "Ds3.wav",
+   "root": 51
+  },
+  {
+   "url": "E3.wav",
+   "root": 52
+  },
+  {
+   "url": "F3.wav",
+   "root": 53
+  },
+  {
+   "url": "Fs3.wav",
+   "root": 54
+  },
+  {
+   "url": "G3.wav",
+   "root": 55
+  },
+  {
+   "url": "Gs3.wav",
+   "root": 56
+  },
+  {
+   "url": "A3.wav",
+   "root": 57
+  },
+  {
+   "url": "As3.wav",
+   "root": 58
+  },
+  {
+   "url": "B3.wav",
+   "root": 59
+  },
+  {
+   "url": "C4.wav",
+   "root": 60
+  },
+  {
+   "url": "Cs4.wav",
+   "root": 61
+  },
+  {
+   "url": "D4.wav",
+   "root": 62
+  },
+  {
+   "url": "Ds4.wav",
+   "root": 63
+  },
+  {
+   "url": "E4.wav",
+   "root": 64
+  },
+  {
+   "url": "F4.wav",
+   "root": 65
+  },
+  {
+   "url": "Fs4.wav",
+   "root": 66
+  },
+  {
+   "url": "G4.wav",
+   "root": 67
+  },
+  {
+   "url": "Gs4.wav",
+   "root": 68
+  },
+  {
+   "url": "A4.wav",
+   "root": 69
+  },
+  {
+   "url": "As4.wav",
+   "root": 70
+  },
+  {
+   "url": "B4.wav",
+   "root": 71
+  },
+  {
+   "url": "C5.wav",
+   "root": 72
+  },
+  {
+   "url": "Cs5.wav",
+   "root": 73
+  },
+  {
+   "url": "D5.wav",
+   "root": 74
+  }
+ ]
+}
