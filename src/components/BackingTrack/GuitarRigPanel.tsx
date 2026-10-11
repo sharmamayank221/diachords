@@ -18,6 +18,8 @@ interface Props {
   onRemoveTone: (id: string) => void;
   status: string | null; // error message from the amp engine
   loading: boolean;
+  /** no card of its own (when it sits inside another panel) */
+  bare?: boolean;
 }
 
 const chip = (active: boolean) =>
@@ -68,7 +70,7 @@ function Pedal({ name, on, onToggle, children, disabled }: { name: string; on: b
   );
 }
 
-export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChange, userTones, onAddFiles, onRemoveTone, status, loading }: Props) {
+export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChange, userTones, onAddFiles, onRemoveTone, status, loading, bare }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -92,11 +94,13 @@ export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChan
   };
 
   return (
-    <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5 flex flex-col gap-5" aria-label="Guitar rig">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Guitar rig</h3>
-        {status && <p className="font-Inter text-xs text-[#f59e0b]" role="status">{status}</p>}
-      </div>
+    <section className={`flex flex-col gap-5 ${bare ? "" : "rounded-2xl bg-[#0f0f0f] border border-white/5 p-5"}`} aria-label="Guitar rig">
+      {(!bare || status) && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {!bare && <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Guitar rig</h3>}
+          {status && <p className="font-Inter text-xs text-[#f59e0b]" role="status">{status}</p>}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Rig presets">
         {Object.entries(RIG_PRESETS).map(([id, p]) => (
