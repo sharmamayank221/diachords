@@ -74,7 +74,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const [loopLimit, setLoopLimit] = useState(0);
   const [countIn, setCountIn] = useState(true);
   const [energyMode, setEnergyMode] = useState<EnergyMode>("auto");
-  const [kit, setKit] = useState<"auto" | "modern" | "vintage">("auto");
+  const [kit, setKit] = useState<"auto" | "modern" | "vintage" | "brushes">("auto");
   const [customText, setCustomText] = useState("");
   const [parts, setParts] = useState<Record<PartId, boolean>>({ ...STYLE_BY_ID.rock.parts });
   const [volumes, setVolumes] = useState<Record<PartId, number>>({ drums: 0.8, bass: 0.8, guitar: 0.75, keys: 0.7 });
@@ -615,9 +615,10 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
                   <span className="font-Inter text-sm text-gray-300 w-20">Drum kit</span>
                   {(
                     [
-                      { id: "auto", label: `Auto · ${style.kit === "vintage" ? "Vintage" : "Modern"}`, hint: "The kit that suits this style" },
+                      { id: "auto", label: `Auto · ${{ modern: "Modern", vintage: "Vintage", brushes: "Brushes" }[style.kit]}`, hint: style.kit === "brushes" ? "Brushes, switching to sticks for loud choruses" : "The kit that suits this style" },
                       { id: "modern", label: "Modern", hint: "Pearl kit: tight 22\" kick, bright snare" },
                       { id: "vintage", label: "Vintage", hint: "Ludwig 26\" kick, Porkpie snare, Zildjian A cymbals" },
+                      { id: "brushes", label: "Brushes", hint: "Jazz brushes: snare taps over a sweep" },
                     ] as const
                   ).map((k) => (
                     <button key={k.id} type="button" title={k.hint} onClick={() => setKit(k.id)} aria-pressed={kit === k.id} className={chipClass(kit === k.id)}>

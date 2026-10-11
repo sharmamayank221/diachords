@@ -8,7 +8,7 @@ import { ParsedChord, parseChord } from "./theory";
 import { jitter, rand } from "./rng";
 import { findChord } from "@/helpers/chordSearch";
 import { getChordStringNotes } from "@/helpers/chordNotes";
-import { bassSlotsFor, energyGain, fillGrid, fillKind, guitarPatternFor, keysPatternFor, sectionFor, varyDrums } from "./dynamics";
+import { bassSlotsFor, brushGrid, energyGain, fillGrid, fillKind, guitarPatternFor, keysPatternFor, sectionFor, varyDrums } from "./dynamics";
 
 export interface JamEvent {
   part: PartId;
@@ -19,7 +19,7 @@ export interface JamEvent {
   midi?: number;
   piece?: DrumPiece;
   string?: number; // guitar string 0 (low E) … 5 (high e), for cutting ringing strings
-  kit?: "modern" | "vintage"; // drums only
+  kit?: "modern" | "vintage" | "brushes"; // drums only
 }
 
 export interface CompiledPass {
@@ -35,7 +35,7 @@ const DRUM_VEL: Record<string, number> = { X: 1, x: 0.8, o: 0.5, g: 0.28 };
 const DRUM_GROUP: Record<DrumPiece, "kick" | "snare" | "hats"> = {
   kick: "kick", snare: "snare", sidestick: "snare", tom1: "snare", tom2: "snare", tom3: "snare",
   hihat: "hats", pedalhat: "hats", openhat: "hats", ride: "hats", ridebell: "hats", crash: "hats",
-  tambourine: "hats", clap: "snare", shaker: "hats", cowbell: "hats",
+  tambourine: "hats", clap: "snare", shaker: "hats", cowbell: "hats", sweep: "snare",
 };
 
 // Piecewise-linear swing: the off-beat (8th or 16th) moves from 50% toward `ratio`
@@ -148,12 +148,14 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
   };
 
   // ── drums ──
-  const kit = arr.kit && arr.kit !== "auto" ? arr.kit : style.kit;
+  // auto: the style's kit, except brush styles pick up sticks for a loud chorus
+  const kit = arr.kit && arr.kit !== "auto" ? arr.kit : style.kit === "brushes" && energy >= 0.8 ? "vintage" : style.kit;
   if (arr.parts.drums) {
     for (let bar = 0; bar < bars; bar++) {
       const r = barRand(bar);
       const kind = fillKind(bars, bar, cycle, arr.energy, rr);
       let grid = varyDrums(style, style.drums.bars[bar % style.drums.bars.length], section, r);
+      if (kit === "brushes") grid = brushGrid(style, grid);
       if (kind !== "none") grid = fillGrid(style, grid, kind, energy, r);
       for (const [piece, pattern] of Object.entries(grid) as [DrumPiece, string][]) {
         for (let step = 0; step < Math.min(pattern.length, barSteps); step++) {

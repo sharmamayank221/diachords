@@ -9,7 +9,7 @@
 import { Arrangement, PartId } from "./arrangement";
 import { compilePass, CompiledPass, JamEvent } from "./compile";
 import { STYLE_BY_ID, DrumPiece } from "./styles";
-import { drumBuffer, pitchedBuffer, preloadDrums, preloadPitched, resolveManifests } from "./samples";
+import { DrumKit, drumBuffer, pitchedBuffer, preloadDrums, preloadPitched, resolveManifests } from "./samples";
 import { GuitarRig, RigSettings, RIG_PRESETS } from "./rig";
 
 const LOOKAHEAD_S = 0.12;
@@ -114,13 +114,13 @@ interface Voice {
 }
 class Voices {
   private map = new Map<string, Voice>();
-  cut(key: string, at: number) {
+  cut(key: string, at: number, fade = 0.012) {
     const v = this.map.get(key);
     if (!v) return;
     try {
       v.gain.gain.cancelScheduledValues(at);
-      v.gain.gain.setTargetAtTime(0, at, 0.012);
-      v.src.stop(at + 0.08);
+      v.gain.gain.setTargetAtTime(0, at, fade);
+      v.src.stop(at + fade * 7);
     } catch {
       /* already stopped */
     }
@@ -135,7 +135,7 @@ class Voices {
 }
 
 // hand percussion sits behind the kit
-const PIECE_GAIN: Partial<Record<DrumPiece, number>> = { tambourine: 0.4, shaker: 0.3, clap: 0.55, cowbell: 0.35 };
+const PIECE_GAIN: Partial<Record<DrumPiece, number>> = { tambourine: 0.4, shaker: 0.3, clap: 0.55, cowbell: 0.35, sweep: 0.75 };
 
 function playEvent(g: Graph, voices: Voices, ev: JamEvent, when: number, secPerBeat: number) {
   const ctx = g.ctx;
@@ -168,6 +168,10 @@ function playEvent(g: Graph, voices: Voices, ev: JamEvent, when: number, secPerB
   } else if (ev.part === "guitar" && ev.string !== undefined) {
     voices.cut(`g${ev.string}`, when);
     voices.set(`g${ev.string}`, { src, gain });
+  } else if (ev.piece === "sweep") {
+    // one continuous brush stroke: each new sweep crossfades out the last
+    voices.cut("sweep", when, 0.06);
+    voices.set("sweep", { src, gain });
   } else if (ev.piece === "hihat" || ev.piece === "pedalhat" || ev.piece === "openhat") {
     voices.cut("hat", when);
     if (ev.piece === "openhat") voices.set("hat", { src, gain });
@@ -200,20 +204,20 @@ function playClick(g: Graph, when: number, accent: boolean) {
 /** Every drum piece and pitch the arrangement can reach across a full song cycle of sections. */
 export async function preloadArrangement(ctx: BaseAudioContext, arr: Arrangement, guitar: "acoustic" | "electric" = "acoustic"): Promise<void> {
   await resolveManifests();
-  const pieces = new Set<DrumPiece>(["crash"]);
-  let kit: "modern" | "vintage" = "modern";
+  const kits = new Map<DrumKit, Set<DrumPiece>>();
   const notes: Record<"bass" | "guitar" | "keys", Set<number>> = { bass: new Set(), guitar: new Set(), keys: new Set() };
   for (let cycle = 0; cycle < 8; cycle++) {
     for (const ev of compilePass({ ...arr, parts: { drums: true, bass: true, guitar: true, keys: true } }, cycle).events) {
       if (ev.part === "drums" && ev.piece) {
-        pieces.add(ev.piece);
-        if (ev.kit) kit = ev.kit;
+        const k = ev.kit ?? "modern";
+        if (!kits.has(k)) kits.set(k, new Set<DrumPiece>(["crash"]));
+        kits.get(k)!.add(ev.piece);
       }
       else if (ev.midi !== undefined && ev.part !== "drums") notes[ev.part].add(ev.midi);
     }
   }
   await Promise.all([
-    preloadDrums(ctx, pieces, kit),
+    ...Array.from(kits.entries()).map(([k, pieces]) => preloadDrums(ctx, pieces, k)),
     preloadPitched(ctx, "bass", notes.bass),
     preloadPitched(ctx, guitar === "electric" ? "guitarElectric" : "guitar", notes.guitar),
     preloadPitched(ctx, "keys", notes.keys),
@@ -514,15 +518,24 @@ export async function renderArrangement(
   }
   void style;
   const rendered = await ctx.startRendering();
-  // the limiter's 1 ms attack lets the odd drum transient through; keep the file under -0.5 dBFS
+  // even out loudness between styles (sparse jazz renders far quieter than rock): aim for
+  // about -16 dB RMS, boost at most 12 dB, and never let a peak past -0.5 dBFS (the limiter's
+  // 1 ms attack lets the odd drum transient through)
   let peak = 0;
+  let sum = 0;
+  let count = 0;
   for (let c = 0; c < rendered.numberOfChannels; c++) {
     const data = rendered.getChannelData(c);
-    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+    for (let i = 0; i < data.length; i++) {
+      peak = Math.max(peak, Math.abs(data[i]));
+      sum += data[i] * data[i];
+    }
+    count += data.length;
   }
+  const rms = Math.sqrt(sum / Math.max(1, count));
   const ceiling = 0.944;
-  if (peak > ceiling) {
-    const k = ceiling / peak;
+  const k = peak > 0 ? Math.min(rms > 0 ? Math.pow(10, -16 / 20) / rms : 1, 4, ceiling / peak) : 1;
+  if (Math.abs(k - 1) > 0.01) {
     for (let c = 0; c < rendered.numberOfChannels; c++) {
       const data = rendered.getChannelData(c);
       for (let i = 0; i < data.length; i++) data[i] *= k;

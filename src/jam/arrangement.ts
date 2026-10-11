@@ -28,7 +28,7 @@ export interface Arrangement {
   /** how the band's intensity moves across loop passes (default: evolving song sections) */
   energy?: EnergyMode;
   /** drum kit; "auto" (default) uses the style's */
-  kit?: "auto" | "modern" | "vintage";
+  kit?: "auto" | "modern" | "vintage" | "brushes";
 }
 
 export interface GenerateOptions {

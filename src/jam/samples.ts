@@ -5,7 +5,7 @@
 import type { DrumPiece } from "./styles";
 
 export type Instrument = "bass" | "guitar" | "guitarElectric" | "keys";
-export type DrumKit = "modern" | "vintage";
+export type DrumKit = "modern" | "vintage" | "brushes";
 
 interface DrumManifest {
   pieces: Record<string, { url: string; loVel: number; hiVel: number }[]>;
@@ -17,6 +17,7 @@ interface PitchedManifest {
 const KITS: Record<DrumKit, string> = {
   modern: "/samples/drums-avl-pearl/",
   vintage: "/samples/drums-avl-vintage/",
+  brushes: "/samples/drums-brushes/",
 };
 const ROOTS: Record<Instrument, string> = {
   bass: "/samples/bass-electric/",

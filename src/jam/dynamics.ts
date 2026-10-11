@@ -141,6 +141,25 @@ function addPercussion(style: StyleDef, g: Grid, section: Section, n: number, sp
   if (style.id === "disco" && e >= 0.85 && r("cowbell") < 0.6) setPiece(g, "cowbell", mapSteps(".".repeat(n), (_, i) => (i % spb === 0 ? "o" : ".")));
 }
 
+/**
+ * Brushes: the right hand moves from the ride to taps on the snare and the left hand
+ * keeps a sweep going, one stroke per beat (alternating samples so it doesn't loop).
+ */
+export function brushGrid(style: StyleDef, base: Grid): Grid {
+  const n = stepsPerBar(style);
+  const spb = style.meter.stepsPerBeat;
+  const g: Grid = { ...base };
+  const tap = (c: string) => (c === "X" ? "x" : c === "." ? "." : c === "g" ? "g" : "o");
+  const hand = g.ride ?? (style.id === "jazz" ? undefined : g.hihat);
+  if (hand) {
+    setPiece(g, "snare", mergeSteps(g.snare, mapSteps(hand, tap), n));
+    if (g.ride) delete g.ride;
+    else delete g.hihat;
+  }
+  setPiece(g, "sweep", mapSteps(".".repeat(n), (_, i) => (i % spb === 0 ? ((i / spb) % 2 === 0 ? "o" : "x") : ".")));
+  return g;
+}
+
 export type FillKind = "none" | "small" | "big" | "build";
 
 /** Where fills go: end of 4-bar phrases (small), end of the pass (big), into a louder section (build). */

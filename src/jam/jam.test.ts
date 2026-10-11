@@ -194,11 +194,11 @@ describe("dynamics", () => {
 
 describe("kits and percussion", () => {
   const manifest = (folder: string) => JSON.parse(readFileSync(join(__dirname, "../../public/samples", folder, "manifest.json"), "utf8")).pieces as Record<string, unknown[]>;
-  const kits = { modern: manifest("drums-avl-pearl"), vintage: manifest("drums-avl-vintage") };
+  const kits = { modern: manifest("drums-avl-pearl"), vintage: manifest("drums-avl-vintage"), brushes: manifest("drums-brushes") };
 
   it("every drum piece any style can play has samples in its kit", () => {
     for (const st of STYLES) {
-      for (const kit of ["auto", "modern", "vintage"] as const) {
+      for (const kit of ["auto", "modern", "vintage", "brushes"] as const) {
         for (let cycle = 0; cycle < 8; cycle++) {
           const arr = { ...generateArrangement({ style: st.id, key: "C", seed: 4 }), kit };
           for (const ev of compilePass(arr, cycle).events.filter((e) => e.part === "drums")) {
@@ -209,9 +209,9 @@ describe("kits and percussion", () => {
     }
   });
 
-  it("picks the vintage kit for jazz and blues, modern for rock, and honours an override", () => {
-    const kitOf = (style: string, kit?: "auto" | "modern" | "vintage") => compilePass({ ...generateArrangement({ style, key: "C", seed: 1 }), kit }, 0).events.find((e) => e.part === "drums")!.kit;
-    expect(kitOf("jazz")).toBe("vintage");
+  it("picks brushes for jazz, vintage for blues, modern for rock, and honours an override", () => {
+    const kitOf = (style: string, kit?: "auto" | "modern" | "vintage" | "brushes") => compilePass({ ...generateArrangement({ style, key: "C", seed: 1 }), kit }, 0).events.find((e) => e.part === "drums")!.kit;
+    expect(kitOf("jazz")).toBe("brushes");
     expect(kitOf("blues")).toBe("vintage");
     expect(kitOf("rock")).toBe("modern");
     expect(kitOf("rock", "vintage")).toBe("vintage");
@@ -224,6 +224,18 @@ describe("kits and percussion", () => {
     expect(pieces(rock, 0).has("tambourine")).toBe(false);
     expect(pieces(generateArrangement({ style: "bossa", key: "C", seed: 2 }), 0).has("shaker")).toBe(true);
     expect(pieces({ ...generateArrangement({ style: "disco", key: "C", seed: 2 }), energy: "drive" }, 0).has("clap")).toBe(true);
+  });
+
+  it("plays jazz with brushes: snare taps over a sweep on every beat, sticks for the loud chorus", () => {
+    const jazz = generateArrangement({ style: "jazz", key: "Bb", seed: 6 });
+    const verse = compilePass(jazz, 0).events.filter((e) => e.part === "drums");
+    const sweeps = verse.filter((e) => e.piece === "sweep");
+    expect(sweeps.length).toBe(totalBeats(jazz));
+    expect(verse.some((e) => e.piece === "ride")).toBe(false);
+    expect(verse.filter((e) => e.piece === "snare").length).toBeGreaterThan(totalBeats(jazz));
+    const chorus = compilePass(jazz, 7).events.filter((e) => e.part === "drums");
+    expect(chorus.every((e) => e.kit === "vintage")).toBe(true);
+    expect(chorus.some((e) => e.piece === "ride")).toBe(true);
   });
 });
 

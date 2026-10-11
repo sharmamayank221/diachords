@@ -1,0 +1,257 @@
+{
+ "version": 1,
+ "name": "Jazz brushes (stomachache + Heigh-hoo, Freesound)",
+ "license": "CC0 1.0",
+ "author": "stomachache; Heigh-hoo",
+ "pieces": {
+  "kick": [
+   {
+    "url": "kick-1.wav",
+    "loVel": 1,
+    "hiVel": 64
+   },
+   {
+    "url": "kick-2.wav",
+    "loVel": 65,
+    "hiVel": 127
+   }
+  ],
+  "snare": [
+   {
+    "url": "snare-1.wav",
+    "loVel": 1,
+    "hiVel": 32
+   },
+   {
+    "url": "snare-2.wav",
+    "loVel": 33,
+    "hiVel": 64
+   },
+   {
+    "url": "snare-3.wav",
+    "loVel": 65,
+    "hiVel": 95
+   },
+   {
+    "url": "snare-4.wav",
+    "loVel": 96,
+    "hiVel": 127
+   }
+  ],
+  "sidestick": [
+   {
+    "url": "sidestick-1.wav",
+    "loVel": 1,
+    "hiVel": 64
+   },
+   {
+    "url": "sidestick-2.wav",
+    "loVel": 65,
+    "hiVel": 127
+   }
+  ],
+  "hihat": [
+   {
+    "url": "hihat-1.wav",
+    "loVel": 1,
+    "hiVel": 64
+   },
+   {
+    "url": "hihat-2.wav",
+    "loVel": 65,
+    "hiVel": 127
+   }
+  ],
+  "pedalhat": [
+   {
+    "url": "hihat-1.wav",
+    "loVel": 1,
+    "hiVel": 64
+   },
+   {
+    "url": "hihat-2.wav",
+    "loVel": 65,
+    "hiVel": 127
+   }
+  ],
+  "openhat": [
+   {
+    "url": "hihat-2.wav",
+    "loVel": 1,
+    "hiVel": 127
+   }
+  ],
+  "ride": [
+   {
+    "url": "ride-1.wav",
+    "loVel": 1,
+    "hiVel": 42
+   },
+   {
+    "url": "ride-2.wav",
+    "loVel": 43,
+    "hiVel": 85
+   },
+   {
+    "url": "ride-3.wav",
+    "loVel": 86,
+    "hiVel": 127
+   }
+  ],
+  "ridebell": [
+   {
+    "url": "ride-3.wav",
+    "loVel": 1,
+    "hiVel": 127
+   }
+  ],
+  "crash": [
+   {
+    "url": "crash-1.wav",
+    "loVel": 1,
+    "hiVel": 127
+   }
+  ],
+  "tom1": [
+   {
+    "url": "tom1-1.wav",
+    "loVel": 1,
+    "hiVel": 127
+   }
+  ],
+  "tom2": [
+   {
+    "url": "tom1-1.wav",
+    "loVel": 1,
+    "hiVel": 127
+   }
+  ],
+  "tom3": [
+   {
+    "url": "tom3-1.wav",
+    "loVel": 1,
+    "hiVel": 127
+   }
+  ],
+  "sweep": [
+   {
+    "url": "sweep-1.wav",
+    "loVel": 1,
+    "hiVel": 64
+   },
+   {
+    "url": "sweep-2.wav",
+    "loVel": 65,
+    "hiVel": 127
+   }
+  ],
+  "tambourine": [
+   {
+    "url": "../drums-avl-pearl/tambourine-1.wav",
+    "loVel": 1,
+    "hiVel": 26
+   },
+   {
+    "url": "../drums-avl-pearl/tambourine-2.wav",
+    "loVel": 27,
+    "hiVel": 52
+   },
+   {
+    "url": "../drums-avl-pearl/tambourine-3.wav",
+    "loVel": 53,
+    "hiVel": 77
+   },
+   {
+    "url": "../drums-avl-pearl/tambourine-4.wav",
+    "loVel": 78,
+    "hiVel": 102
+   },
+   {
+    "url": "../drums-avl-pearl/tambourine-5.wav",
+    "loVel": 103,
+    "hiVel": 127
+   }
+  ],
+  "clap": [
+   {
+    "url": "../drums-avl-pearl/clap-1.wav",
+    "loVel": 1,
+    "hiVel": 26
+   },
+   {
+    "url": "../drums-avl-pearl/clap-2.wav",
+    "loVel": 27,
+    "hiVel": 52
+   },
+   {
+    "url": "../drums-avl-pearl/clap-3.wav",
+    "loVel": 53,
+    "hiVel": 77
+   },
+   {
+    "url": "../drums-avl-pearl/clap-4.wav",
+    "loVel": 78,
+    "hiVel": 102
+   },
+   {
+    "url": "../drums-avl-pearl/clap-5.wav",
+    "loVel": 103,
+    "hiVel": 127
+   }
+  ],
+  "shaker": [
+   {
+    "url": "../drums-avl-pearl/shaker-1.wav",
+    "loVel": 1,
+    "hiVel": 26
+   },
+   {
+    "url": "../drums-avl-pearl/shaker-2.wav",
+    "loVel": 27,
+    "hiVel": 52
+   },
+   {
+    "url": "../drums-avl-pearl/shaker-3.wav",
+    "loVel": 53,
+    "hiVel": 77
+   },
+   {
+    "url": "../drums-avl-pearl/shaker-4.wav",
+    "loVel": 78,
+    "hiVel": 102
+   },
+   {
+    "url": "../drums-avl-pearl/shaker-5.wav",
+    "loVel": 103,
+    "hiVel": 127
+   }
+  ],
+  "cowbell": [
+   {
+    "url": "../drums-avl-pearl/cowbell-1.wav",
+    "loVel": 1,
+    "hiVel": 26
+   },
+   {
+    "url": "../drums-avl-pearl/cowbell-2.wav",
+    "loVel": 27,
+    "hiVel": 52
+   },
+   {
+    "url": "../drums-avl-pearl/cowbell-3.wav",
+    "loVel": 53,
+    "hiVel": 77
+   },
+   {
+    "url": "../drums-avl-pearl/cowbell-4.wav",
+    "loVel": 78,
+    "hiVel": 102
+   },
+   {
+    "url": "../drums-avl-pearl/cowbell-5.wav",
+    "loVel": 103,
+    "hiVel": 127
+   }
+  ]
+ }
+}
