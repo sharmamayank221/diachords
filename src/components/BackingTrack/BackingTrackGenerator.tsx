@@ -10,6 +10,7 @@ import { KEY_NAMES, Mode, noteToPc, parseChord } from "@/jam/theory";
 import { hashString } from "@/jam/rng";
 import type { JamEngine as JamEngineType } from "@/jam/engine";
 import { RIG_PRESETS, RigSettings, STYLE_RIG } from "@/jam/rig";
+import { ENERGY_MODES, EnergyMode, sectionFor } from "@/jam/dynamics";
 import { addUserTone, listUserTones, removeUserTone, type UserTone } from "@/jam/userTones";
 import GuitarRigPanel from "./GuitarRigPanel";
 
@@ -72,6 +73,8 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const [speed, setSpeed] = useState(1);
   const [loopLimit, setLoopLimit] = useState(0);
   const [countIn, setCountIn] = useState(true);
+  const [energyMode, setEnergyMode] = useState<EnergyMode>("auto");
+  const [kit, setKit] = useState<"auto" | "modern" | "vintage" | "brushes">("auto");
   const [customText, setCustomText] = useState("");
   const [parts, setParts] = useState<Record<PartId, boolean>>({ ...STYLE_BY_ID.rock.parts });
   const [volumes, setVolumes] = useState<Record<PartId, number>>({ drums: 0.8, bass: 0.8, guitar: 0.75, keys: 0.7 });
@@ -169,8 +172,8 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const arrangement: Arrangement = useMemo(() => {
     const base = generateArrangement({ style: styleId, key: keyName, mode, tempo: effectiveBpm, seed, progressionIndex: Math.min(progressionIndex, progressions.length - 1) });
     const withChords = custom.length ? withCustomChords(base, custom.filter((c) => c.valid).map((c) => c.name)) : base;
-    return { ...withChords, tempo: effectiveBpm, parts };
-  }, [styleId, keyName, mode, effectiveBpm, seed, progressionIndex, progressions.length, custom, parts]);
+    return { ...withChords, tempo: effectiveBpm, parts, energy: energyMode, kit };
+  }, [styleId, keyName, mode, effectiveBpm, seed, progressionIndex, progressions.length, custom, parts, energyMode, kit]);
 
   // ── engine ─────────────────────────────────────────────────────────────────
   const getEngine = useCallback(async () => {
@@ -319,6 +322,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const bpmPercent = ((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)) * 100;
   const invalid = custom.filter((c) => !c.valid);
   const beatsPerBar = style.meter.beats;
+  const section = sectionFor(energyMode, playing ? passCount : 0);
   const soundingChord = playing && !beat?.countIn && chordIdx >= 0 ? chords[chordIdx]?.chord : null;
   const soloChord = useMemo(() => {
     const parsed = soundingChord ? parseChord(soundingChord) : null;
@@ -343,6 +347,16 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
             <div className="min-w-0">
               <p className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-500">
                 {beat?.countIn ? <span className="text-[#f59e0b]">Count-in</span> : playing ? "Now playing" : "First chord"}
+                {playing && !beat?.countIn && (
+                  <span className="ml-2 inline-flex items-center gap-1.5 normal-case tracking-normal text-white" title={`Band energy ${Math.round(section.energy * 100)}%`}>
+                    · {section.name}
+                    <span className="inline-flex items-end gap-[2px]" aria-hidden>
+                      {[0.25, 0.5, 0.7, 0.85].map((t, i) => (
+                        <span key={t} className="w-[3px] rounded-sm transition-colors" style={{ height: 5 + i * 3, background: section.energy >= t ? "#1BD79E" : "#333" }} />
+                      ))}
+                    </span>
+                  </span>
+                )}
                 <span className="ml-2 normal-case tracking-normal text-gray-600">
                   {style.name} · {style.meter.label} · {keyName} {mode}
                 </span>
@@ -416,6 +430,25 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
               {speed !== 1 && <span className="text-gray-500"> ({Math.round(speed * 100)}% of {bpm})</span>}
               {playing && loopLimit > 0 && <span className="text-gray-500"> · loop {Math.min(passCount + 1, loopLimit)}/{loopLimit}</span>}
             </p>
+            <div className="flex rounded-full bg-[#161616] p-1" role="group" aria-label="Band energy">
+              {ENERGY_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  title={m.hint}
+                  aria-pressed={energyMode === m.id}
+                  onClick={() => {
+                    setEnergyMode(m.id);
+                    trackEvent("backing_track_energy", { energy: m.id, genre: styleId });
+                  }}
+                  className={`flex-1 h-8 rounded-full font-Inter text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+                    energyMode === m.id ? "bg-white/10 text-white font-semibold" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
             {error && (
               <p role="alert" className="font-Inter text-xs text-[#f59e0b] text-center">
                 {error}
@@ -578,7 +611,22 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
                     );
                   })}
                 </div>
-                <p className="mt-3 font-Inter text-xs text-gray-500">Real recorded drums, bass, acoustic guitar and piano. Turn the guitar off to play the chords yourself.</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Drum kit">
+                  <span className="font-Inter text-sm text-gray-300 w-20">Drum kit</span>
+                  {(
+                    [
+                      { id: "auto", label: `Auto · ${{ modern: "Modern", vintage: "Vintage", brushes: "Brushes" }[style.kit]}`, hint: style.kit === "brushes" ? "Brushes, switching to sticks for loud choruses" : "The kit that suits this style" },
+                      { id: "modern", label: "Modern", hint: "Pearl kit: tight 22\" kick, bright snare" },
+                      { id: "vintage", label: "Vintage", hint: "Ludwig 26\" kick, Porkpie snare, Zildjian A cymbals" },
+                      { id: "brushes", label: "Brushes", hint: "Jazz brushes: snare taps over a sweep" },
+                    ] as const
+                  ).map((k) => (
+                    <button key={k.id} type="button" title={k.hint} onClick={() => setKit(k.id)} aria-pressed={kit === k.id} className={chipClass(kit === k.id)}>
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 font-Inter text-xs text-gray-500">Real recorded drums, percussion, bass, guitar and piano. Turn the guitar off to play the chords yourself.</p>
               </section>
 
               {/* ── Practice ── */}

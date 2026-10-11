@@ -3,6 +3,9 @@ import { parseChord, romanToChord } from "./theory";
 import { STYLES, STYLE_BY_ID, stepsPerBar } from "./styles";
 import { generateArrangement, progressionToChords, totalBeats, withCustomChords } from "./arrangement";
 import { compilePass, swingBeat } from "./compile";
+import { sectionFor } from "./dynamics";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 const KEYS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 
@@ -121,3 +124,118 @@ describe("compile", () => {
     expect(swingBeat(1.25, STYLE_BY_ID.rock)).toBe(1.25); // straight style untouched
   });
 });
+
+describe("dynamics", () => {
+  const sane = (id: string, energy: "auto" | "chill" | "groove" | "drive", cycle: number) => {
+    const arr = { ...generateArrangement({ style: id, key: "F#", seed: 11 }), energy, parts: { drums: true, bass: true, guitar: true, keys: true } };
+    const pass = compilePass(arr, cycle);
+    for (const ev of pass.events) {
+      const where = `${id} ${energy} pass ${cycle} ${ev.part}`;
+      expect(ev.beat, where).toBeGreaterThanOrEqual(0);
+      expect(ev.beat, where).toBeLessThan(pass.lengthBeats);
+      expect(ev.vel, where).toBeGreaterThan(0);
+      expect(ev.vel, where).toBeLessThanOrEqual(1);
+      if (ev.part === "bass") expect(ev.midi!, where).toBeGreaterThanOrEqual(26);
+      if (ev.part === "bass") expect(ev.midi!, where).toBeLessThanOrEqual(56);
+    }
+    return pass;
+  };
+
+  it("every style compiles cleanly through a whole song cycle and in every energy mode", () => {
+    for (const st of STYLES) {
+      for (let cycle = 0; cycle < 8; cycle++) sane(st.id, "auto", cycle);
+      for (const mode of ["chill", "groove", "drive"] as const) for (const cycle of [0, 1]) sane(st.id, mode, cycle);
+    }
+  });
+
+  it("walks through song sections and reports them", () => {
+    expect([0, 3, 5, 7].map((c) => sectionFor("auto", c).name)).toEqual(["Verse", "Chorus", "Breakdown", "Chorus"]);
+    expect(sectionFor("chill", 3).name).toBe("Chill");
+    expect(compilePass(generateArrangement({ style: "rock", key: "C", seed: 1 }), 3).section.name).toBe("Chorus");
+  });
+
+  it("plays a chorus louder and busier than a breakdown", () => {
+    for (const id of ["rock", "pop", "funk", "country", "soul"]) {
+      const arr = generateArrangement({ style: id, key: "C", seed: 5 });
+      const chorus = compilePass(arr, 3).events;
+      const breakdown = compilePass(arr, 5).events;
+      const loud = (evs: typeof chorus) => evs.filter((e) => e.part === "drums").reduce((n, e) => n + e.vel, 0);
+      expect(loud(chorus), id).toBeGreaterThan(loud(breakdown) * 1.3);
+      const guitar = (evs: typeof chorus) => evs.filter((e) => e.part === "guitar").reduce((n, e) => n + e.vel, 0);
+      expect(guitar(chorus), id).toBeGreaterThan(guitar(breakdown));
+    }
+  });
+
+  it("breaks down to sidestick and quarter-note hats", () => {
+    const drums = compilePass(generateArrangement({ style: "rock", key: "C", seed: 5 }), 5).events.filter((e) => e.part === "drums");
+    const body = drums.filter((e) => e.beat < 12); // ignore the build fill at the end
+    expect(body.some((e) => e.piece === "snare")).toBe(false);
+    expect(body.some((e) => e.piece === "sidestick")).toBe(true);
+    for (const e of body.filter((e) => e.piece === "hihat")) expect(e.beat % 1).toBe(0);
+  });
+
+  it("jazz drops to a two-feel when it's chill", () => {
+    const arr = { ...generateArrangement({ style: "jazz", key: "C", seed: 3 }), energy: "chill" as const };
+    const bass = compilePass(arr, 0).events.filter((e) => e.part === "bass");
+    expect(bass.every((e) => e.beat % 2 === 0)).toBe(true);
+    expect(bass.length).toBe(totalBeats(arr) / 2);
+  });
+
+  it("adds walk-ups into the next chord when the band is driving", () => {
+    const arr = { ...generateArrangement({ style: "rock", key: "C", seed: 8 }), energy: "drive" as const };
+    let found = false;
+    for (let cycle = 0; cycle < 6 && !found; cycle++) {
+      const bass = compilePass(arr, cycle).events.filter((e) => e.part === "bass");
+      found = bass.some((e) => Math.abs(((e.beat % 4) + 4) % 4 - 3.5) < 1e-6) && bass.some((e) => Math.abs(((e.beat % 4) + 4) % 4 - 3) < 1e-6);
+    }
+    expect(found).toBe(true);
+  });
+});
+
+describe("kits and percussion", () => {
+  const manifest = (folder: string) => JSON.parse(readFileSync(join(__dirname, "../../public/samples", folder, "manifest.json"), "utf8")).pieces as Record<string, unknown[]>;
+  const kits = { modern: manifest("drums-avl-pearl"), vintage: manifest("drums-avl-vintage"), brushes: manifest("drums-brushes") };
+
+  it("every drum piece any style can play has samples in its kit", () => {
+    for (const st of STYLES) {
+      for (const kit of ["auto", "modern", "vintage", "brushes"] as const) {
+        for (let cycle = 0; cycle < 8; cycle++) {
+          const arr = { ...generateArrangement({ style: st.id, key: "C", seed: 4 }), kit };
+          for (const ev of compilePass(arr, cycle).events.filter((e) => e.part === "drums")) {
+            expect(kits[ev.kit!][ev.piece!], `${st.id} ${kit} ${ev.piece}`).toBeDefined();
+          }
+        }
+      }
+    }
+  });
+
+  it("picks brushes for jazz, vintage for blues, modern for rock, and honours an override", () => {
+    const kitOf = (style: string, kit?: "auto" | "modern" | "vintage" | "brushes") => compilePass({ ...generateArrangement({ style, key: "C", seed: 1 }), kit }, 0).events.find((e) => e.part === "drums")!.kit;
+    expect(kitOf("jazz")).toBe("brushes");
+    expect(kitOf("blues")).toBe("vintage");
+    expect(kitOf("rock")).toBe("modern");
+    expect(kitOf("rock", "vintage")).toBe("vintage");
+  });
+
+  it("brings in tambourine for a rock chorus but not the verse, and a shaker for bossa", () => {
+    const rock = generateArrangement({ style: "rock", key: "C", seed: 2 });
+    const pieces = (arr: typeof rock, cycle: number) => new Set(compilePass(arr, cycle).events.map((e) => e.piece));
+    expect(pieces(rock, 3).has("tambourine")).toBe(true);
+    expect(pieces(rock, 0).has("tambourine")).toBe(false);
+    expect(pieces(generateArrangement({ style: "bossa", key: "C", seed: 2 }), 0).has("shaker")).toBe(true);
+    expect(pieces({ ...generateArrangement({ style: "disco", key: "C", seed: 2 }), energy: "drive" }, 0).has("clap")).toBe(true);
+  });
+
+  it("plays jazz with brushes: snare taps over a sweep on every beat, sticks for the loud chorus", () => {
+    const jazz = generateArrangement({ style: "jazz", key: "Bb", seed: 6 });
+    const verse = compilePass(jazz, 0).events.filter((e) => e.part === "drums");
+    const sweeps = verse.filter((e) => e.piece === "sweep");
+    expect(sweeps.length).toBe(totalBeats(jazz));
+    expect(verse.some((e) => e.piece === "ride")).toBe(false);
+    expect(verse.filter((e) => e.piece === "snare").length).toBeGreaterThan(totalBeats(jazz));
+    const chorus = compilePass(jazz, 7).events.filter((e) => e.part === "drums");
+    expect(chorus.every((e) => e.kit === "vintage")).toBe(true);
+    expect(chorus.some((e) => e.piece === "ride")).toBe(true);
+  });
+});
+

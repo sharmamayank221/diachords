@@ -8,6 +8,7 @@ import { ParsedChord, parseChord } from "./theory";
 import { jitter, rand } from "./rng";
 import { findChord } from "@/helpers/chordSearch";
 import { getChordStringNotes } from "@/helpers/chordNotes";
+import { bassSlotsFor, brushGrid, energyGain, fillGrid, fillKind, guitarPatternFor, keysPatternFor, sectionFor, varyDrums } from "./dynamics";
 
 export interface JamEvent {
   part: PartId;
@@ -18,6 +19,7 @@ export interface JamEvent {
   midi?: number;
   piece?: DrumPiece;
   string?: number; // guitar string 0 (low E) … 5 (high e), for cutting ringing strings
+  kit?: "modern" | "vintage" | "brushes"; // drums only
 }
 
 export interface CompiledPass {
@@ -26,12 +28,14 @@ export interface CompiledPass {
   beatsPerBar: number;
   /** first beat of each chord, for the UI */
   chordStarts: { beat: number; index: number }[];
+  section: { name: string; energy: number };
 }
 
 const DRUM_VEL: Record<string, number> = { X: 1, x: 0.8, o: 0.5, g: 0.28 };
 const DRUM_GROUP: Record<DrumPiece, "kick" | "snare" | "hats"> = {
   kick: "kick", snare: "snare", sidestick: "snare", tom1: "snare", tom2: "snare", tom3: "snare",
   hihat: "hats", pedalhat: "hats", openhat: "hats", ride: "hats", ridebell: "hats", crash: "hats",
+  tambourine: "hats", clap: "snare", shaker: "hats", cowbell: "hats", sweep: "snare",
 };
 
 // Piecewise-linear swing: the off-beat (8th or 16th) moves from 50% toward `ratio`
@@ -48,11 +52,13 @@ export function swingBeat(beat: number, style: StyleDef): number {
 // ── Voicings ──────────────────────────────────────────────────────────────────
 
 const guitarCache = new Map<string, (number | null)[]>();
-function guitarStrings(chord: string, parsed: ParsedChord): (number | null)[] {
-  const cached = guitarCache.get(chord);
+/** `up` = a shape higher on the neck (choruses), when the chord library has one. */
+function guitarStrings(chord: string, parsed: ParsedChord, up = false): (number | null)[] {
+  const key = up ? `${chord}|up` : chord;
+  const cached = guitarCache.get(key);
   if (cached) return cached;
   const item = findChord(chord);
-  const pos = item?.positions[0];
+  const pos = (up && item?.positions.find((p) => p.baseFret >= 3 && p.baseFret <= 9)) || item?.positions[0];
   let strings: (number | null)[];
   if (pos) {
     strings = getChordStringNotes(pos.frets, pos.baseFret, item?.key).map((n) => n.midi);
@@ -62,7 +68,7 @@ function guitarStrings(chord: string, parsed: ParsedChord): (number | null)[] {
     strings = [null, root, ...parsed.intervals.slice(1, 4).map((i) => root + i), root + 12].slice(0, 6);
     while (strings.length < 6) strings.push(null);
   }
-  guitarCache.set(chord, strings);
+  guitarCache.set(key, strings);
   return strings;
 }
 
@@ -121,15 +127,36 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
   const feel = style.feel;
   const human = (base: number, beat: number, salt: string, voice = 0) => base + jitter(seed, cycle, beat, salt, voice) * feel.spread;
 
-  // fills: every pass for long forms, every other pass for short loops
-  const fillThisPass = bars >= 8 || cycle % 2 === 1;
-  const filledLastPass = cycle > 0 && (bars >= 8 || (cycle - 1) % 2 === 1);
+  // how hard the band plays this pass (see dynamics.ts)
+  const section = sectionFor(arr.energy, cycle);
+  const energy = section.energy;
+  const gain = energyGain(energy);
+  const barRand = (bar: number) => (salt: string) => rand(seed, cycle, bar * beatsPerBar, salt);
+  const rr = (salt: string, bar: number) => rand(seed, cycle, bar * beatsPerBar, salt);
+  // pushed chords: when it's loud, the last eighth before a chord change sometimes jumps early
+  const pushedBars = new Set<number>();
+  if (energy >= 0.75) {
+    for (let bar = 0; bar < bars; bar++) {
+      const next = (bar + 1) * beatsPerBar;
+      if (next < length && starts.includes(next) && rr("push", bar) < 0.35) pushedBars.add(bar);
+    }
+  }
+  const pushWindow = spb === 4 ? 0.5 : 1 / 3;
+  const harmonyBeat = (beat: number) => {
+    const bar = Math.floor(beat / beatsPerBar);
+    return pushedBars.has(bar) && beat >= (bar + 1) * beatsPerBar - pushWindow - 1e-6 ? (bar + 1) * beatsPerBar : beat;
+  };
 
   // ── drums ──
+  // auto: the style's kit, except brush styles pick up sticks for a loud chorus
+  const kit = arr.kit && arr.kit !== "auto" ? arr.kit : style.kit === "brushes" && energy >= 0.8 ? "vintage" : style.kit;
   if (arr.parts.drums) {
     for (let bar = 0; bar < bars; bar++) {
-      const isLast = bar === bars - 1;
-      const grid = isLast && fillThisPass ? style.drums.fill : style.drums.bars[bar % style.drums.bars.length];
+      const r = barRand(bar);
+      const kind = fillKind(bars, bar, cycle, arr.energy, rr);
+      let grid = varyDrums(style, style.drums.bars[bar % style.drums.bars.length], section, r);
+      if (kit === "brushes") grid = brushGrid(style, grid);
+      if (kind !== "none") grid = fillGrid(style, grid, kind, energy, r);
       for (const [piece, pattern] of Object.entries(grid) as [DrumPiece, string][]) {
         for (let step = 0; step < Math.min(pattern.length, barSteps); step++) {
           const v = DRUM_VEL[pattern[step]];
@@ -139,16 +166,24 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
           events.push({
             part: "drums",
             piece,
+            kit,
             beat: swingBeat(beat, style),
             offsetMs: human(feel[DRUM_GROUP[piece]], beat, piece),
             dur: 0.25,
-            vel: Math.min(1, v * (1 + jitter(seed, cycle, beat, `vel-${piece}`) * 0.08)),
+            vel: Math.min(1, v * gain * (1 + jitter(seed, cycle, beat, `vel-${piece}`) * 0.08)),
           });
         }
       }
+      // crash into a loud phrase
+      if (bar > 0 && bar % 4 === 0 && energy >= 0.75 && rr("phrasecrash", bar) < 0.4) {
+        events.push({ part: "drums", piece: "crash", kit, beat: bar * beatsPerBar, offsetMs: feel.hats, dur: 2, vel: 0.75 });
+      }
     }
-    if (style.drums.crashOnLoop && filledLastPass) {
-      events.push({ part: "drums", piece: "crash", beat: 0, offsetMs: feel.hats, dur: 2, vel: 0.85 });
+    // crash on the downbeat after a big fill or a section change
+    const prevBars = bars; // same form every pass
+    const prevKind = cycle > 0 ? fillKind(prevBars, prevBars - 1, cycle - 1, arr.energy, (salt, bar) => rand(seed, cycle - 1, bar * beatsPerBar, salt)) : "none";
+    if (style.drums.crashOnLoop && (prevKind === "big" || prevKind === "build") && energy >= 0.35) {
+      events.push({ part: "drums", piece: "crash", kit, beat: 0, offsetMs: feel.hats, dur: 2, vel: Math.min(1, 0.85 * gain) });
     }
   }
 
@@ -160,7 +195,25 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
       for (let n = best; n <= hi; n += 12) if (Math.abs(n - around) < Math.abs(best - around)) best = n;
       return best;
     };
-    if (style.bass === "walking") {
+    const plan = bassSlotsFor(style, energy, barRand(0));
+    if (plan === "two") {
+      // jazz two-feel: half notes, root then fifth or an approach into the next chord
+      for (let b = 0; b < length; b += 2) {
+        const ch = chordAt(b);
+        const ci = chordIndexAt(b);
+        const posInChord = b - starts[ci];
+        const lastHalf = posInChord + 2 >= arr.chords[ci].beats;
+        let midi: number;
+        if (posInChord === 0) midi = nearest(ch.bassPc, prev);
+        else if (lastHalf) {
+          const target = nearest(chordAt(b + 2).bassPc, prev);
+          midi = rand(seed, cycle, b, "approach") < 0.6 ? target - 1 : target + 1;
+        } else midi = nearest((ch.rootPc + ch.fifth) % 12, prev);
+        midi = Math.max(28, Math.min(52, midi));
+        prev = midi;
+        events.push({ part: "bass", midi, beat: b, offsetMs: human(feel.bass, b, "bass"), dur: 1.9, vel: Math.min(1, 0.74 * gain) });
+      }
+    } else if (plan === "walking") {
       for (let b = 0; b < length; b++) {
         const ch = chordAt(b);
         const next = chordAt(b + 1);
@@ -174,21 +227,30 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
           midi = rand(seed, cycle, b, "approach") < 0.65 ? target - 1 : target + 1;
         } else {
           const tones = [0, ch.third ?? 5, ch.fifth, ch.seventh ?? 9].map((t) => (ch.rootPc + t) % 12);
+          // chord tones plus, some of the time, the scale steps between them
+          if (rand(seed, cycle, b, "passing") < 0.35) tones.push((ch.rootPc + 2) % 12, (ch.rootPc + (ch.quality === "min" || ch.quality === "dim" ? 5 : 9)) % 12);
           const target = nearest(next.bassPc, prev);
-          const dir = target >= prev ? 1 : -1;
+          // usually head for the next chord; now and then turn away first so lines don't repeat
+          const dir = (target >= prev ? 1 : -1) * (rand(seed, cycle, b, "turn") < 0.2 ? -1 : 1);
           let candidate = prev + dir;
           while (!tones.includes(((candidate % 12) + 12) % 12)) candidate += dir;
           midi = Math.max(28, Math.min(52, candidate));
         }
         prev = midi;
-        events.push({ part: "bass", midi, beat: b, offsetMs: human(feel.bass, b, "bass"), dur: 0.95, vel: 0.78 + jitter(seed, cycle, b, "bassvel") * 0.06 });
+        events.push({ part: "bass", midi, beat: b, offsetMs: human(feel.bass, b, "bass"), dur: 0.95, vel: Math.min(1, (0.78 + jitter(seed, cycle, b, "bassvel") * 0.06) * gain) });
       }
     } else {
       for (let bar = 0; bar < bars; bar++) {
-        for (const slot of style.bass) {
-          const beat = bar * beatsPerBar + slot.step / spb;
+        const barStart = bar * beatsPerBar;
+        const nextBar = barStart + beatsPerBar;
+        // a walk-up into the next chord at the end of a phrase
+        const pickup = energy >= 0.5 && ((bar + 1) % 4 === 0 || bar === bars - 1) && starts.includes(nextBar % length) && rr("pickup", bar) < 0.55;
+        const pickupFrom = nextBar - 1;
+        for (const slot of plan) {
+          const beat = barStart + slot.step / spb;
           if (beat >= length) continue;
-          const ch = chordAt(beat);
+          if (pickup && beat >= pickupFrom - 1e-6) continue;
+          const ch = chordAt(harmonyBeat(beat));
           const root = nearest(ch.bassPc, slot.step === 0 ? 40 : prev);
           const endBeat = beat + slot.len / spb;
           let midi: number;
@@ -209,7 +271,23 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
             beat: swingBeat(beat, style),
             offsetMs: human(feel.bass, beat, "bass"),
             dur: (slot.len / spb) * 0.9,
-            vel: Math.min(1, slot.vel * (1 + jitter(seed, cycle, beat, "bassvel") * 0.06)),
+            vel: Math.min(1, slot.vel * gain * (1 + jitter(seed, cycle, beat, "bassvel") * 0.06)),
+          });
+        }
+        if (pickup) {
+          const target = nearest(chordAt(nextBar % length).bassPc, prev);
+          const above = rr("pickupdir", bar) < 0.35 && target + 2 <= 55;
+          const steps = spb === 3 ? (above ? [4, 2, 1] : [-4, -2, -1]) : above ? [2, 1] : [-2, -1];
+          steps.forEach((d, k) => {
+            const beat = pickupFrom + k / steps.length;
+            events.push({
+              part: "bass",
+              midi: Math.max(28, Math.min(55, target + d)),
+              beat: swingBeat(beat, style),
+              offsetMs: human(feel.bass, beat, "bass"),
+              dur: (1 / steps.length) * 0.9,
+              vel: Math.min(1, (0.7 + k * 0.06) * gain),
+            });
           });
         }
       }
@@ -218,22 +296,24 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
 
   // ── guitar ──
   if (arr.parts.guitar && style.guitar.pattern) {
-    const pat = style.guitar.pattern;
+    const up = energy >= 0.75 && !/[0-5P]/.test(style.guitar.pattern);
     for (let bar = 0; bar < bars; bar++) {
+      const pat = guitarPatternFor(style, energy, section, barRand(bar));
       for (let step = 0; step < pat.length; step++) {
         const c = pat[step];
         if (c === ".") continue;
         const beat = bar * beatsPerBar + step / spb;
         if (beat >= length) continue;
-        const ch = chordAt(beat);
-        const strings = guitarStrings(arr.chords[chordIndexAt(beat)].chord, ch);
+        const hb = harmonyBeat(beat);
+        const ch = chordAt(hb);
+        const strings = guitarStrings(arr.chords[chordIndexAt(hb % length)].chord, ch, up);
         let nextStep = step + 1;
         while (nextStep < pat.length && pat[nextStep] === ".") nextStep++;
         const ringBeats = (nextStep - step) / spb;
         const base = human(feel.guitar, beat, "gtr");
         const at = swingBeat(beat, style);
         const push = (string: number, midi: number, delayMs: number, vel: number, dur: number) =>
-          events.push({ part: "guitar", midi, string, beat: at, offsetMs: base + delayMs, dur, vel });
+          events.push({ part: "guitar", midi, string, beat: at, offsetMs: base + delayMs, dur, vel: Math.min(1, vel * gain) });
         const played = strings.map((m, i) => ({ m, i })).filter((x) => x.m !== null) as { m: number; i: number }[];
         if (c === "D" || c === "d") {
           const vel = c === "D" ? 0.85 : 0.6;
@@ -259,7 +339,7 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
 
   // ── keys ──
   if (arr.parts.keys && style.keys.pattern) {
-    const pat = style.keys.pattern;
+    const pat = keysPatternFor(style, energy);
     let prevVoicing: number[] | null = null;
     let lastChord = -1;
     let voicing: number[] = [];
@@ -282,7 +362,7 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
         const dur = style.keys.short ? 0.3 : Math.min(hold / spb, nextChange - beat);
         const base = human(feel.keys, beat, "keys");
         voicing.forEach((midi, k) =>
-          events.push({ part: "keys", midi, beat: swingBeat(beat, style), offsetMs: base + k * 3, dur: dur * 0.95, vel: Math.min(1, (c === "X" ? 0.62 : 0.45) * (1 + jitter(seed, cycle, beat, "keysvel", k) * 0.06)) })
+          events.push({ part: "keys", midi, beat: swingBeat(beat, style), offsetMs: base + k * 3, dur: dur * 0.95, vel: Math.min(1, (c === "X" ? 0.62 : 0.45) * gain * (1 + jitter(seed, cycle, beat, "keysvel", k) * 0.06)) })
         );
       }
     }
@@ -294,5 +374,6 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
     lengthBeats: length,
     beatsPerBar,
     chordStarts: starts.map((beat, index) => ({ beat, index })),
+    section,
   };
 }

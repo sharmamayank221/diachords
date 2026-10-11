@@ -5,6 +5,7 @@
 import type { DrumPiece } from "./styles";
 
 export type Instrument = "bass" | "guitar" | "guitarElectric" | "keys";
+export type DrumKit = "modern" | "vintage" | "brushes";
 
 interface DrumManifest {
   pieces: Record<string, { url: string; loVel: number; hiVel: number }[]>;
@@ -13,13 +14,28 @@ interface PitchedManifest {
   regions: { url: string; root: number }[];
 }
 
-const ROOTS: Record<Instrument | "drums", string> = {
-  drums: "/samples/drums-avl-pearl/",
+const KITS: Record<DrumKit, string> = {
+  modern: "/samples/drums-avl-pearl/",
+  vintage: "/samples/drums-avl-vintage/",
+  brushes: "/samples/drums-brushes/",
+};
+const ROOTS: Record<Instrument, string> = {
   bass: "/samples/bass-electric/",
   guitar: "/samples/guitar-acoustic/",
   guitarElectric: "/samples/guitar-electric/",
   keys: "/samples/piano-salamander/",
 };
+
+/** folder + manifest url, resolving "../other-kit/file.wav" so shared samples share one buffer */
+function sampleUrl(folder: string, url: string): string {
+  let base = folder.replace(/\/$/, "");
+  let rest = url;
+  while (rest.startsWith("../")) {
+    base = base.slice(0, base.lastIndexOf("/"));
+    rest = rest.slice(3);
+  }
+  return `${base}/${rest}`;
+}
 
 const buffers = new Map<string, AudioBuffer>();
 const pending = new Map<string, Promise<AudioBuffer | null>>();
@@ -73,9 +89,9 @@ function load(ctx: BaseAudioContext, url: string): Promise<AudioBuffer | null> {
 
 // ── preload exactly what an arrangement will use ─────────────────────────────
 
-export async function preloadDrums(ctx: BaseAudioContext, pieces: Set<DrumPiece>): Promise<void> {
-  const m = await manifest<DrumManifest>(ROOTS.drums);
-  const urls = Array.from(pieces).flatMap((p) => (m.pieces[p] ?? []).map((l) => ROOTS.drums + l.url));
+export async function preloadDrums(ctx: BaseAudioContext, pieces: Set<DrumPiece>, kit: DrumKit = "modern"): Promise<void> {
+  const m = await manifest<DrumManifest>(KITS[kit]);
+  const urls = Array.from(pieces).flatMap((p) => (m.pieces[p] ?? []).map((l) => sampleUrl(KITS[kit], l.url)));
   await Promise.all(urls.map((u) => load(ctx, u)));
 }
 
@@ -98,24 +114,32 @@ function nearestRegion(m: PitchedManifest, midi: number) {
 }
 
 // synchronous lookups for the scheduler (manifests are resolved by the time we play)
-const resolved: Partial<Record<Instrument | "drums", any>> = {};
+const resolved: Partial<Record<Instrument, any>> = {};
+const resolvedKits: Partial<Record<DrumKit, DrumManifest>> = {};
 export async function resolveManifests(): Promise<void> {
-  for (const k of Object.keys(ROOTS) as (Instrument | "drums")[]) {
+  for (const k of Object.keys(ROOTS) as Instrument[]) {
     try {
       resolved[k] = await manifest(ROOTS[k]);
     } catch {
       /* instrument unavailable */
     }
   }
+  for (const k of Object.keys(KITS) as DrumKit[]) {
+    try {
+      resolvedKits[k] = await manifest<DrumManifest>(KITS[k]);
+    } catch {
+      /* kit unavailable */
+    }
+  }
 }
 
-export function drumBuffer(piece: DrumPiece, vel: number): AudioBuffer | null {
-  const m: DrumManifest | undefined = resolved.drums;
+export function drumBuffer(piece: DrumPiece, vel: number, kit: DrumKit = "modern"): AudioBuffer | null {
+  const m: DrumManifest | undefined = resolvedKits[kit];
   const layers = m?.pieces[piece];
   if (!layers) return null;
   const v = Math.max(1, Math.min(127, Math.round(vel * 127)));
   const layer = layers.find((l) => v >= l.loVel && v <= l.hiVel) ?? layers[layers.length - 1];
-  return buffers.get(ROOTS.drums + layer.url) ?? null;
+  return buffers.get(sampleUrl(KITS[kit], layer.url)) ?? null;
 }
 
 export function pitchedBuffer(inst: Instrument, midi: number): { buffer: AudioBuffer; rate: number } | null {

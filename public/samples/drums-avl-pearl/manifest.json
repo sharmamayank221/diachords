@@ -327,6 +327,114 @@
     "loVel": 103,
     "hiVel": 127
    }
+  ],
+  "tambourine": [
+   {
+    "url": "tambourine-1.wav",
+    "loVel": 1,
+    "hiVel": 26
+   },
+   {
+    "url": "tambourine-2.wav",
+    "loVel": 27,
+    "hiVel": 52
+   },
+   {
+    "url": "tambourine-3.wav",
+    "loVel": 53,
+    "hiVel": 77
+   },
+   {
+    "url": "tambourine-4.wav",
+    "loVel": 78,
+    "hiVel": 102
+   },
+   {
+    "url": "tambourine-5.wav",
+    "loVel": 103,
+    "hiVel": 127
+   }
+  ],
+  "clap": [
+   {
+    "url": "clap-1.wav",
+    "loVel": 1,
+    "hiVel": 26
+   },
+   {
+    "url": "clap-2.wav",
+    "loVel": 27,
+    "hiVel": 52
+   },
+   {
+    "url": "clap-3.wav",
+    "loVel": 53,
+    "hiVel": 77
+   },
+   {
+    "url": "clap-4.wav",
+    "loVel": 78,
+    "hiVel": 102
+   },
+   {
+    "url": "clap-5.wav",
+    "loVel": 103,
+    "hiVel": 127
+   }
+  ],
+  "shaker": [
+   {
+    "url": "shaker-1.wav",
+    "loVel": 1,
+    "hiVel": 26
+   },
+   {
+    "url": "shaker-2.wav",
+    "loVel": 27,
+    "hiVel": 52
+   },
+   {
+    "url": "shaker-3.wav",
+    "loVel": 53,
+    "hiVel": 77
+   },
+   {
+    "url": "shaker-4.wav",
+    "loVel": 78,
+    "hiVel": 102
+   },
+   {
+    "url": "shaker-5.wav",
+    "loVel": 103,
+    "hiVel": 127
+   }
+  ],
+  "cowbell": [
+   {
+    "url": "cowbell-1.wav",
+    "loVel": 1,
+    "hiVel": 26
+   },
+   {
+    "url": "cowbell-2.wav",
+    "loVel": 27,
+    "hiVel": 52
+   },
+   {
+    "url": "cowbell-3.wav",
+    "loVel": 53,
+    "hiVel": 77
+   },
+   {
+    "url": "cowbell-4.wav",
+    "loVel": 78,
+    "hiVel": 102
+   },
+   {
+    "url": "cowbell-5.wav",
+    "loVel": 103,
+    "hiVel": 127
+   }
   ]
  }
 }
