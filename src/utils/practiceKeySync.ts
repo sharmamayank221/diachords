@@ -1,5 +1,4 @@
 import { SCALES } from "@/data/scales";
-import type { Genre } from "@/utils/backingTrackEngine";
 
 /** Keys used in jam UI (enharmonic spellings). */
 export const PRACTICE_KEYS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"] as const;
@@ -47,15 +46,14 @@ export function rootIndexToJamKey(index: number): PracticeKey {
   return SEMITONE_TO_JAM_KEY[i];
 }
 
-/** Pick a scale that matches jam genre + key for solo practice. */
-export function suggestedScaleForJam(genre: Genre, key: string): string {
-  if (genre === "blues") return "blues";
-  if (genre === "jazz") return "mixolydian";
-  if (genre === "country" || genre === "rock" || genre === "pop" || genre === "funk" || genre === "reggae") {
-    return "pentatonic_major";
-  }
+/** Pick a scale that suits a jam style and mode for soloing over it. */
+export function suggestedScaleForJam(style: string, key: string, mode: "major" | "minor" = "major"): string {
   void key;
-  return "major";
+  if (style === "blues" || style === "slowblues") return "blues";
+  if (style === "jazz" || style === "bossa" || style === "lofi") return mode === "minor" ? "dorian" : "major";
+  if (style === "funk" || style === "disco" || style === "soul") return mode === "minor" ? "dorian" : "mixolydian";
+  if (style === "metal") return mode === "minor" ? "phrygian" : "pentatonic_major";
+  return mode === "minor" ? "pentatonic_minor" : "pentatonic_major";
 }
 
 export function isValidScaleId(id: string): boolean {

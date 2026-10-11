@@ -1,48 +1,26 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { track as trackEvent } from "@/lib/analytics";
-import { createBackingTrack, disposeBackingTrack, isKnownChord, Genre, BackingTrack } from "@/utils/backingTrackEngine";
 import { buildJamShareUrl, loadJamSession, saveJamSession } from "@/utils/jamPracticeHelpers";
-import { spellScale } from "@/helpers/scaleSpelling";
 import { findChord } from "@/helpers/chordSearch";
 import ChordDiagram from "@/components/Chord/ChordDiagram";
+import { STYLES, STYLE_BY_ID } from "@/jam/styles";
+import { Arrangement, PartId, generateArrangement, styleProgressions, withCustomChords, progressionToChords } from "@/jam/arrangement";
+import { KEY_NAMES, Mode, noteToPc, parseChord } from "@/jam/theory";
+import { hashString } from "@/jam/rng";
+import type { JamEngine as JamEngineType } from "@/jam/engine";
+import { RIG_PRESETS, RigSettings, STYLE_RIG } from "@/jam/rig";
+import { addUserTone, listUserTones, removeUserTone, type UserTone } from "@/jam/userTones";
+import GuitarRigPanel from "./GuitarRigPanel";
 
-// ── Data ──────────────────────────────────────────────────────────────────────
+const RIG_STORAGE_KEY = "jam-rig-v1";
 
-const GENRES: { id: Genre; name: string; description: string }[] = [
-  { id: "rock", name: "Rock", description: "Driving eighth-note beat" },
-  { id: "blues", name: "Blues", description: "Shuffle with a boogie bass" },
-  { id: "jazz", name: "Jazz", description: "Swing ride, walking bass" },
-  { id: "pop", name: "Pop", description: "Modern, steady beat" },
-  { id: "funk", name: "Funk", description: "Syncopated and tight" },
-  { id: "reggae", name: "Reggae", description: "Off-beat skank" },
-  { id: "country", name: "Country", description: "Train beat, root–fifth bass" },
+const PARTS: { id: PartId; label: string }[] = [
+  { id: "drums", label: "Drums" },
+  { id: "bass", label: "Bass" },
+  { id: "guitar", label: "Guitar" },
+  { id: "keys", label: "Keys" },
 ];
-
-const KEYS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
-const SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-const FLATS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
-const LETTER_PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-
-// written in C; transposed to the chosen key
-const PRESET_PROGRESSIONS = [
-  { name: "I–V–vi–IV", label: "Pop", chords: ["C", "G", "Am", "F"] },
-  { name: "I–IV–V", label: "Rock", chords: ["C", "F", "G", "G"] },
-  { name: "ii–V–I", label: "Jazz", chords: ["Dm7", "G7", "Cmaj7", "Cmaj7"] },
-  { name: "I–vi–IV–V", label: "50s", chords: ["C", "Am", "F", "G"] },
-  { name: "vi–IV–I–V", label: "Sad", chords: ["Am", "F", "C", "G"] },
-  { name: "I–IV", label: "2-chord", chords: ["C", "F", "C", "F"] },
-  { name: "12-bar blues", label: "Blues", chords: ["C7", "C7", "C7", "C7", "F7", "F7", "C7", "C7", "G7", "F7", "C7", "G7"] },
-  { name: "i–VII–VI–VII", label: "Minor", chords: ["Cm", "Bb", "Ab", "Bb"] },
-];
-
-const INSTRUMENTS: { key: "drums" | "bass" | "rhythm"; label: string }[] = [
-  { key: "drums", label: "Drums" },
-  { key: "bass", label: "Bass" },
-  { key: "rhythm", label: "Guitar" },
-];
-
-const VALID_GENRES = new Set<Genre>(GENRES.map((g) => g.id));
 const PLAYBACK_SPEEDS = [0.75, 1, 1.25] as const;
 const LOOP_OPTIONS = [
   { value: 0, label: "∞" },
@@ -51,256 +29,280 @@ const LOOP_OPTIONS = [
   { value: 4, label: "4×" },
   { value: 8, label: "8×" },
 ];
-const MIN_BPM = 60;
-const MAX_BPM = 180;
-
-// Transpose a chord written in C into `key`, spelled the way that key is written (Ab key → Db, not C#)
-function transposeChord(chord: string, key: string): string {
-  const m = chord.match(/^([A-G])([#b]?)(.*)$/);
-  if (!m) return chord;
-  const fromPc = (LETTER_PC[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + 12) % 12;
-  const keyPc = KEYS.indexOf(key);
-  if (keyPc < 0) return chord;
-  const pc = (fromPc + keyPc) % 12;
-  const spelled = spellScale(keyPc, [0, 2, 4, 5, 7, 9, 11]);
-  const inKey = spelled.nameForPc(pc);
-  if (inKey) return inKey + m[3];
-  // borrowed chords keep the direction they're written in (bVII stays a flat: Bb, not A#)
-  const flat = m[2] === "b" || (m[2] !== "#" && spelled.names.some((n) => n.includes("b")));
-  return (flat ? FLATS : SHARPS)[pc] + m[3];
-}
-
-function parseCustomChords(text: string) {
-  return text
-    .split(/[\s,|→]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((name) => ({ name, valid: isKnownChord(name) }));
-}
+const MINOR_SCALES = new Set(["natural_minor", "harmonic_minor", "melodic_minor", "pentatonic_minor", "blues", "dorian", "phrygian", "locrian"]);
+const MIN_BPM = 40;
+const MAX_BPM = 240;
 
 const chipClass = (active: boolean) =>
   `h-8 px-3 rounded-full font-Inter text-sm transition-colors focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
     active ? "bg-[#1BD79E] text-black font-semibold" : "bg-[#161616] text-gray-300 hover:bg-[#222]"
   }`;
 
-// ── Component ─────────────────────────────────────────────────────────────────
+function parseCustom(text: string) {
+  return text
+    .split(/[\s,|→]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((name) => ({ name, valid: !!parseChord(name) && !!findChord(name) }));
+}
 
 export interface BackingTrackGeneratorProps {
   practiceKey?: string;
   onPracticeKeyChange?: (key: string) => void;
   practiceScaleId?: string;
-  onSuggestScale?: (genre: Genre) => void;
+  onSuggestScale?: (style: string, mode: Mode) => void;
   onOpenScales?: () => void;
 }
 
 export default function BackingTrackGenerator({ practiceKey, practiceScaleId, onSuggestScale, onOpenScales }: BackingTrackGeneratorProps) {
   const router = useRouter();
-  const [selectedGenre, setSelectedGenre] = useState<Genre>("rock");
-  const [selectedKey, setSelectedKey] = useState(practiceKey && KEYS.includes(practiceKey) ? practiceKey : "C");
-  const [bpm, setBpm] = useState(100);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState(0);
-  const [currentBeat, setCurrentBeat] = useState(-1);
-  const [countingIn, setCountingIn] = useState(false);
-  const [currentChordIndex, setCurrentChordIndex] = useState(-1);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const keyName = practiceKey && noteToPc(practiceKey) !== null ? KEY_NAMES[noteToPc(practiceKey)!] : "C";
+  const scaleMode: Mode = practiceScaleId && MINOR_SCALES.has(practiceScaleId) ? "minor" : "major";
+
+  const [styleId, setStyleId] = useState("rock");
+  const [mode, setMode] = useState<Mode>(scaleMode);
+  const [modeTouched, setModeTouched] = useState(false);
+  const [progressionIndex, setProgressionIndex] = useState(0);
+  const [seed, setSeed] = useState(1);
+  const [bpm, setBpm] = useState(STYLE_BY_ID.rock.tempo.default);
+  const [speed, setSpeed] = useState(1);
   const [loopLimit, setLoopLimit] = useState(0);
-  const [loopsDone, setLoopsDone] = useState(0);
   const [countIn, setCountIn] = useState(true);
-  const [customChordsText, setCustomChordsText] = useState("");
+  const [customText, setCustomText] = useState("");
+  const [parts, setParts] = useState<Record<PartId, boolean>>({ ...STYLE_BY_ID.rock.parts });
+  const [volumes, setVolumes] = useState<Record<PartId, number>>({ drums: 0.8, bass: 0.8, guitar: 0.75, keys: 0.7 });
+
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [beat, setBeat] = useState<{ bar: number; beat: number; countIn: boolean } | null>(null);
+  const [chordIdx, setChordIdx] = useState(-1);
   const [shareCopied, setShareCopied] = useState(false);
-  const [volumes, setVolumes] = useState({ drums: 80, bass: 70, rhythm: 55 });
-  const [muted, setMuted] = useState({ drums: false, bass: false, rhythm: false });
+  const [error, setError] = useState<string | null>(null);
 
-  const trackRef = useRef<BackingTrack | null>(null);
-  const lastChordIdxRef = useRef(-1);
-  const loopsRef = useRef(0);
-  const hydratedRef = useRef(false);
+  const [rigPreset, setRigPreset] = useState<string | null>(STYLE_RIG.rock);
+  const [rig, setRig] = useState<RigSettings>(RIG_PRESETS[STYLE_RIG.rock].settings);
+  const [rigStatus, setRigStatus] = useState<string | null>(null);
+  const [userTones, setUserTones] = useState<Omit<UserTone, "data">[]>([]);
+  const engineRef = useRef<JamEngineType | null>(null);
+  const hydrated = useRef(false);
+  const style = STYLE_BY_ID[styleId];
 
-  useEffect(() => () => disposeBackingTrack(), []);
-
-  // restore the last session, then let URL params (share links) override it
   useEffect(() => {
-    if (!router.isReady || hydratedRef.current) return;
-    hydratedRef.current = true;
+    if (!modeTouched) setMode(scaleMode);
+  }, [scaleMode, modeTouched]);
+
+  // last-used rig (per browser) and the user's own .nam / IR files
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(RIG_STORAGE_KEY) || "null");
+      if (saved?.settings) {
+        setRig(saved.settings);
+        setRigPreset(saved.presetId ?? null);
+      }
+    } catch {
+      /* storage unavailable */
+    }
+    listUserTones().then(setUserTones);
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(RIG_STORAGE_KEY, JSON.stringify({ settings: rig, presetId: rigPreset }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [rig, rigPreset]);
+
+  // restore the last session; share-link params override it
+  useEffect(() => {
+    if (!router.isReady || hydrated.current) return;
+    hydrated.current = true;
     const saved = loadJamSession();
-    if (saved) {
-      if (VALID_GENRES.has(saved.genre as Genre)) setSelectedGenre(saved.genre as Genre);
-      if (saved.bpm >= MIN_BPM && saved.bpm <= MAX_BPM) setBpm(saved.bpm);
-      if (saved.preset >= 0 && saved.preset < PRESET_PROGRESSIONS.length) setSelectedPreset(saved.preset);
-      if (saved.playbackSpeed) setPlaybackSpeed(saved.playbackSpeed);
-      if (saved.loopLimit !== undefined) setLoopLimit(saved.loopLimit);
-      if (saved.countIn !== undefined) setCountIn(saved.countIn);
-      if (saved.customChords) setCustomChordsText(saved.customChords);
+    const q = router.query;
+    const st = typeof q.genre === "string" && STYLE_BY_ID[q.genre] ? q.genre : saved?.genre && STYLE_BY_ID[saved.genre] ? saved.genre : null;
+    if (st) {
+      setStyleId(st);
+      setParts({ ...STYLE_BY_ID[st].parts });
     }
-    const { genre, bpm: bpmParam, preset, speed, loops, countin, chords } = router.query;
-    if (typeof genre === "string" && VALID_GENRES.has(genre as Genre)) setSelectedGenre(genre as Genre);
-    if (typeof bpmParam === "string") {
-      const n = parseInt(bpmParam, 10);
-      if (n >= MIN_BPM && n <= MAX_BPM) setBpm(n);
+    const b = typeof q.bpm === "string" ? parseInt(q.bpm, 10) : saved?.bpm;
+    if (b && b >= MIN_BPM && b <= MAX_BPM) setBpm(b);
+    else if (st) setBpm(STYLE_BY_ID[st].tempo.default);
+    const p = typeof q.preset === "string" ? parseInt(q.preset, 10) : saved?.preset;
+    if (p !== undefined && p >= 0) setProgressionIndex(p);
+    if (saved?.playbackSpeed) setSpeed(saved.playbackSpeed);
+    if (saved?.loopLimit !== undefined) setLoopLimit(saved.loopLimit);
+    if (q.countin === "1" || q.countin === "0") setCountIn(q.countin === "1");
+    else if (saved?.countIn !== undefined) setCountIn(saved.countIn);
+    const chords = typeof q.chords === "string" ? q.chords : saved?.customChords;
+    if (chords) setCustomText(chords);
+    if (typeof q.mode === "string" && (q.mode === "major" || q.mode === "minor")) {
+      setMode(q.mode);
+      setModeTouched(true);
     }
-    if (typeof preset === "string") {
-      const i = parseInt(preset, 10);
-      if (i >= 0 && i < PRESET_PROGRESSIONS.length) setSelectedPreset(i);
-    }
-    if (typeof speed === "string" && PLAYBACK_SPEEDS.includes(parseFloat(speed) as (typeof PLAYBACK_SPEEDS)[number])) setPlaybackSpeed(parseFloat(speed));
-    if (typeof loops === "string" && parseInt(loops, 10) >= 0) setLoopLimit(parseInt(loops, 10));
-    if (countin === "1" || countin === "0") setCountIn(countin === "1");
-    if (typeof chords === "string") setCustomChordsText(chords);
   }, [router.isReady, router.query]);
 
   useEffect(() => {
-    if (practiceKey && KEYS.includes(practiceKey)) setSelectedKey(practiceKey);
-  }, [practiceKey]);
-
-  useEffect(() => {
     saveJamSession({
-      key: selectedKey,
-      genre: selectedGenre,
+      key: keyName,
+      genre: styleId,
       bpm,
-      preset: selectedPreset,
-      playbackSpeed,
+      preset: progressionIndex,
+      playbackSpeed: speed,
       loopLimit,
       countIn,
-      customChords: customChordsText.trim() || undefined,
+      customChords: customText.trim() || undefined,
       scale: practiceScaleId,
       lastTab: "jam",
     });
-  }, [selectedKey, selectedGenre, bpm, selectedPreset, playbackSpeed, loopLimit, countIn, customChordsText, practiceScaleId]);
+  }, [keyName, styleId, bpm, progressionIndex, speed, loopLimit, countIn, customText, practiceScaleId]);
 
-  const effectiveBpm = Math.round(bpm * playbackSpeed);
-  const custom = useMemo(() => parseCustomChords(customChordsText), [customChordsText]);
-  const chords = useMemo(
-    () => (custom.length ? custom.filter((c) => c.valid).map((c) => c.name) : PRESET_PROGRESSIONS[selectedPreset].chords.map((c) => transposeChord(c, selectedKey))),
-    [custom, selectedPreset, selectedKey]
-  );
-  const chordKey = chords.join(" ");
+  const custom = useMemo(() => parseCustom(customText), [customText]);
+  const progressions = styleProgressions(style, mode);
+  const effectiveBpm = Math.round(bpm * speed);
 
-  // ── Transport ──────────────────────────────────────────────────────────────
-  const stopSession = useCallback(() => {
-    trackRef.current?.stop();
-    trackRef.current = null;
-    setIsPlaying(false);
-    setCountingIn(false);
-    setCurrentBeat(-1);
-    setCurrentChordIndex(-1);
-    lastChordIdxRef.current = -1;
-    loopsRef.current = 0;
-    setLoopsDone(0);
+  const arrangement: Arrangement = useMemo(() => {
+    const base = generateArrangement({ style: styleId, key: keyName, mode, tempo: effectiveBpm, seed, progressionIndex: Math.min(progressionIndex, progressions.length - 1) });
+    const withChords = custom.length ? withCustomChords(base, custom.filter((c) => c.valid).map((c) => c.name)) : base;
+    return { ...withChords, tempo: effectiveBpm, parts };
+  }, [styleId, keyName, mode, effectiveBpm, seed, progressionIndex, progressions.length, custom, parts]);
+
+  // ── engine ─────────────────────────────────────────────────────────────────
+  const getEngine = useCallback(async () => {
+    if (!engineRef.current) {
+      const { JamEngine } = await import("@/jam/engine");
+      engineRef.current = new JamEngine({
+        onBeat: (b) => setBeat({ bar: b.bar, beat: b.beat, countIn: b.countIn }),
+        onChord: (i) => setChordIdx(i),
+        onPass: (pass) => setPassCount(pass),
+      });
+      setRigStatus(null);
+      const err = await engineRef.current.setRig(rigRef.current);
+      setRigStatus(err);
+    }
+    return engineRef.current;
   }, []);
 
-  const startSession = useCallback(
-    async (withCountIn: boolean) => {
-      if (!chords.length) return;
-      setStarting(true);
-      const len = chords.length;
-      const t = await createBackingTrack({
-        key: selectedKey,
-        bpm: effectiveBpm,
-        genre: selectedGenre,
-        chordProgression: chords,
-        countIn: withCountIn,
-        onBeat: (beat, isCount) => {
-          setCountingIn(isCount);
-          setCurrentBeat(beat);
-        },
-        onChordChange: (idx) => {
-          if (lastChordIdxRef.current === len - 1 && idx === 0) {
-            loopsRef.current += 1;
-            setLoopsDone(loopsRef.current);
-          }
-          lastChordIdxRef.current = idx;
-          setCurrentChordIndex(idx);
-        },
-      });
-      t.setVolume("drums", muted.drums ? 0 : volumes.drums);
-      t.setVolume("bass", muted.bass ? 0 : volumes.bass);
-      t.setVolume("rhythm", muted.rhythm ? 0 : volumes.rhythm);
-      trackRef.current = t;
-      lastChordIdxRef.current = -1;
-      loopsRef.current = 0;
-      setLoopsDone(0);
-      t.start();
-      setStarting(false);
-      setIsPlaying(true);
-    },
-    [chords, selectedKey, effectiveBpm, selectedGenre, muted, volumes]
-  );
+  const [passCount, setPassCount] = useState(0);
+  const rigRef = useRef(rig);
+  rigRef.current = rig;
+  useEffect(() => () => engineRef.current?.dispose(), []);
 
-  const handlePlay = async () => {
-    if (isPlaying) return stopSession();
-    if (starting) return;
-    trackEvent("backing_track_play", { key: selectedKey, genre: selectedGenre, bpm: effectiveBpm, chords: chordKey });
-    await startSession(countIn);
-  };
+  const stop = useCallback(() => {
+    engineRef.current?.stop();
+    setPlaying(false);
+    setBeat(null);
+    setChordIdx(-1);
+    setPassCount(0);
+  }, []);
 
-  // stop after the chosen number of loops
-  useEffect(() => {
-    if (isPlaying && loopLimit > 0 && loopsDone >= loopLimit) stopSession();
-  }, [isPlaying, loopLimit, loopsDone, stopSession]);
-
-  // changing the style or the chords while playing restarts the band with them (no count-in)
-  const restartKey = `${selectedGenre}|${chordKey}`;
-  const lastRestartKey = useRef(restartKey);
-  useEffect(() => {
-    if (lastRestartKey.current === restartKey) return;
-    lastRestartKey.current = restartKey;
-    if (trackRef.current) {
-      trackRef.current.stop();
-      trackRef.current = null;
-      startSession(false);
+  const play = async () => {
+    if (playing) return stop();
+    setError(null);
+    setLoading(true);
+    try {
+      const engine = await getEngine();
+      PARTS.forEach(({ id }) => engine.setVolume(id, volumes[id]));
+      await engine.start(arrangement, { countIn });
+      setPlaying(true);
+      trackEvent("backing_track_play", { key: keyName, genre: styleId, bpm: effectiveBpm, mode, chords: arrangement.chords.map((c) => c.chord).join(" ") });
+    } catch {
+      setError("Couldn’t start audio. Check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
-  }, [restartKey, startSession]);
+  };
 
-  const changeBpm = (v: number) => {
-    const next = Math.min(MAX_BPM, Math.max(MIN_BPM, Math.round(v)));
-    setBpm(next);
-    trackRef.current?.setBpm(Math.round(next * playbackSpeed));
+  // rig changes go straight to the engine (works before and during playback)
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const isModel = rig.guitar === "electric" && (rig.amp.model.startsWith("nam:") || rig.amp.model.startsWith("user:"));
+    if (isModel) setRigStatus("Loading amp model…");
+    engine.setRig(rig).then((err) => setRigStatus(err));
+  }, [rig]);
+
+  // live updates while playing
+  useEffect(() => {
+    if (playing) engineRef.current?.update(arrangement);
+  }, [arrangement, playing]);
+  useEffect(() => {
+    if (playing && loopLimit > 0 && passCount >= loopLimit) stop();
+  }, [passCount, loopLimit, playing, stop]);
+
+  const changeStyle = (id: string) => {
+    setStyleId(id);
+    setBpm(STYLE_BY_ID[id].tempo.default);
+    setParts({ ...STYLE_BY_ID[id].parts });
+    setProgressionIndex(0);
+    setCustomText("");
+    const rigId = STYLE_RIG[id];
+    if (rigId) {
+      setRigPreset(rigId);
+      setRig(RIG_PRESETS[rigId].settings);
+    }
   };
-  const changeSpeed = (s: number) => {
-    setPlaybackSpeed(s);
-    trackRef.current?.setBpm(Math.round(bpm * s));
+  const newIdea = () => {
+    const nextSeed = hashString(`${Date.now()}|${Math.random()}`);
+    setSeed(nextSeed);
+    setProgressionIndex(nextSeed % progressions.length);
+    setCustomText("");
+    trackEvent("backing_track_new_idea", { genre: styleId });
   };
-  const handleVolume = (inst: "drums" | "bass" | "rhythm", v: number) => {
-    setVolumes((p) => ({ ...p, [inst]: v }));
-    if (!muted[inst]) trackRef.current?.setVolume(inst, v);
+  const changeBpm = (v: number) => setBpm(Math.min(MAX_BPM, Math.max(MIN_BPM, Math.round(v))));
+  const setVolume = (p: PartId, v: number) => {
+    setVolumes((s) => ({ ...s, [p]: v }));
+    engineRef.current?.setVolume(p, v);
   };
-  const handleMute = (inst: "drums" | "bass" | "rhythm") => {
-    const next = !muted[inst];
-    setMuted((p) => ({ ...p, [inst]: next }));
-    trackRef.current?.setVolume(inst, next ? 0 : volumes[inst]);
+
+  const exportWav = async (passes: number) => {
+    setExporting(true);
+    try {
+      const { renderArrangement, audioBufferToWav } = await import("@/jam/engine");
+      const muted = { drums: !parts.drums, bass: !parts.bass, guitar: !parts.guitar, keys: !parts.keys };
+      const buf = await renderArrangement(arrangement, passes, { volumes, muted }, rig);
+      const url = URL.createObjectURL(audioBufferToWav(buf));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `diachords-${keyName}${mode === "minor" ? "m" : ""}-${styleId}-${effectiveBpm}bpm.wav`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      trackEvent("backing_track_export", { genre: styleId, passes });
+    } catch {
+      setError("Export failed. Try fewer loops.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const copyShareLink = async () => {
     const url = buildJamShareUrl("/jam", {
-      key: selectedKey,
-      genre: selectedGenre,
+      key: keyName,
+      genre: styleId,
       bpm,
-      preset: selectedPreset,
-      playbackSpeed,
-      loopLimit,
+      preset: progressionIndex,
       countIn,
-      customChords: customChordsText.trim() || undefined,
+      customChords: customText.trim() || undefined,
     });
+    const withMode = `${url}${url.includes("?") ? "&" : "?"}mode=${mode}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(withMode);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
     } catch {
-      window.prompt("Copy this link:", url);
+      window.prompt("Copy this link:", withMode);
     }
   };
 
-  // ── Derived display ────────────────────────────────────────────────────────
-  const activeGenre = GENRES.find((g) => g.id === selectedGenre)!;
-  const nowIdx = isPlaying && currentChordIndex >= 0 ? currentChordIndex : 0;
-  const nowChord = chords[nowIdx];
-  const nextChord = chords[(nowIdx + 1) % chords.length];
+  // ── display ────────────────────────────────────────────────────────────────
+  const chords = arrangement.chords;
+  const nowIdx = playing && chordIdx >= 0 ? chordIdx : 0;
+  const nowChord = chords[nowIdx]?.chord;
+  const nextChord = chords[(nowIdx + 1) % chords.length]?.chord;
   const nowShape = nowChord ? findChord(nowChord) : undefined;
   const nextShape = nextChord ? findChord(nextChord) : undefined;
   const bpmPercent = ((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)) * 100;
   const invalid = custom.filter((c) => !c.valid);
+  const beatsPerBar = style.meter.beats;
 
   return (
     <div className="flex flex-col gap-5 text-white">
@@ -309,36 +311,33 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-center">
           <div className="flex items-center gap-5 md:gap-8">
             <div className="shrink-0 rounded-2xl bg-[#161616] p-2">
-              {nowShape?.positions[0] ? (
-                <ChordDiagram position={nowShape.positions[0]} size={112} title={`${nowChord} chord shape`} />
-              ) : (
-                <div className="w-[112px] h-[140px]" />
-              )}
+              {nowShape?.positions[0] ? <ChordDiagram position={nowShape.positions[0]} size={112} title={`${nowChord} chord shape`} /> : <div className="w-[112px] h-[140px]" />}
             </div>
             <div className="min-w-0">
               <p className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-500">
-                {countingIn ? <span className="text-[#f59e0b]">Count-in</span> : isPlaying ? "Now playing" : "First chord"}
+                {beat?.countIn ? <span className="text-[#f59e0b]">Count-in</span> : playing ? "Now playing" : "First chord"}
+                <span className="ml-2 normal-case tracking-normal text-gray-600">
+                  {style.name} · {style.meter.label} · {keyName} {mode}
+                </span>
               </p>
               <p className="font-Lora text-5xl md:text-6xl leading-tight text-[#1BD79E]" aria-live="polite">
                 {nowChord ?? "—"}
               </p>
-              <div className="mt-2 flex items-center gap-3">
-                {nextChord && chords.length > 1 && (
-                  <span className="inline-flex items-center gap-2 font-Inter text-sm text-gray-400">
-                    Next
-                    {nextShape?.positions[0] && <ChordDiagram position={nextShape.positions[0]} size={46} showFingers={false} />}
-                    <span className="font-Lora text-lg text-white">{nextChord}</span>
-                  </span>
-                )}
-              </div>
+              {nextChord && chords.length > 1 && (
+                <p className="mt-2 inline-flex items-center gap-2 font-Inter text-sm text-gray-400">
+                  Next
+                  {nextShape?.positions[0] && <ChordDiagram position={nextShape.positions[0]} size={46} showFingers={false} />}
+                  <span className="font-Lora text-lg text-white">{nextChord}</span>
+                </p>
+              )}
               <div className="mt-3 flex gap-2" aria-hidden>
-                {[0, 1, 2, 3].map((b) => (
+                {Array.from({ length: beatsPerBar }, (_, b) => (
                   <span
                     key={b}
                     className="h-3 w-3 rounded-full transition-all duration-75"
                     style={{
-                      background: currentBeat === b ? (countingIn ? "#f59e0b" : b === 0 ? "#1BD79E" : "#e5e7eb") : "#262626",
-                      transform: currentBeat === b ? "scale(1.25)" : "scale(1)",
+                      background: beat && beat.beat === b ? (beat.countIn ? "#f59e0b" : b === 0 ? "#1BD79E" : "#e5e7eb") : "#262626",
+                      transform: beat && beat.beat === b ? "scale(1.25)" : "scale(1)",
                     }}
                   />
                 ))}
@@ -346,17 +345,27 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 lg:w-[300px]">
-            <button
-              type="button"
-              onClick={handlePlay}
-              disabled={!chords.length}
-              className={`h-14 rounded-full font-Inter text-base font-semibold inline-flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-40 ${
-                isPlaying ? "bg-white text-black" : "bg-[#1BD79E] text-black hover:brightness-110"
-              }`}
-            >
-              {starting ? "Loading sounds…" : isPlaying ? "■ Stop" : "▶ Start jam"}
-            </button>
+          <div className="flex flex-col gap-3 lg:w-[320px]">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={play}
+                disabled={loading || !chords.length}
+                className={`flex-1 h-14 rounded-full font-Inter text-base font-semibold inline-flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-60 ${
+                  playing ? "bg-white text-black" : "bg-[#1BD79E] text-black hover:brightness-110"
+                }`}
+              >
+                {loading ? "Loading sounds…" : playing ? "■ Stop" : "▶ Start jam"}
+              </button>
+              <button
+                type="button"
+                onClick={newIdea}
+                title="New progression and feel in this style"
+                className="h-14 px-4 rounded-full border border-white/15 font-Inter text-sm font-semibold text-gray-200 hover:border-[#1BD79E]/60"
+              >
+                ✨ New idea
+              </button>
+            </div>
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => changeBpm(bpm - 5)} aria-label="Slower" className="h-9 w-9 shrink-0 rounded-full bg-[#161616] text-lg hover:bg-[#222]">
                 −
@@ -377,24 +386,27 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
             </div>
             <p className="font-Inter text-sm text-center text-gray-400 tabular-nums">
               <span className="text-white font-semibold">{effectiveBpm}</span> BPM
-              {playbackSpeed !== 1 && <span className="text-gray-500"> ({Math.round(playbackSpeed * 100)}% of {bpm})</span>}
-              {isPlaying && loopLimit > 0 && <span className="text-gray-500"> · loop {Math.min(loopsDone + 1, loopLimit)}/{loopLimit}</span>}
+              {speed !== 1 && <span className="text-gray-500"> ({Math.round(speed * 100)}% of {bpm})</span>}
+              {playing && loopLimit > 0 && <span className="text-gray-500"> · loop {Math.min(passCount + 1, loopLimit)}/{loopLimit}</span>}
             </p>
+            {error && (
+              <p role="alert" className="font-Inter text-xs text-[#f59e0b] text-center">
+                {error}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* progression strip */}
         <ol className="mt-6 flex gap-2 overflow-x-auto no-scrollbar pb-1" aria-label="Progression">
-          {chords.map((chord, idx) => {
-            const active = isPlaying && !countingIn && currentChordIndex === idx;
+          {chords.map((c, idx) => {
+            const active = playing && !beat?.countIn && chordIdx === idx;
             return (
               <li
                 key={idx}
-                className={`shrink-0 min-w-[56px] px-3 py-2 rounded-xl text-center font-Lora text-lg border transition-colors ${
-                  active ? "bg-[#1BD79E] text-black border-transparent" : "bg-[#161616] text-gray-200 border-white/5"
-                }`}
+                className={`shrink-0 min-w-[56px] px-3 py-2 rounded-xl text-center border transition-colors ${active ? "bg-[#1BD79E] text-black border-transparent" : "bg-[#161616] text-gray-200 border-white/5"}`}
+                style={{ flexGrow: c.beats / beatsPerBar }}
               >
-                {chord}
+                <span className="block font-Lora text-lg">{c.chord}</span>
               </li>
             );
           })}
@@ -402,88 +414,96 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* ── Style + progression ── */}
+        {/* ── Style + chords ── */}
         <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5 flex flex-col gap-5" aria-label="Style and chords">
           <div>
             <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Style</h3>
             <div className="mt-3 flex flex-wrap gap-2">
-              {GENRES.map((g) => (
-                <button key={g.id} type="button" onClick={() => setSelectedGenre(g.id)} aria-pressed={g.id === selectedGenre} className={chipClass(g.id === selectedGenre)}>
-                  {g.name}
+              {STYLES.map((s) => (
+                <button key={s.id} type="button" onClick={() => changeStyle(s.id)} aria-pressed={s.id === styleId} className={chipClass(s.id === styleId)} title={`${s.description} · ${s.meter.label}`}>
+                  {s.name}
                 </button>
               ))}
             </div>
-            <p className="mt-2 font-Inter text-sm text-gray-500">{activeGenre.description}</p>
+            <p className="mt-2 font-Inter text-sm text-gray-500">
+              {style.description} · {style.meter.label} · {style.tempo.min}–{style.tempo.max} BPM
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400 mr-1">Mode</span>
+            {(["major", "minor"] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={mode === m}
+                onClick={() => {
+                  setMode(m);
+                  setModeTouched(true);
+                  setProgressionIndex(0);
+                }}
+                className={chipClass(mode === m)}
+              >
+                {keyName} {m}
+              </button>
+            ))}
           </div>
 
           <div>
-            <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Progression in {selectedKey}</h3>
+            <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Progression</h3>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {PRESET_PROGRESSIONS.map((prog, idx) => {
-                const active = !custom.length && selectedPreset === idx;
-                const preview = prog.chords.slice(0, 4).map((c) => transposeChord(c, selectedKey));
+              {progressions.map((prog, idx) => {
+                const active = !custom.length && progressionIndex === idx;
+                const preview = progressionToChords(prog, noteToPc(keyName) ?? 0, mode, beatsPerBar).map((c) => c.chord);
+                const unique = preview.filter((c, i) => i === 0 || c !== preview[i - 1]);
                 return (
                   <button
-                    key={prog.name}
+                    key={prog}
                     type="button"
                     onClick={() => {
-                      setSelectedPreset(idx);
-                      setCustomChordsText("");
+                      setProgressionIndex(idx);
+                      setCustomText("");
                     }}
                     aria-pressed={active}
                     className={`text-left rounded-xl px-3.5 py-3 border transition-colors ${active ? "border-[#1BD79E]/60 bg-[#1BD79E]/10" : "border-white/5 bg-[#161616] hover:border-white/15"}`}
                   >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className={`font-Inter text-sm font-semibold ${active ? "text-[#1BD79E]" : "text-white"}`}>{prog.name}</span>
-                      <span className="font-Inter text-[11px] text-gray-500">{prog.label}</span>
-                    </span>
-                    <span className="block font-Lora text-sm text-gray-400 mt-1">
-                      {preview.join(" · ")}
-                      {prog.chords.length > 4 ? " …" : ""}
-                    </span>
+                    <span className={`block font-Inter text-xs ${active ? "text-[#1BD79E]" : "text-gray-500"}`}>{prog.split(" ").length} bars · {prog.replace(/\s+/g, " – ").slice(0, 46)}</span>
+                    <span className="block font-Lora text-sm text-gray-200 mt-1 truncate">{unique.join(" · ")}</span>
                   </button>
                 );
               })}
             </div>
-
             <label htmlFor="custom-chords" className="block mt-4 font-Inter text-sm text-gray-300">
               Or type your own chords
             </label>
             <input
               id="custom-chords"
               type="text"
-              value={customChordsText}
-              onChange={(e) => setCustomChordsText(e.target.value)}
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
               placeholder="e.g. Am F C G  ·  D/F# Em7 Cadd9 G"
               className="mt-1.5 w-full h-11 rounded-xl bg-[#161616] border border-white/10 px-3 font-Lora text-base text-white placeholder:text-gray-600 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
             />
             <p className="mt-1.5 font-Inter text-xs text-gray-500">One chord per bar. Separate with spaces, commas or |.</p>
-            {invalid.length > 0 && (
-              <p role="alert" className="mt-1 font-Inter text-xs text-[#f59e0b]">
-                Not recognised, so skipped: {invalid.map((c) => c.name).join(", ")}
-              </p>
-            )}
+            {invalid.length > 0 && <p className="mt-1 font-Inter text-xs text-[#f59e0b]">Not recognised, so skipped: {invalid.map((c) => c.name).join(", ")}</p>}
           </div>
         </section>
 
         <div className="flex flex-col gap-5">
           {/* ── Mixer ── */}
           <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5" aria-label="Mixer">
-            <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Mixer</h3>
+            <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Band</h3>
             <div className="mt-3 flex flex-col gap-3">
-              {INSTRUMENTS.map(({ key, label }) => {
-                const isMuted = muted[key];
-                const v = volumes[key];
+              {PARTS.map(({ id, label }) => {
+                const on = parts[id];
                 return (
-                  <div key={key} className="flex items-center gap-3">
+                  <div key={id} className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => handleMute(key)}
-                      aria-pressed={isMuted}
-                      aria-label={`${isMuted ? "Unmute" : "Mute"} ${label}`}
-                      className={`w-20 shrink-0 h-9 rounded-full font-Inter text-sm font-semibold border transition-colors ${
-                        isMuted ? "border-white/10 text-gray-500 line-through" : "border-[#1BD79E]/40 text-white"
-                      }`}
+                      onClick={() => setParts((p) => ({ ...p, [id]: !p[id] }))}
+                      aria-pressed={on}
+                      aria-label={`${on ? "Turn off" : "Turn on"} ${label}`}
+                      className={`w-20 shrink-0 h-9 rounded-full font-Inter text-sm font-semibold border transition-colors ${on ? "border-[#1BD79E]/50 text-white" : "border-white/10 text-gray-500 line-through"}`}
                     >
                       {label}
                     </button>
@@ -491,28 +511,28 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
                       type="range"
                       min={0}
                       max={100}
-                      value={v}
-                      onChange={(e) => handleVolume(key, Number(e.target.value))}
+                      value={Math.round(volumes[id] * 100)}
+                      onChange={(e) => setVolume(id, Number(e.target.value) / 100)}
                       aria-label={`${label} volume`}
-                      disabled={isMuted}
+                      disabled={!on}
                       className="metronome-range flex-1 disabled:opacity-40"
-                      style={{ background: `linear-gradient(to right, #1BD79E ${isMuted ? 0 : v}%, #262626 ${isMuted ? 0 : v}%)` }}
+                      style={{ background: `linear-gradient(to right, #1BD79E ${on ? volumes[id] * 100 : 0}%, #262626 ${on ? volumes[id] * 100 : 0}%)` }}
                     />
-                    <span className="w-9 text-right font-Inter text-xs tabular-nums text-gray-500">{isMuted ? "off" : v}</span>
+                    <span className="w-9 text-right font-Inter text-xs tabular-nums text-gray-500">{on ? Math.round(volumes[id] * 100) : "off"}</span>
                   </div>
                 );
               })}
             </div>
-            <p className="mt-3 font-Inter text-xs text-gray-500">Tip: mute the guitar and play the chords yourself.</p>
+            <p className="mt-3 font-Inter text-xs text-gray-500">Real recorded drums, bass, acoustic guitar and piano. Turn the guitar off to play the chords yourself.</p>
           </section>
 
-          {/* ── Practice options ── */}
+          {/* ── Practice ── */}
           <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5 flex flex-col gap-4" aria-label="Practice options">
             <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Practice</h3>
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-Inter text-sm text-gray-300 w-14">Speed</span>
               {PLAYBACK_SPEEDS.map((s) => (
-                <button key={s} type="button" onClick={() => changeSpeed(s)} aria-pressed={playbackSpeed === s} className={chipClass(playbackSpeed === s)}>
+                <button key={s} type="button" onClick={() => setSpeed(s)} aria-pressed={speed === s} className={chipClass(speed === s)}>
                   {Math.round(s * 100)}%
                 </button>
               ))}
@@ -537,15 +557,29 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
                 <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${countIn ? "left-6" : "left-1"}`} />
               </button>
             </label>
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="font-Inter text-sm text-gray-300 w-14">Save</span>
+              {[1, 4].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => exportWav(n)}
+                  disabled={exporting}
+                  className="h-9 px-3.5 rounded-full border border-[#1BD79E]/40 text-[#1BD79E] font-Inter text-sm font-semibold hover:bg-[#1BD79E]/10 disabled:opacity-50"
+                >
+                  {exporting ? "Rendering…" : `⬇ WAV · ${n} loop${n > 1 ? "s" : ""}`}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
               {onOpenScales && (
-                <button type="button" onClick={onOpenScales} className="h-9 px-3.5 rounded-full border border-[#1BD79E]/40 text-[#1BD79E] font-Inter text-sm font-semibold hover:bg-[#1BD79E]/10">
+                <button type="button" onClick={onOpenScales} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
                   Solo on the scale fretboard
                 </button>
               )}
               {onSuggestScale && (
-                <button type="button" onClick={() => onSuggestScale(selectedGenre)} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
-                  Best scale for {activeGenre.name.toLowerCase()}
+                <button type="button" onClick={() => onSuggestScale(styleId, mode)} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
+                  Best scale for {style.name.toLowerCase()}
                 </button>
               )}
               <button type="button" onClick={copyShareLink} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
@@ -555,6 +589,42 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
           </section>
         </div>
       </div>
+
+      <GuitarRigPanel
+        settings={rig}
+        presetId={rigPreset}
+        onPreset={(id) => {
+          setRigPreset(id);
+          setRig(RIG_PRESETS[id].settings);
+        }}
+        onChange={(next) => {
+          setRig(next);
+          setRigPreset(null);
+        }}
+        userTones={userTones}
+        onAddFiles={async (files) => {
+          let last: Omit<UserTone, "data"> | null = null;
+          for (const f of Array.from(files)) last = await addUserTone(f);
+          setUserTones(await listUserTones());
+          // switch to what was just loaded so you hear it straight away
+          if (last) {
+            const added = last;
+            setRigPreset(null);
+            setRig((r) => (added.kind === "nam" ? { ...r, guitar: "electric", amp: { ...r.amp, model: `user:${added.id}` } } : { ...r, guitar: "electric", cab: `user:${added.id}` }));
+            trackEvent("rig_user_tone_added", { kind: added.kind });
+          }
+        }}
+        onRemoveTone={async (id) => {
+          await removeUserTone(id);
+          setUserTones(await listUserTones());
+          setRig((r) => ({
+            ...r,
+            amp: r.amp.model === `user:${id}` ? { ...r.amp, model: "clean" } : r.amp,
+            cab: r.cab === `user:${id}` ? "2x12" : r.cab,
+          }));
+        }}
+        status={rigStatus}
+      />
     </div>
   );
 }

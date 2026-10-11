@@ -1,0 +1,63 @@
+{
+ "version": 1,
+ "name": "Electric guitar DI (Karoryfer, via tonejs-instruments)",
+ "license": "CC-BY 3.0",
+ "regions": [
+  {
+   "url": "E2.wav",
+   "root": 40
+  },
+  {
+   "url": "Fs2.wav",
+   "root": 42
+  },
+  {
+   "url": "A2.wav",
+   "root": 45
+  },
+  {
+   "url": "C3.wav",
+   "root": 48
+  },
+  {
+   "url": "Ds3.wav",
+   "root": 51
+  },
+  {
+   "url": "Fs3.wav",
+   "root": 54
+  },
+  {
+   "url": "A3.wav",
+   "root": 57
+  },
+  {
+   "url": "C4.wav",
+   "root": 60
+  },
+  {
+   "url": "Ds4.wav",
+   "root": 63
+  },
+  {
+   "url": "Fs4.wav",
+   "root": 66
+  },
+  {
+   "url": "A4.wav",
+   "root": 69
+  },
+  {
+   "url": "C5.wav",
+   "root": 72
+  },
+  {
+   "url": "Ds5.wav",
+   "root": 75
+  },
+  {
+   "url": "Fs5.wav",
+   "root": 78
+  }
+ ]
+}
