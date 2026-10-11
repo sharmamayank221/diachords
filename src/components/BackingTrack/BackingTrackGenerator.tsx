@@ -83,6 +83,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const [rigPreset, setRigPreset] = useState<string | null>(STYLE_RIG.rock);
   const [rig, setRig] = useState<RigSettings>(RIG_PRESETS[STYLE_RIG.rock].settings);
   const [rigStatus, setRigStatus] = useState<string | null>(null);
+  const [rigLoading, setRigLoading] = useState(false);
   const [userTones, setUserTones] = useState<Omit<UserTone, "data">[]>([]);
   const engineRef = useRef<JamEngineType | null>(null);
   const hydrated = useRef(false);
@@ -176,7 +177,10 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
         onPass: (pass) => setPassCount(pass),
       });
       setRigStatus(null);
+      setRigLoading(true);
+      lastModelRef.current = rigRef.current.guitar === "electric" ? rigRef.current.amp.model : "none";
       const err = await engineRef.current.setRig(rigRef.current);
+      setRigLoading(false);
       setRigStatus(err);
     }
     return engineRef.current;
@@ -184,6 +188,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
 
   const [passCount, setPassCount] = useState(0);
   const rigRef = useRef(rig);
+  const lastModelRef = useRef<string | null>(null);
   rigRef.current = rig;
   useEffect(() => () => engineRef.current?.dispose(), []);
 
@@ -217,8 +222,14 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
     const engine = engineRef.current;
     if (!engine) return;
     const isModel = rig.guitar === "electric" && (rig.amp.model.startsWith("nam:") || rig.amp.model.startsWith("user:"));
-    if (isModel) setRigStatus("Loading amp model…");
-    engine.setRig(rig).then((err) => setRigStatus(err));
+    const modelKey = rig.guitar === "electric" ? rig.amp.model : "none";
+    const modelChanged = modelKey !== lastModelRef.current;
+    lastModelRef.current = modelKey;
+    if (isModel && modelChanged) setRigLoading(true);
+    engine.setRig(rig).then((err) => {
+      setRigLoading(false);
+      setRigStatus(err);
+    });
   }, [rig]);
 
   // live updates while playing
@@ -624,6 +635,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
           }));
         }}
         status={rigStatus}
+        loading={rigLoading}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { AmpModel, BUILTIN_NAM, CabType, DelayTime, RIG_PRESETS, RigSettings } from "@/jam/rig";
 import type { UserTone } from "@/jam/userTones";
+import RigVisual from "./RigVisual";
 
 type ToneInfo = Omit<UserTone, "data">;
 
@@ -12,7 +13,8 @@ interface Props {
   userTones: ToneInfo[];
   onAddFiles: (files: FileList) => Promise<void>;
   onRemoveTone: (id: string) => void;
-  status: string | null; // loading / error message from the amp engine
+  status: string | null; // error message from the amp engine
+  loading: boolean;
 }
 
 const chip = (active: boolean) =>
@@ -63,7 +65,7 @@ function Pedal({ name, on, onToggle, children, disabled }: { name: string; on: b
   );
 }
 
-export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChange, userTones, onAddFiles, onRemoveTone, status }: Props) {
+export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChange, userTones, onAddFiles, onRemoveTone, status, loading }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -100,6 +102,8 @@ export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChan
           </button>
         ))}
       </div>
+
+      <RigVisual settings={s} userTones={userTones} loading={loading} onTogglePedal={(k) => set(k, { ...s[k], on: !s[k].on } as RigSettings[typeof k])} />
 
       <div className="flex items-center gap-2">
         <span className="font-Inter text-sm text-gray-300 w-16">Guitar</span>
