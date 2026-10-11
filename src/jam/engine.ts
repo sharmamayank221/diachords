@@ -194,12 +194,12 @@ function playClick(g: Graph, when: number, accent: boolean) {
   osc.stop(when + 0.06);
 }
 
-/** Every drum piece and pitch the arrangement can reach in its first two passes. */
+/** Every drum piece and pitch the arrangement can reach across a full song cycle of sections. */
 export async function preloadArrangement(ctx: BaseAudioContext, arr: Arrangement, guitar: "acoustic" | "electric" = "acoustic"): Promise<void> {
   await resolveManifests();
   const pieces = new Set<DrumPiece>(["crash"]);
   const notes: Record<"bass" | "guitar" | "keys", Set<number>> = { bass: new Set(), guitar: new Set(), keys: new Set() };
-  for (const cycle of [0, 1]) {
+  for (let cycle = 0; cycle < 8; cycle++) {
     for (const ev of compilePass({ ...arr, parts: { drums: true, bass: true, guitar: true, keys: true } }, cycle).events) {
       if (ev.part === "drums" && ev.piece) pieces.add(ev.piece);
       else if (ev.midi !== undefined && ev.part !== "drums") notes[ev.part].add(ev.midi);
