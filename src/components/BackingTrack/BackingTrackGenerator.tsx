@@ -52,9 +52,13 @@ export interface BackingTrackGeneratorProps {
   practiceScaleId?: string;
   onSuggestScale?: (style: string, mode: Mode) => void;
   onOpenScales?: () => void;
+  /** rendered under the transport — the Practice page puts the scale fretboard here */
+  renderSolo?: (chord: { name: string; pcs: number[] } | null) => React.ReactNode;
 }
 
-export default function BackingTrackGenerator({ practiceKey, practiceScaleId, onSuggestScale, onOpenScales }: BackingTrackGeneratorProps) {
+type SettingsTab = "style" | "band" | "rig";
+
+export default function BackingTrackGenerator({ practiceKey, practiceScaleId, onSuggestScale, onOpenScales, renderSolo }: BackingTrackGeneratorProps) {
   const router = useRouter();
   const keyName = practiceKey && noteToPc(practiceKey) !== null ? KEY_NAMES[noteToPc(practiceKey)!] : "C";
   const scaleMode: Mode = practiceScaleId && MINOR_SCALES.has(practiceScaleId) ? "minor" : "major";
@@ -78,6 +82,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const [beat, setBeat] = useState<{ bar: number; beat: number; countIn: boolean } | null>(null);
   const [chordIdx, setChordIdx] = useState(-1);
   const [shareCopied, setShareCopied] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("rig");
   const [error, setError] = useState<string | null>(null);
 
   const [rigPreset, setRigPreset] = useState<string | null>(STYLE_RIG.rock);
@@ -314,6 +319,17 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const bpmPercent = ((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)) * 100;
   const invalid = custom.filter((c) => !c.valid);
   const beatsPerBar = style.meter.beats;
+  const soundingChord = playing && !beat?.countIn && chordIdx >= 0 ? chords[chordIdx]?.chord : null;
+  const soloChord = useMemo(() => {
+    const parsed = soundingChord ? parseChord(soundingChord) : null;
+    return parsed && soundingChord ? { name: soundingChord, pcs: parsed.intervals.map((i) => (parsed.rootPc + i) % 12) } : null;
+  }, [soundingChord]);
+  const rigLabel = rig.guitar === "acoustic" ? "Acoustic" : (rigPreset && RIG_PRESETS[rigPreset]?.label) || "Custom";
+  const SETTINGS_TABS: { id: SettingsTab; label: string; detail: string }[] = [
+    { id: "rig", label: "Guitar rig", detail: rigLabel },
+    { id: "style", label: "Style & chords", detail: style.name },
+    { id: "band", label: "Band & practice", detail: `${Object.values(parts).filter(Boolean).length} players` },
+  ];
 
   return (
     <div className="flex flex-col gap-5 text-white">
@@ -424,219 +440,252 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
         </ol>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* ── Style + chords ── */}
-        <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5 flex flex-col gap-5" aria-label="Style and chords">
-          <div>
-            <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Style</h3>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {STYLES.map((s) => (
-                <button key={s.id} type="button" onClick={() => changeStyle(s.id)} aria-pressed={s.id === styleId} className={chipClass(s.id === styleId)} title={`${s.description} · ${s.meter.label}`}>
-                  {s.name}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 font-Inter text-sm text-gray-500">
-              {style.description} · {style.meter.label} · {style.tempo.min}–{style.tempo.max} BPM
-            </p>
-          </div>
+      {renderSolo?.(soloChord)}
 
-          <div className="flex items-center gap-2">
-            <span className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400 mr-1">Mode</span>
-            {(["major", "minor"] as Mode[]).map((m) => (
+      {/* ── Settings, one tab at a time ── */}
+      <section className="rounded-2xl bg-[#0f0f0f] border border-white/5" aria-label="Jam settings">
+        <div role="tablist" aria-label="Jam settings" className="flex gap-1 px-2 pt-2 border-b border-white/5 overflow-x-auto no-scrollbar">
+          {SETTINGS_TABS.map((t) => {
+            const active = settingsTab === t.id;
+            return (
               <button
-                key={m}
+                key={t.id}
                 type="button"
-                aria-pressed={mode === m}
-                onClick={() => {
-                  setMode(m);
-                  setModeTouched(true);
-                  setProgressionIndex(0);
-                }}
-                className={chipClass(mode === m)}
+                role="tab"
+                id={`jam-tab-${t.id}`}
+                aria-selected={active}
+                aria-controls={`jam-panel-${t.id}`}
+                onClick={() => setSettingsTab(t.id)}
+                className={`shrink-0 px-4 pt-2.5 pb-3 -mb-px border-b-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] rounded-t-lg ${
+                  active ? "border-[#1BD79E]" : "border-transparent hover:bg-white/[0.03]"
+                }`}
               >
-                {keyName} {m}
+                <span className={`block font-Inter text-sm font-semibold ${active ? "text-white" : "text-gray-400"}`}>{t.label}</span>
+                <span className={`block font-Inter text-xs ${active ? "text-[#1BD79E]" : "text-gray-600"}`}>{t.detail}</span>
               </button>
-            ))}
-          </div>
-
-          <div>
-            <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Progression</h3>
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {progressions.map((prog, idx) => {
-                const active = !custom.length && progressionIndex === idx;
-                const preview = progressionToChords(prog, noteToPc(keyName) ?? 0, mode, beatsPerBar).map((c) => c.chord);
-                const unique = preview.filter((c, i) => i === 0 || c !== preview[i - 1]);
-                return (
-                  <button
-                    key={prog}
-                    type="button"
-                    onClick={() => {
-                      setProgressionIndex(idx);
-                      setCustomText("");
-                    }}
-                    aria-pressed={active}
-                    className={`text-left rounded-xl px-3.5 py-3 border transition-colors ${active ? "border-[#1BD79E]/60 bg-[#1BD79E]/10" : "border-white/5 bg-[#161616] hover:border-white/15"}`}
-                  >
-                    <span className={`block font-Inter text-xs ${active ? "text-[#1BD79E]" : "text-gray-500"}`}>{prog.split(" ").length} bars · {prog.replace(/\s+/g, " – ").slice(0, 46)}</span>
-                    <span className="block font-Lora text-sm text-gray-200 mt-1 truncate">{unique.join(" · ")}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <label htmlFor="custom-chords" className="block mt-4 font-Inter text-sm text-gray-300">
-              Or type your own chords
-            </label>
-            <input
-              id="custom-chords"
-              type="text"
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              placeholder="e.g. Am F C G  ·  D/F# Em7 Cadd9 G"
-              className="mt-1.5 w-full h-11 rounded-xl bg-[#161616] border border-white/10 px-3 font-Lora text-base text-white placeholder:text-gray-600 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
-            />
-            <p className="mt-1.5 font-Inter text-xs text-gray-500">One chord per bar. Separate with spaces, commas or |.</p>
-            {invalid.length > 0 && <p className="mt-1 font-Inter text-xs text-[#f59e0b]">Not recognised, so skipped: {invalid.map((c) => c.name).join(", ")}</p>}
-          </div>
-        </section>
-
-        <div className="flex flex-col gap-5">
-          {/* ── Mixer ── */}
-          <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5" aria-label="Mixer">
-            <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Band</h3>
-            <div className="mt-3 flex flex-col gap-3">
-              {PARTS.map(({ id, label }) => {
-                const on = parts[id];
-                return (
-                  <div key={id} className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setParts((p) => ({ ...p, [id]: !p[id] }))}
-                      aria-pressed={on}
-                      aria-label={`${on ? "Turn off" : "Turn on"} ${label}`}
-                      className={`w-20 shrink-0 h-9 rounded-full font-Inter text-sm font-semibold border transition-colors ${on ? "border-[#1BD79E]/50 text-white" : "border-white/10 text-gray-500 line-through"}`}
-                    >
-                      {label}
-                    </button>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={Math.round(volumes[id] * 100)}
-                      onChange={(e) => setVolume(id, Number(e.target.value) / 100)}
-                      aria-label={`${label} volume`}
-                      disabled={!on}
-                      className="metronome-range flex-1 disabled:opacity-40"
-                      style={{ background: `linear-gradient(to right, #1BD79E ${on ? volumes[id] * 100 : 0}%, #262626 ${on ? volumes[id] * 100 : 0}%)` }}
-                    />
-                    <span className="w-9 text-right font-Inter text-xs tabular-nums text-gray-500">{on ? Math.round(volumes[id] * 100) : "off"}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-3 font-Inter text-xs text-gray-500">Real recorded drums, bass, acoustic guitar and piano. Turn the guitar off to play the chords yourself.</p>
-          </section>
-
-          {/* ── Practice ── */}
-          <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5 flex flex-col gap-4" aria-label="Practice options">
-            <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Practice</h3>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-Inter text-sm text-gray-300 w-14">Speed</span>
-              {PLAYBACK_SPEEDS.map((s) => (
-                <button key={s} type="button" onClick={() => setSpeed(s)} aria-pressed={speed === s} className={chipClass(speed === s)}>
-                  {Math.round(s * 100)}%
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-Inter text-sm text-gray-300 w-14">Loops</span>
-              {LOOP_OPTIONS.map((o) => (
-                <button key={o.value} type="button" onClick={() => setLoopLimit(o.value)} aria-pressed={loopLimit === o.value} className={chipClass(loopLimit === o.value)}>
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <label className="flex items-center justify-between gap-3 cursor-pointer">
-              <span className="font-Inter text-sm text-gray-300">One-bar count-in</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={countIn}
-                onClick={() => setCountIn((c) => !c)}
-                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${countIn ? "bg-[#1BD79E]" : "bg-[#333]"}`}
-              >
-                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${countIn ? "left-6" : "left-1"}`} />
-              </button>
-            </label>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span className="font-Inter text-sm text-gray-300 w-14">Save</span>
-              {[1, 4].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => exportWav(n)}
-                  disabled={exporting}
-                  className="h-9 px-3.5 rounded-full border border-[#1BD79E]/40 text-[#1BD79E] font-Inter text-sm font-semibold hover:bg-[#1BD79E]/10 disabled:opacity-50"
-                >
-                  {exporting ? "Rendering…" : `⬇ WAV · ${n} loop${n > 1 ? "s" : ""}`}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {onOpenScales && (
-                <button type="button" onClick={onOpenScales} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
-                  Solo on the scale fretboard
-                </button>
-              )}
-              {onSuggestScale && (
-                <button type="button" onClick={() => onSuggestScale(styleId, mode)} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
-                  Best scale for {style.name.toLowerCase()}
-                </button>
-              )}
-              <button type="button" onClick={copyShareLink} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
-                {shareCopied ? "✓ Link copied" : "Copy share link"}
-              </button>
-            </div>
-          </section>
+            );
+          })}
         </div>
-      </div>
+        <div className="p-4 md:p-5" role="tabpanel" id={`jam-panel-${settingsTab}`} aria-labelledby={`jam-tab-${settingsTab}`}>
+          {settingsTab === "style" && (
+            <section className="flex flex-col gap-5" aria-label="Style and chords">
+              <div>
+                <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Style</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {STYLES.map((s) => (
+                    <button key={s.id} type="button" onClick={() => changeStyle(s.id)} aria-pressed={s.id === styleId} className={chipClass(s.id === styleId)} title={`${s.description} · ${s.meter.label}`}>
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 font-Inter text-sm text-gray-500">
+                  {style.description} · {style.meter.label} · {style.tempo.min}–{style.tempo.max} BPM
+                </p>
+              </div>
 
-      <GuitarRigPanel
-        settings={rig}
-        presetId={rigPreset}
-        onPreset={(id) => {
-          setRigPreset(id);
-          setRig(RIG_PRESETS[id].settings);
-        }}
-        onChange={(next) => {
-          setRig(next);
-          setRigPreset(null);
-        }}
-        userTones={userTones}
-        onAddFiles={async (files, t3k) => {
-          let last: Omit<UserTone, "data"> | null = null;
-          for (const f of files) last = await addUserTone(f, t3k);
-          setUserTones(await listUserTones());
-          // switch to what was just loaded so you hear it straight away
-          if (last) {
-            const added = last;
-            setRigPreset(null);
-            setRig((r) => (added.kind === "nam" ? { ...r, guitar: "electric", amp: { ...r.amp, model: `user:${added.id}` } } : { ...r, guitar: "electric", cab: `user:${added.id}` }));
-            trackEvent("rig_user_tone_added", { kind: added.kind, source: t3k ? "tone3000" : "file" });
-          }
-        }}
-        onRemoveTone={async (id) => {
-          await removeUserTone(id);
-          setUserTones(await listUserTones());
-          setRig((r) => ({
-            ...r,
-            amp: r.amp.model === `user:${id}` ? { ...r.amp, model: "clean" } : r.amp,
-            cab: r.cab === `user:${id}` ? "2x12" : r.cab,
-          }));
-        }}
-        status={rigStatus}
-        loading={rigLoading}
-      />
+              <div className="flex items-center gap-2">
+                <span className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400 mr-1">Mode</span>
+                {(["major", "minor"] as Mode[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={mode === m}
+                    onClick={() => {
+                      setMode(m);
+                      setModeTouched(true);
+                      setProgressionIndex(0);
+                    }}
+                    className={chipClass(mode === m)}
+                  >
+                    {keyName} {m}
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Progression</h3>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                  {progressions.map((prog, idx) => {
+                    const active = !custom.length && progressionIndex === idx;
+                    const preview = progressionToChords(prog, noteToPc(keyName) ?? 0, mode, beatsPerBar).map((c) => c.chord);
+                    const unique = preview.filter((c, i) => i === 0 || c !== preview[i - 1]);
+                    return (
+                      <button
+                        key={prog}
+                        type="button"
+                        onClick={() => {
+                          setProgressionIndex(idx);
+                          setCustomText("");
+                        }}
+                        aria-pressed={active}
+                        className={`text-left rounded-xl px-3.5 py-3 border transition-colors ${active ? "border-[#1BD79E]/60 bg-[#1BD79E]/10" : "border-white/5 bg-[#161616] hover:border-white/15"}`}
+                      >
+                        <span className={`block font-Inter text-xs ${active ? "text-[#1BD79E]" : "text-gray-500"}`}>{prog.split(" ").length} bars · {prog.replace(/\s+/g, " – ").slice(0, 46)}</span>
+                        <span className="block font-Lora text-sm text-gray-200 mt-1 truncate">{unique.join(" · ")}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <label htmlFor="custom-chords" className="block mt-4 font-Inter text-sm text-gray-300">
+                  Or type your own chords
+                </label>
+                <input
+                  id="custom-chords"
+                  type="text"
+                  value={customText}
+                  onChange={(e) => setCustomText(e.target.value)}
+                  placeholder="e.g. Am F C G  ·  D/F# Em7 Cadd9 G"
+                  className="mt-1.5 w-full h-11 rounded-xl bg-[#161616] border border-white/10 px-3 font-Lora text-base text-white placeholder:text-gray-600 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E]"
+                />
+                <p className="mt-1.5 font-Inter text-xs text-gray-500">One chord per bar. Separate with spaces, commas or |.</p>
+                {invalid.length > 0 && <p className="mt-1 font-Inter text-xs text-[#f59e0b]">Not recognised, so skipped: {invalid.map((c) => c.name).join(", ")}</p>}
+              </div>
+            </section>
+          )}
+
+          {settingsTab === "band" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* ── Mixer ── */}
+              <section className="rounded-2xl bg-[#141414] border border-white/5 p-5" aria-label="Mixer">
+                <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Band</h3>
+                <div className="mt-3 flex flex-col gap-3">
+                  {PARTS.map(({ id, label }) => {
+                    const on = parts[id];
+                    return (
+                      <div key={id} className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setParts((p) => ({ ...p, [id]: !p[id] }))}
+                          aria-pressed={on}
+                          aria-label={`${on ? "Turn off" : "Turn on"} ${label}`}
+                          className={`w-20 shrink-0 h-9 rounded-full font-Inter text-sm font-semibold border transition-colors ${on ? "border-[#1BD79E]/50 text-white" : "border-white/10 text-gray-500 line-through"}`}
+                        >
+                          {label}
+                        </button>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={Math.round(volumes[id] * 100)}
+                          onChange={(e) => setVolume(id, Number(e.target.value) / 100)}
+                          aria-label={`${label} volume`}
+                          disabled={!on}
+                          className="metronome-range flex-1 disabled:opacity-40"
+                          style={{ background: `linear-gradient(to right, #1BD79E ${on ? volumes[id] * 100 : 0}%, #262626 ${on ? volumes[id] * 100 : 0}%)` }}
+                        />
+                        <span className="w-9 text-right font-Inter text-xs tabular-nums text-gray-500">{on ? Math.round(volumes[id] * 100) : "off"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="mt-3 font-Inter text-xs text-gray-500">Real recorded drums, bass, acoustic guitar and piano. Turn the guitar off to play the chords yourself.</p>
+              </section>
+
+              {/* ── Practice ── */}
+              <section className="rounded-2xl bg-[#141414] border border-white/5 p-5 flex flex-col gap-4" aria-label="Practice options">
+                <h3 className="font-Inter text-xs font-semibold uppercase tracking-wider text-gray-400">Practice</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-Inter text-sm text-gray-300 w-14">Speed</span>
+                  {PLAYBACK_SPEEDS.map((s) => (
+                    <button key={s} type="button" onClick={() => setSpeed(s)} aria-pressed={speed === s} className={chipClass(speed === s)}>
+                      {Math.round(s * 100)}%
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-Inter text-sm text-gray-300 w-14">Loops</span>
+                  {LOOP_OPTIONS.map((o) => (
+                    <button key={o.value} type="button" onClick={() => setLoopLimit(o.value)} aria-pressed={loopLimit === o.value} className={chipClass(loopLimit === o.value)}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="font-Inter text-sm text-gray-300">One-bar count-in</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={countIn}
+                    onClick={() => setCountIn((c) => !c)}
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${countIn ? "bg-[#1BD79E]" : "bg-[#333]"}`}
+                  >
+                    <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${countIn ? "left-6" : "left-1"}`} />
+                  </button>
+                </label>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <span className="font-Inter text-sm text-gray-300 w-14">Save</span>
+                  {[1, 4].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => exportWav(n)}
+                      disabled={exporting}
+                      className="h-9 px-3.5 rounded-full border border-[#1BD79E]/40 text-[#1BD79E] font-Inter text-sm font-semibold hover:bg-[#1BD79E]/10 disabled:opacity-50"
+                    >
+                      {exporting ? "Rendering…" : `⬇ WAV · ${n} loop${n > 1 ? "s" : ""}`}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {onOpenScales && (
+                    <button type="button" onClick={onOpenScales} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
+                      Open full scale explorer
+                    </button>
+                  )}
+                  {onSuggestScale && (
+                    <button type="button" onClick={() => onSuggestScale(styleId, mode)} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
+                      Best scale for {style.name.toLowerCase()}
+                    </button>
+                  )}
+                  <button type="button" onClick={copyShareLink} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
+                    {shareCopied ? "✓ Link copied" : "Copy share link"}
+                  </button>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {settingsTab === "rig" && (
+            <GuitarRigPanel
+              bare
+              settings={rig}
+              presetId={rigPreset}
+              onPreset={(id) => {
+                setRigPreset(id);
+                setRig(RIG_PRESETS[id].settings);
+              }}
+              onChange={(next) => {
+                setRig(next);
+                setRigPreset(null);
+              }}
+              userTones={userTones}
+              onAddFiles={async (files, t3k) => {
+                let last: Omit<UserTone, "data"> | null = null;
+                for (const f of files) last = await addUserTone(f, t3k);
+                setUserTones(await listUserTones());
+                // switch to what was just loaded so you hear it straight away
+                if (last) {
+                  const added = last;
+                  setRigPreset(null);
+                  setRig((r) => (added.kind === "nam" ? { ...r, guitar: "electric", amp: { ...r.amp, model: `user:${added.id}` } } : { ...r, guitar: "electric", cab: `user:${added.id}` }));
+                  trackEvent("rig_user_tone_added", { kind: added.kind, source: t3k ? "tone3000" : "file" });
+                }
+              }}
+              onRemoveTone={async (id) => {
+                await removeUserTone(id);
+                setUserTones(await listUserTones());
+                setRig((r) => ({
+                  ...r,
+                  amp: r.amp.model === `user:${id}` ? { ...r.amp, model: "clean" } : r.amp,
+                  cab: r.cab === `user:${id}` ? "2x12" : r.cab,
+                }));
+              }}
+              status={rigStatus}
+              loading={rigLoading}
+            />
+          )}
+        </div>
+      </section>
     </div>
   );
 }

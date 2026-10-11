@@ -186,9 +186,9 @@ export default function RigVisual({ settings: s, userTones, loading, onTogglePed
   const cabTone = userTones.find((t) => `user:${t.id}` === s.cab && t.t3k?.image);
   return (
     <div className="rounded-xl bg-gradient-to-b from-[#1a1a1a] to-[#0b0b0b] border border-white/5 px-4 pt-4 pb-3 overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-center gap-5 sm:gap-10 lg:gap-20">
         {/* pedalboard */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0">
           <div className="flex gap-2 sm:gap-3 justify-center sm:justify-start rounded-lg bg-[#0a0a0a] p-2.5 border border-white/5 w-fit mx-auto sm:mx-0">
             {PEDALS.map((p) => (
               <Stompbox key={p.key} name={p.name} color={p.color} on={s[p.key].on} knobs={p.knobs(s)} disabled={acoustic && p.key === "drive"} onClick={() => onTogglePedal(p.key)} />

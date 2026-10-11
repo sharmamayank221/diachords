@@ -125,11 +125,11 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
   const scaleLabel = SCALES[practiceScale]?.name ?? "Major";
 
   const TabBar = (
-    <div className="flex gap-1 bg-[#131313] rounded-2xl p-1 border border-white/5 max-w-md">
+    <div className="flex rounded-full bg-[#131313] p-1 border border-white/5" role="group" aria-label="Practice view">
       {(
         [
-          { id: "jam" as const, label: "Backing track", sub: "Jam & progressions" },
-          { id: "scales" as const, label: "Scale fretboard", sub: "Patterns & pitch" },
+          { id: "jam" as const, label: "Jam & solo" },
+          { id: "scales" as const, label: "Scales only" },
         ] as const
       ).map(item => {
         const active = tab === item.id;
@@ -138,58 +138,42 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className="flex-1 flex flex-col items-start px-4 py-3 rounded-xl transition-all text-left"
-            style={{
-              background: active ? "rgba(27,215,158,0.12)" : "transparent",
-              border: active ? "1px solid rgba(27,215,158,0.35)" : "1px solid transparent",
-            }}
+            aria-pressed={active}
+            className={`h-10 px-4 rounded-full font-Inter text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] ${
+              active ? "bg-[#1BD79E] text-black font-semibold" : "text-gray-300 hover:text-white"
+            }`}
           >
-            <span className="font-Inter font-semibold text-sm" style={{ color: active ? "#1BD79E" : "white" }}>
-              {item.label}
-            </span>
-            <span className="font-Inter text-[11px] text-gray-500">{item.sub}</span>
+            {item.label}
           </button>
         );
       })}
     </div>
   );
 
+  const selectClass =
+    "h-11 bg-[#161616] border border-white/10 text-white font-Lora text-lg rounded-xl px-3 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] cursor-pointer";
   const KeyScaleBar = (
-    <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
-      <div className="flex flex-col gap-2 min-w-[100px]">
-        <label htmlFor="practice-key" className="font-Inter text-xs font-semibold text-gray-400 uppercase tracking-wider">Key</label>
-        <select
-          id="practice-key"
-          value={practiceKey}
-          onChange={e => setKey(e.target.value)}
-          className="bg-[#161616] border border-white/10 text-white font-Lora text-lg rounded-xl px-4 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] cursor-pointer"
-        >
+    <div className="flex items-end gap-2">
+      <label className="flex flex-col gap-1">
+        <span className="font-Inter text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Key</span>
+        <select value={practiceKey} onChange={e => setKey(e.target.value)} className={`${selectClass} w-[84px]`}>
           {PRACTICE_KEYS.map(k => (
             <option key={k} value={k}>
               {k}
             </option>
           ))}
         </select>
-      </div>
-      <div className="flex flex-col gap-2 flex-1 min-w-[140px]">
-        <label htmlFor="practice-scale" className="font-Inter text-xs font-semibold text-gray-400 uppercase tracking-wider">Scale</label>
-        <select
-          id="practice-scale"
-          value={practiceScale}
-          onChange={e => setScale(e.target.value)}
-          className="bg-[#161616] border border-white/10 text-white font-Lora text-lg rounded-xl px-4 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-[#1BD79E] cursor-pointer"
-        >
+      </label>
+      <label className="flex flex-col gap-1 min-w-0 flex-1 sm:flex-none">
+        <span className="font-Inter text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Scale</span>
+        <select value={practiceScale} onChange={e => setScale(e.target.value)} className={`${selectClass} w-full sm:w-[220px]`}>
           {Object.entries(SCALES).map(([id, s]) => (
             <option key={id} value={id}>
               {s.name}
             </option>
           ))}
         </select>
-      </div>
-      <p className="font-Inter text-xs text-gray-500 sm:max-w-xs sm:pb-2">
-        Shared by both tabs: jam in {practiceKey}, then solo with{" "}
-        <span className="text-[#1BD79E]">{practiceKey} {scaleLabel}</span>.
-      </p>
+      </label>
     </div>
   );
 
@@ -199,18 +183,19 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
         <div>
           <p className="font-Inter text-xs font-semibold text-[#1BD79E] uppercase tracking-wider mb-2">Practice studio</p>
           <h1 className="font-Lora text-3xl lg:text-4xl text-white">
-            {tab === "scales" ? "Guitar scale explorer" : "Backing tracks"}
+            {tab === "scales" ? "Guitar scale explorer" : "Jam & solo"}
           </h1>
           <p className="font-Inter text-sm text-gray-400 mt-1">
             {tab === "scales"
               ? "See every scale on the neck, hear it, and check your playing by ear."
-              : "Drums, bass and chords that play along in your key."}
+              : `A real band plays in ${practiceKey}. Solo over it with ${practiceKey} ${scaleLabel} right below.`}
           </p>
         </div>
-        {TabBar}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          {KeyScaleBar}
+          {TabBar}
+        </div>
       </div>
-
-      <div className="bg-[#0f0f0f] rounded-2xl border border-white/5 p-4 lg:p-5">{KeyScaleBar}</div>
 
       {tab === "jam" ? (
         <BackingTrackGenerator
@@ -221,6 +206,11 @@ export default function PracticeStudio({ defaultTab = "jam" }: PracticeStudioPro
             if (STYLE_BY_ID[style]) suggestScaleFromJam(style, mode);
           }}
           onOpenScales={() => setTab("scales")}
+          renderSolo={chord => (
+            <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-4 md:p-5" aria-label="Solo scale">
+              <ScaleFretboard compact currentChord={chord} practiceKey={practiceKey} practiceScaleId={practiceScale} onPracticeScaleChange={setScale} />
+            </section>
+          )}
         />
       ) : (
         <ScaleFretboard

@@ -80,9 +80,13 @@ export interface ScaleFretboardProps {
   practiceScaleId?: string;
   onPracticeScaleChange?: (scaleId: string) => void;
   onOpenJam?: () => void;
+  /** slim version that sits under the backing track (no big header, no progression player) */
+  compact?: boolean;
+  /** chord the band is playing right now: its notes get a ring on the neck */
+  currentChord?: { name: string; pcs: number[] } | null;
 }
 
-export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "major", onOpenJam }: ScaleFretboardProps) {
+export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "major", onOpenJam, compact = false, currentChord: bandChord = null }: ScaleFretboardProps) {
   const scaleId = SCALES[practiceScaleId] ? practiceScaleId : "major";
   const scale = SCALES[scaleId];
   const rootPc = jamKeyToRootIndex(practiceKey);
@@ -297,6 +301,9 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
     return (
       <div key={stringNum} className={`relative ${rowH}`}>
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-white/90" style={{ height: STRING_HEIGHTS[stringNum - 1] }} />
+        {n && bandChord?.pcs.includes(n.midiNote % 12) && inWindow(fret) && (
+          <span aria-hidden className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 md:h-[40px] md:w-[40px] rounded-full border-2 border-[#f5b942] shadow-[0_0_12px_rgba(245,185,66,0.55)] pointer-events-none transition-opacity" />
+        )}
         {n && (
           <div className={`transition-opacity ${inWindow(fret) ? "opacity-100" : "opacity-20"}`}>
             <FretboardNote
@@ -320,18 +327,38 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
   return (
     <div className="flex flex-col gap-5 text-white">
       {/* ── Scale header ── */}
-      <section className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-        <div>
-          <h2 className="font-Lora text-3xl md:text-4xl">
-            {spelled.rootName} <span className="text-[#1BD79E]">{scale.name}</span>
-          </h2>
-          <p className="font-Inter text-sm text-gray-400 mt-1">{scale.description}</p>
-        </div>
-        <ol className="flex flex-wrap gap-1.5" aria-label="Notes in this scale">
+      <section className={`flex flex-col lg:flex-row lg:justify-between gap-4 ${compact ? "lg:items-center" : "lg:items-end"}`}>
+        {compact ? (
+          <div>
+            <h2 className="font-Lora text-2xl">
+              Solo with {spelled.rootName} <span className="text-[#1BD79E]">{scale.name}</span>
+            </h2>
+            <p className="font-Inter text-xs text-gray-400 mt-1 flex items-center gap-1.5 min-h-[16px]">
+              {bandChord ? (
+                <>
+                  <span className="inline-block h-3 w-3 shrink-0 rounded-full border-2 border-[#f5b942]" aria-hidden />
+                  <span>
+                    Ringed notes belong to <b className="text-white font-semibold">{bandChord.name}</b>, the chord playing now. Land on them.
+                  </span>
+                </>
+              ) : (
+                "Start the jam and the notes of each chord light up as it plays."
+              )}
+            </p>
+          </div>
+        ) : (
+          <div>
+            <h2 className="font-Lora text-3xl md:text-4xl">
+              {spelled.rootName} <span className="text-[#1BD79E]">{scale.name}</span>
+            </h2>
+            <p className="font-Inter text-sm text-gray-400 mt-1">{scale.description}</p>
+          </div>
+        )}
+        <ol className="flex flex-wrap gap-1 sm:gap-1.5" aria-label="Notes in this scale">
           {spelled.names.map((name, i) => (
             <li
               key={name + i}
-              className={`min-w-[44px] px-2 py-1.5 rounded-xl text-center ${i === 0 ? "bg-[#1BD79E] text-black" : "bg-[#161616] text-white border border-white/5"}`}
+              className={`min-w-[38px] sm:min-w-[44px] px-1.5 sm:px-2 py-1.5 rounded-xl text-center ${i === 0 ? "bg-[#1BD79E] text-black" : "bg-[#161616] text-white border border-white/5"}`}
             >
               <span className="block font-Lora text-base leading-none">{name}</span>
               <span className={`block font-Inter text-[10px] mt-1 ${i === 0 ? "text-black/60" : "text-gray-500"}`}>{spelled.degrees[i]}</span>
@@ -472,7 +499,7 @@ export default function ScaleFretboard({ practiceKey = "C", practiceScaleId = "m
       </section>
 
       {/* ── Progression ── */}
-      {progression && (
+      {progression && !compact && (
         <section className="rounded-2xl bg-[#0f0f0f] border border-white/5 p-5" aria-labelledby="prog-heading">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
