@@ -88,6 +88,8 @@ export function varyDrums(style: StyleDef, base: Grid, section: Section, r: Rand
     for (const p of ["hihat", "ride"] as DrumPiece[]) if (g[p]) setPiece(g, p, mapSteps(g[p]!, (c, i) => (c === "x" && i % spb !== 0 ? "o" : c)));
   }
 
+  addPercussion(style, g, section, n, spb, r);
+
   if (e >= 0.75) {
     if (g.hihat && !g.ride && RIDE_IN_CHORUS.has(style.id)) {
       setPiece(g, "ride", mapSteps(g.hihat, (c) => (c === "." ? "." : "x")));
@@ -117,6 +119,26 @@ export function varyDrums(style: StyleDef, base: Grid, section: Section, r: Rand
     }
   }
   return g;
+}
+
+const TAMBOURINE = new Set(["rock", "pop", "soul", "country", "blues", "slowblues", "ballad68"]);
+const CLAP = new Set(["disco", "pop", "funk"]);
+const SHAKER = new Set(["bossa", "reggae", "lofi", "pop"]);
+
+/** Hand percussion that comes and goes with the energy (added before the fill is cut in). */
+function addPercussion(style: StyleDef, g: Grid, section: Section, n: number, spb: number, r: Rand) {
+  const e = section.energy;
+  const backbeat = mapSteps(g.snare ?? g.sidestick ?? ".".repeat(n), (c) => (c === "X" || c === "x" ? "x" : "."));
+  if (e >= 0.75 && TAMBOURINE.has(style.id)) {
+    // backbeats, plus eighths for pop
+    const eighths = style.id === "pop" && spb === 4 ? mapSteps(".".repeat(n), (_, i) => (i % 2 === 0 ? "g" : ".")) : ".".repeat(n);
+    setPiece(g, "tambourine", mergeSteps(backbeat, eighths, n));
+  }
+  if (e >= 0.75 && CLAP.has(style.id)) setPiece(g, "clap", backbeat);
+  if (e >= 0.4 && SHAKER.has(style.id) && !(style.id === "pop" && e >= 0.75)) {
+    setPiece(g, "shaker", mapSteps(".".repeat(n), (_, i) => (i % spb === 0 ? "o" : "g")));
+  }
+  if (style.id === "disco" && e >= 0.85 && r("cowbell") < 0.6) setPiece(g, "cowbell", mapSteps(".".repeat(n), (_, i) => (i % spb === 0 ? "o" : ".")));
 }
 
 export type FillKind = "none" | "small" | "big" | "build";

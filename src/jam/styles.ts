@@ -9,7 +9,8 @@
 
 export type DrumPiece =
   | "kick" | "snare" | "sidestick" | "hihat" | "pedalhat" | "openhat"
-  | "ride" | "ridebell" | "crash" | "tom1" | "tom2" | "tom3";
+  | "ride" | "ridebell" | "crash" | "tom1" | "tom2" | "tom3"
+  | "tambourine" | "clap" | "shaker" | "cowbell";
 
 export type BassRole = "R" | "3" | "5" | "6" | "b7" | "8" | "approach" | "chord";
 export interface BassSlot {
@@ -31,6 +32,8 @@ export interface StyleDef {
   /** Milliseconds behind (+) or ahead (−) of the grid, and random spread. */
   feel: { kick: number; snare: number; hats: number; bass: number; guitar: number; keys: number; spread: number };
   drums: { bars: Partial<Record<DrumPiece, string>>[]; fill: Partial<Record<DrumPiece, string>>; crashOnLoop: boolean };
+  /** which drum kit suits the style: modern (Pearl) or vintage (Ludwig 26", Porkpie snare) */
+  kit: "modern" | "vintage";
   bass: BassSlot[] | "walking";
   guitar: { pattern: string; short?: boolean };
   keys: { pattern: string; voicing: "triad" | "seventh" | "shell"; short?: boolean };
@@ -60,6 +63,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X.......x.......", snare: "....X...X.......", hihat: "x.o.x.o.x.o.....", tom1: "............Xx..", tom2: "..............X.", tom3: "...............X" },
       crashOnLoop: true,
     },
+    kit: "modern",
     bass: [s(0, "R", 2, 0.95), s(2, "R", 2), s(4, "R", 2), s(6, "R", 2), s(8, "R", 2, 0.9), s(10, "R", 2), s(12, "5", 2), s(14, "approach", 2, 0.75)],
     guitar: { pattern: "D...D.U...U.D.U." },
     keys: { pattern: "X---------------", voicing: "triad" },
@@ -81,6 +85,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X.......X.......", snare: "....X.......XoXo", hihat: "xoxoxoxoxoxo...." },
       crashOnLoop: true,
     },
+    kit: "modern",
     bass: [s(0, "R", 3, 0.95), s(3, "R", 1, 0.6), s(6, "R", 2), s(8, "R", 3, 0.9), s(11, "R", 1, 0.6), s(14, "5", 2, 0.75)],
     guitar: { pattern: "D...D.U...U.D.U." },
     keys: { pattern: "X-------x-------", voicing: "triad" },
@@ -102,6 +107,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X.....X.....", snare: "...X.....XoX", hihat: "x.ox.ox.o...", tom1: "..........X.", tom3: "...........X" },
       crashOnLoop: true,
     },
+    kit: "vintage",
     bass: [s(0, "R", 2, 0.95), s(2, "3", 1, 0.7), s(3, "5", 2, 0.85), s(5, "6", 1, 0.7), s(6, "b7", 2, 0.85), s(8, "6", 1, 0.7), s(9, "5", 2, 0.85), s(11, "3", 1, 0.7)],
     guitar: { pattern: "D.uD.uD.uD.u", short: true },
     keys: { pattern: "...x.....x..", voicing: "seventh", short: true },
@@ -126,6 +132,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X.....X.....", snare: "...X.....ooo", hihat: "xooxooxoo...", tom1: "......XX....", tom3: ".........XXX" },
       crashOnLoop: true,
     },
+    kit: "vintage",
     bass: [s(0, "R", 3, 0.95), s(3, "3", 3, 0.8), s(6, "5", 3, 0.85), s(9, "6", 2, 0.75), s(11, "approach", 1, 0.65)],
     guitar: { pattern: "d..d..d..d..", short: false },
     keys: { pattern: "X-----------", voicing: "seventh" },
@@ -153,6 +160,7 @@ export const STYLES: StyleDef[] = [
       fill: { ride: "x..x.xx..x..", pedalhat: "...x.....x..", snare: "......o.oo.X", kick: "g..g..g....." },
       crashOnLoop: false,
     },
+    kit: "vintage",
     bass: "walking",
     guitar: { pattern: "d..d..d..d..", short: true },
     keys: { pattern: "X....x......", voicing: "shell", short: true },
@@ -180,6 +188,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X..x..X.........", snare: "....X..g.g..XgXX", hihat: "XoxoXoxoXoxo...." },
       crashOnLoop: false,
     },
+    kit: "modern",
     bass: [s(0, "R", 1, 1), s(3, "8", 1, 0.8), s(6, "R", 1, 0.85), s(7, "b7", 1, 0.7), s(10, "5", 1, 0.85), s(12, "R", 1, 0.6), s(14, "8", 1, 0.8)],
     guitar: { pattern: "x.d.u.dux.d.u.du", short: true },
     keys: { pattern: "...x......x.....", voicing: "seventh", short: true },
@@ -201,6 +210,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X......xX.......", snare: "....X.......X.oo", hihat: "x.x.x.x.x.x....." },
       crashOnLoop: false,
     },
+    kit: "vintage",
     bass: [s(0, "R", 3, 0.95), s(6, "R", 1, 0.6), s(7, "5", 1, 0.75), s(8, "R", 2, 0.85), s(11, "b7", 2, 0.7), s(14, "approach", 2, 0.65)],
     guitar: { pattern: "....d.......d...", short: true },
     keys: { pattern: "X-----x-------x-", voicing: "seventh" },
@@ -222,6 +232,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "........X.......", sidestick: "........X.......", hihat: "x.x.x.x.x.x.x...", snare: "............X.XX" },
       crashOnLoop: false,
     },
+    kit: "vintage",
     bass: [s(0, "R", 3, 0.95), s(6, "5", 2, 0.75), s(8, "R", 3, 0.9), s(14, "b7", 2, 0.7)],
     guitar: { pattern: "....d.......d...", short: true },
     keys: { pattern: "..x...x...x...x.", voicing: "triad", short: true },
@@ -243,6 +254,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X.......X.......", snare: "....X.......XoXo", hihat: "xoxoxoxoxoxo...." },
       crashOnLoop: true,
     },
+    kit: "vintage",
     bass: [s(0, "R", 4, 0.95), s(8, "5", 4, 0.85)],
     guitar: { pattern: "b...d...b...d..." },
     keys: { pattern: "....x.......x...", voicing: "triad", short: true },
@@ -267,6 +279,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X..xX..xX..xX..x", sidestick: "..x..x...x..x.x.", hihat: "xoxoxoxoxoxoxoxo" },
       crashOnLoop: false,
     },
+    kit: "vintage",
     bass: [s(0, "R", 6, 0.9), s(6, "5", 2, 0.7), s(8, "5", 6, 0.85), s(14, "R", 2, 0.7)],
     guitar: { pattern: "d..d..d...d..d.." , short: true },
     keys: { pattern: "", voicing: "seventh" },
@@ -288,6 +301,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X...X...X...X...", snare: "....X.......XXXX", hihat: "x...x...x.......", openhat: "..x...x...x....." },
       crashOnLoop: true,
     },
+    kit: "modern",
     bass: [s(0, "R", 2, 0.95), s(2, "8", 2, 0.8), s(4, "R", 2, 0.9), s(6, "8", 2, 0.8), s(8, "R", 2, 0.9), s(10, "8", 2, 0.8), s(12, "R", 2, 0.9), s(14, "8", 2, 0.8)],
     guitar: { pattern: "x.d.x.d.x.d.x.d.", short: true },
     keys: { pattern: "..x...x...x...x.", voicing: "seventh", short: true },
@@ -309,6 +323,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "XxXxXxXxXxXx....", snare: "....X.......XXXX", ride: "x.x.x.x.x.x....." },
       crashOnLoop: true,
     },
+    kit: "modern",
     bass: [s(0, "R", 2, 1), s(2, "R", 2), s(4, "R", 2), s(6, "R", 2), s(8, "R", 2), s(10, "R", 2), s(12, "R", 2), s(14, "R", 2)],
     guitar: { pattern: "P.P.P.P.P.P.P.P.", short: true },
     keys: { pattern: "", voicing: "triad" },
@@ -333,6 +348,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X......x..X.....", snare: "....X.......X.g.", hihat: "x.x.x.x.x.x....." },
       crashOnLoop: false,
     },
+    kit: "vintage",
     bass: [s(0, "R", 4, 0.85), s(7, "5", 2, 0.65), s(10, "R", 4, 0.75)],
     guitar: { pattern: "0.1.2.3.2.3.1.2." },
     keys: { pattern: "X-------x-------", voicing: "seventh" },
@@ -354,6 +370,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X.....", snare: "...Xoo", hihat: "xoo...", tom1: "....X.", tom3: ".....X" },
       crashOnLoop: true,
     },
+    kit: "vintage",
     bass: [s(0, "R", 3, 0.9), s(3, "5", 3, 0.75)],
     guitar: { pattern: "012321" },
     keys: { pattern: "X-----", voicing: "triad" },
@@ -375,6 +392,7 @@ export const STYLES: StyleDef[] = [
       fill: { kick: "X...........", snare: "....o...ooXX", hihat: "x...x......." },
       crashOnLoop: true,
     },
+    kit: "vintage",
     bass: [s(0, "R", 4, 0.9), s(4, "5", 4, 0.6), s(8, "5", 4, 0.6)],
     guitar: { pattern: "b...d...d..." },
     keys: { pattern: "....x...x...", voicing: "triad", short: true },

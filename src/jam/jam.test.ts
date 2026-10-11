@@ -4,6 +4,8 @@ import { STYLES, STYLE_BY_ID, stepsPerBar } from "./styles";
 import { generateArrangement, progressionToChords, totalBeats, withCustomChords } from "./arrangement";
 import { compilePass, swingBeat } from "./compile";
 import { sectionFor } from "./dynamics";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 const KEYS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 
@@ -187,6 +189,41 @@ describe("dynamics", () => {
       found = bass.some((e) => Math.abs(((e.beat % 4) + 4) % 4 - 3.5) < 1e-6) && bass.some((e) => Math.abs(((e.beat % 4) + 4) % 4 - 3) < 1e-6);
     }
     expect(found).toBe(true);
+  });
+});
+
+describe("kits and percussion", () => {
+  const manifest = (folder: string) => JSON.parse(readFileSync(join(__dirname, "../../public/samples", folder, "manifest.json"), "utf8")).pieces as Record<string, unknown[]>;
+  const kits = { modern: manifest("drums-avl-pearl"), vintage: manifest("drums-avl-vintage") };
+
+  it("every drum piece any style can play has samples in its kit", () => {
+    for (const st of STYLES) {
+      for (const kit of ["auto", "modern", "vintage"] as const) {
+        for (let cycle = 0; cycle < 8; cycle++) {
+          const arr = { ...generateArrangement({ style: st.id, key: "C", seed: 4 }), kit };
+          for (const ev of compilePass(arr, cycle).events.filter((e) => e.part === "drums")) {
+            expect(kits[ev.kit!][ev.piece!], `${st.id} ${kit} ${ev.piece}`).toBeDefined();
+          }
+        }
+      }
+    }
+  });
+
+  it("picks the vintage kit for jazz and blues, modern for rock, and honours an override", () => {
+    const kitOf = (style: string, kit?: "auto" | "modern" | "vintage") => compilePass({ ...generateArrangement({ style, key: "C", seed: 1 }), kit }, 0).events.find((e) => e.part === "drums")!.kit;
+    expect(kitOf("jazz")).toBe("vintage");
+    expect(kitOf("blues")).toBe("vintage");
+    expect(kitOf("rock")).toBe("modern");
+    expect(kitOf("rock", "vintage")).toBe("vintage");
+  });
+
+  it("brings in tambourine for a rock chorus but not the verse, and a shaker for bossa", () => {
+    const rock = generateArrangement({ style: "rock", key: "C", seed: 2 });
+    const pieces = (arr: typeof rock, cycle: number) => new Set(compilePass(arr, cycle).events.map((e) => e.piece));
+    expect(pieces(rock, 3).has("tambourine")).toBe(true);
+    expect(pieces(rock, 0).has("tambourine")).toBe(false);
+    expect(pieces(generateArrangement({ style: "bossa", key: "C", seed: 2 }), 0).has("shaker")).toBe(true);
+    expect(pieces({ ...generateArrangement({ style: "disco", key: "C", seed: 2 }), energy: "drive" }, 0).has("clap")).toBe(true);
   });
 });
 

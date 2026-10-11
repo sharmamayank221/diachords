@@ -19,6 +19,7 @@ export interface JamEvent {
   midi?: number;
   piece?: DrumPiece;
   string?: number; // guitar string 0 (low E) … 5 (high e), for cutting ringing strings
+  kit?: "modern" | "vintage"; // drums only
 }
 
 export interface CompiledPass {
@@ -34,6 +35,7 @@ const DRUM_VEL: Record<string, number> = { X: 1, x: 0.8, o: 0.5, g: 0.28 };
 const DRUM_GROUP: Record<DrumPiece, "kick" | "snare" | "hats"> = {
   kick: "kick", snare: "snare", sidestick: "snare", tom1: "snare", tom2: "snare", tom3: "snare",
   hihat: "hats", pedalhat: "hats", openhat: "hats", ride: "hats", ridebell: "hats", crash: "hats",
+  tambourine: "hats", clap: "snare", shaker: "hats", cowbell: "hats",
 };
 
 // Piecewise-linear swing: the off-beat (8th or 16th) moves from 50% toward `ratio`
@@ -146,6 +148,7 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
   };
 
   // ── drums ──
+  const kit = arr.kit && arr.kit !== "auto" ? arr.kit : style.kit;
   if (arr.parts.drums) {
     for (let bar = 0; bar < bars; bar++) {
       const r = barRand(bar);
@@ -161,6 +164,7 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
           events.push({
             part: "drums",
             piece,
+            kit,
             beat: swingBeat(beat, style),
             offsetMs: human(feel[DRUM_GROUP[piece]], beat, piece),
             dur: 0.25,
@@ -170,14 +174,14 @@ export function compilePass(arr: Arrangement, cycle: number): CompiledPass {
       }
       // crash into a loud phrase
       if (bar > 0 && bar % 4 === 0 && energy >= 0.75 && rr("phrasecrash", bar) < 0.4) {
-        events.push({ part: "drums", piece: "crash", beat: bar * beatsPerBar, offsetMs: feel.hats, dur: 2, vel: 0.75 });
+        events.push({ part: "drums", piece: "crash", kit, beat: bar * beatsPerBar, offsetMs: feel.hats, dur: 2, vel: 0.75 });
       }
     }
     // crash on the downbeat after a big fill or a section change
     const prevBars = bars; // same form every pass
     const prevKind = cycle > 0 ? fillKind(prevBars, prevBars - 1, cycle - 1, arr.energy, (salt, bar) => rand(seed, cycle - 1, bar * beatsPerBar, salt)) : "none";
     if (style.drums.crashOnLoop && (prevKind === "big" || prevKind === "build") && energy >= 0.35) {
-      events.push({ part: "drums", piece: "crash", beat: 0, offsetMs: feel.hats, dur: 2, vel: Math.min(1, 0.85 * gain) });
+      events.push({ part: "drums", piece: "crash", kit, beat: 0, offsetMs: feel.hats, dur: 2, vel: Math.min(1, 0.85 * gain) });
     }
   }
 

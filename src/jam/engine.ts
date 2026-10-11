@@ -134,12 +134,15 @@ class Voices {
   }
 }
 
+// hand percussion sits behind the kit
+const PIECE_GAIN: Partial<Record<DrumPiece, number>> = { tambourine: 0.4, shaker: 0.3, clap: 0.55, cowbell: 0.35 };
+
 function playEvent(g: Graph, voices: Voices, ev: JamEvent, when: number, secPerBeat: number) {
   const ctx = g.ctx;
   let buffer: AudioBuffer | null = null;
   let rate = 1;
   if (ev.part === "drums") {
-    buffer = drumBuffer(ev.piece as DrumPiece, ev.vel);
+    buffer = drumBuffer(ev.piece as DrumPiece, ev.vel, ev.kit);
   } else {
     const found = pitchedBuffer(ev.part === "guitar" ? g.guitarInstrument : ev.part, ev.midi ?? 60);
     if (found) {
@@ -154,7 +157,7 @@ function playEvent(g: Graph, voices: Voices, ev: JamEvent, when: number, secPerB
   src.playbackRate.value = rate;
   const gain = ctx.createGain();
   // velocity layers carry most of the loudness for drums; pitched samples need the full curve
-  const level = ev.part === "drums" ? 0.55 + 0.45 * ev.vel : Math.pow(ev.vel, 1.4);
+  const level = ev.part === "drums" ? (0.55 + 0.45 * ev.vel) * (PIECE_GAIN[ev.piece as DrumPiece] ?? 1) : Math.pow(ev.vel, 1.4);
   gain.gain.setValueAtTime(level, when);
   src.connect(gain).connect(ev.part === "guitar" ? g.guitarIn : g.parts[ev.part]);
 
@@ -198,15 +201,19 @@ function playClick(g: Graph, when: number, accent: boolean) {
 export async function preloadArrangement(ctx: BaseAudioContext, arr: Arrangement, guitar: "acoustic" | "electric" = "acoustic"): Promise<void> {
   await resolveManifests();
   const pieces = new Set<DrumPiece>(["crash"]);
+  let kit: "modern" | "vintage" = "modern";
   const notes: Record<"bass" | "guitar" | "keys", Set<number>> = { bass: new Set(), guitar: new Set(), keys: new Set() };
   for (let cycle = 0; cycle < 8; cycle++) {
     for (const ev of compilePass({ ...arr, parts: { drums: true, bass: true, guitar: true, keys: true } }, cycle).events) {
-      if (ev.part === "drums" && ev.piece) pieces.add(ev.piece);
+      if (ev.part === "drums" && ev.piece) {
+        pieces.add(ev.piece);
+        if (ev.kit) kit = ev.kit;
+      }
       else if (ev.midi !== undefined && ev.part !== "drums") notes[ev.part].add(ev.midi);
     }
   }
   await Promise.all([
-    preloadDrums(ctx, pieces),
+    preloadDrums(ctx, pieces, kit),
     preloadPitched(ctx, "bass", notes.bass),
     preloadPitched(ctx, guitar === "electric" ? "guitarElectric" : "guitar", notes.guitar),
     preloadPitched(ctx, "keys", notes.keys),
@@ -506,7 +513,22 @@ export async function renderArrangement(
     }
   }
   void style;
-  return ctx.startRendering();
+  const rendered = await ctx.startRendering();
+  // the limiter's 1 ms attack lets the odd drum transient through; keep the file under -0.5 dBFS
+  let peak = 0;
+  for (let c = 0; c < rendered.numberOfChannels; c++) {
+    const data = rendered.getChannelData(c);
+    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+  }
+  const ceiling = 0.944;
+  if (peak > ceiling) {
+    const k = ceiling / peak;
+    for (let c = 0; c < rendered.numberOfChannels; c++) {
+      const data = rendered.getChannelData(c);
+      for (let i = 0; i < data.length; i++) data[i] *= k;
+    }
+  }
+  return rendered;
 }
 
 /** 16-bit PCM WAV from an AudioBuffer, trimmed of trailing silence. */

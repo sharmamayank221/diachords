@@ -74,6 +74,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const [loopLimit, setLoopLimit] = useState(0);
   const [countIn, setCountIn] = useState(true);
   const [energyMode, setEnergyMode] = useState<EnergyMode>("auto");
+  const [kit, setKit] = useState<"auto" | "modern" | "vintage">("auto");
   const [customText, setCustomText] = useState("");
   const [parts, setParts] = useState<Record<PartId, boolean>>({ ...STYLE_BY_ID.rock.parts });
   const [volumes, setVolumes] = useState<Record<PartId, number>>({ drums: 0.8, bass: 0.8, guitar: 0.75, keys: 0.7 });
@@ -171,8 +172,8 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
   const arrangement: Arrangement = useMemo(() => {
     const base = generateArrangement({ style: styleId, key: keyName, mode, tempo: effectiveBpm, seed, progressionIndex: Math.min(progressionIndex, progressions.length - 1) });
     const withChords = custom.length ? withCustomChords(base, custom.filter((c) => c.valid).map((c) => c.name)) : base;
-    return { ...withChords, tempo: effectiveBpm, parts, energy: energyMode };
-  }, [styleId, keyName, mode, effectiveBpm, seed, progressionIndex, progressions.length, custom, parts, energyMode]);
+    return { ...withChords, tempo: effectiveBpm, parts, energy: energyMode, kit };
+  }, [styleId, keyName, mode, effectiveBpm, seed, progressionIndex, progressions.length, custom, parts, energyMode, kit]);
 
   // ── engine ─────────────────────────────────────────────────────────────────
   const getEngine = useCallback(async () => {
@@ -610,7 +611,21 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
                     );
                   })}
                 </div>
-                <p className="mt-3 font-Inter text-xs text-gray-500">Real recorded drums, bass, acoustic guitar and piano. Turn the guitar off to play the chords yourself.</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Drum kit">
+                  <span className="font-Inter text-sm text-gray-300 w-20">Drum kit</span>
+                  {(
+                    [
+                      { id: "auto", label: `Auto · ${style.kit === "vintage" ? "Vintage" : "Modern"}`, hint: "The kit that suits this style" },
+                      { id: "modern", label: "Modern", hint: "Pearl kit: tight 22\" kick, bright snare" },
+                      { id: "vintage", label: "Vintage", hint: "Ludwig 26\" kick, Porkpie snare, Zildjian A cymbals" },
+                    ] as const
+                  ).map((k) => (
+                    <button key={k.id} type="button" title={k.hint} onClick={() => setKit(k.id)} aria-pressed={kit === k.id} className={chipClass(kit === k.id)}>
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 font-Inter text-xs text-gray-500">Real recorded drums, percussion, bass, guitar and piano. Turn the guitar off to play the chords yourself.</p>
               </section>
 
               {/* ── Practice ── */}
