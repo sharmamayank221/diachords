@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Loading tone…</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0b0b; color: #d1d5db; font: 14px/1.4 system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <p id="msg">Loading your tone…</p>
+    <script>
+      // TONE3000 redirects the Select-flow popup here. Hand the result back to the
+      // backing-track page (postMessage, or BroadcastChannel if the opener was lost
+      // after a cross-origin sign-in) and close.
+      (function () {
+        var p = new URLSearchParams(location.search);
+        var msg = {
+          type: "t3k_oauth_callback",
+          code: p.get("code"),
+          state: p.get("state"),
+          error: p.get("error"),
+          tone_id: p.get("tone_id"),
+          canceled: p.get("canceled") === "true",
+        };
+        try {
+          if (window.opener) window.opener.postMessage(msg, location.origin);
+        } catch (e) {}
+        try {
+          var bc = new BroadcastChannel("t3k_oauth");
+          bc.postMessage(msg);
+          bc.close();
+        } catch (e) {}
+        setTimeout(function () {
+          window.close();
+          document.getElementById("msg").textContent = "You can close this window and go back to the jam.";
+        }, 150);
+      })();
+    </script>
+  </body>
+</html>

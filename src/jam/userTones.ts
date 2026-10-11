@@ -1,5 +1,6 @@
 // Your own amp/pedal models (.nam) and cabinet impulse responses (.wav), kept in this
 // browser's IndexedDB. Nothing is uploaded anywhere.
+import type { T3KSource } from "./tone3000";
 
 export interface UserTone {
   id: string;
@@ -9,6 +10,8 @@ export interface UserTone {
   addedAt: number;
   data: string | ArrayBuffer; // .nam JSON text, or IR file bytes
   meta?: { gear?: string; type?: string; architecture?: string };
+  /** where it came from, kept for attribution (TONE3000 tones) */
+  t3k?: T3KSource;
 }
 
 const DB = "diachords-tones";
@@ -56,7 +59,7 @@ export async function removeUserTone(id: string): Promise<void> {
 }
 
 /** Validates and stores a dropped file. Throws a user-readable Error when it's not usable. */
-export async function addUserTone(file: File): Promise<Omit<UserTone, "data">> {
+export async function addUserTone(file: File, t3k?: T3KSource): Promise<Omit<UserTone, "data">> {
   const lower = file.name.toLowerCase();
   let tone: UserTone;
   if (lower.endsWith(".nam")) {
@@ -73,15 +76,16 @@ export async function addUserTone(file: File): Promise<Omit<UserTone, "data">> {
     tone = {
       id: `nam-${Date.now().toString(36)}`,
       kind: "nam",
-      name: md.name || [md.gear_make, md.gear_model].filter(Boolean).join(" ") || file.name.replace(/\.nam$/i, ""),
+      name: t3k?.title || md.name || [md.gear_make, md.gear_model].filter(Boolean).join(" ") || file.name.replace(/\.nam$/i, ""),
       size: file.size,
       addedAt: Date.now(),
       data: text,
-      meta: { gear: md.gear_type, type: md.tone_type, architecture: json.architecture },
+      meta: { gear: md.gear_type ?? t3k?.gear, type: md.tone_type, architecture: json.architecture },
+      t3k,
     };
   } else if (/\.(wav|aiff?|flac|ogg|mp3)$/.test(lower)) {
     if (file.size > MAX_IR_BYTES) throw new Error("That impulse response is too large (max 4 MB).");
-    tone = { id: `ir-${Date.now().toString(36)}`, kind: "ir", name: file.name.replace(/\.[^.]+$/, ""), size: file.size, addedAt: Date.now(), data: await file.arrayBuffer() };
+    tone = { id: `ir-${Date.now().toString(36)}`, kind: "ir", name: t3k?.title || file.name.replace(/\.[^.]+$/, ""), size: file.size, addedAt: Date.now(), data: await file.arrayBuffer(), t3k };
   } else {
     throw new Error("Use a .nam amp/pedal model or a .wav cabinet impulse response.");
   }

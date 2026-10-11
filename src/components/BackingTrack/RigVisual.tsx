@@ -1,4 +1,6 @@
+/* eslint-disable @next/next/no-img-element -- TONE3000 tone photos are remote */
 import React from "react";
+import { T3KMark } from "./Tone3000Browser";
 import type { RigSettings } from "@/jam/rig";
 import type { UserTone } from "@/jam/userTones";
 
@@ -147,6 +149,28 @@ function Stompbox({ name, color, on, knobs, disabled, onClick }: { name: string;
   );
 }
 
+/** Photo of a TONE3000 capture, with the credit their terms ask for. */
+function GearPhoto({ tone, loading, compact }: { tone: ToneInfo; loading?: boolean; compact?: boolean }) {
+  const t = tone.t3k!;
+  return (
+    <figure className="relative rounded-xl overflow-hidden border border-white/10 bg-[#111]">
+      <img src={t.image!} alt={t.title} className={`w-full object-cover ${compact ? "h-24" : "h-36"} ${loading ? "opacity-40" : ""}`} />
+      {loading && (
+        <span className="absolute inset-0 flex items-center justify-center gap-2 font-Inter text-xs font-semibold text-white">
+          <span className="h-3.5 w-3.5 rounded-full border-2 border-[#ff8a2b] border-t-transparent animate-spin" /> Warming up…
+        </span>
+      )}
+      <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-2.5 pt-6 pb-1.5 flex items-end justify-between gap-2">
+        <span className="min-w-0">
+          <span className="block truncate font-Inter text-[11px] font-semibold text-white">{t.title}</span>
+          <span className="block truncate font-Inter text-[10px] text-gray-300">by {t.creator}</span>
+        </span>
+        <T3KMark className="h-3 shrink-0" />
+      </figcaption>
+    </figure>
+  );
+}
+
 interface Props {
   settings: RigSettings;
   userTones: ToneInfo[];
@@ -158,6 +182,8 @@ export default function RigVisual({ settings: s, userTones, loading, onTogglePed
   const acoustic = s.guitar === "acoustic";
   const look = acoustic ? null : ampLook(s.amp.model, userTones);
   const cabLook = look ?? { ...LOOKS.highgain, label: "" };
+  const ampTone = userTones.find((t) => `user:${t.id}` === s.amp.model && t.t3k?.image);
+  const cabTone = userTones.find((t) => `user:${t.id}` === s.cab && t.t3k?.image);
   return (
     <div className="rounded-xl bg-gradient-to-b from-[#1a1a1a] to-[#0b0b0b] border border-white/5 px-4 pt-4 pb-3 overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-6">
@@ -175,12 +201,8 @@ export default function RigVisual({ settings: s, userTones, loading, onTogglePed
         <div className="w-[190px] sm:w-[240px] mx-auto sm:mx-0 shrink-0" aria-live="polite">
           {look ? (
             <>
-              <AmpHead look={look} s={s} loading={loading} />
-              {s.cab !== "off" && (
-                <div className="mt-1">
-                  <Cabinet cab={s.cab} look={cabLook} />
-                </div>
-              )}
+              {ampTone ? <GearPhoto tone={ampTone} loading={loading} /> : <AmpHead look={look} s={s} loading={loading} />}
+              {s.cab !== "off" && <div className="mt-1">{cabTone ? <GearPhoto tone={cabTone} compact /> : <Cabinet cab={s.cab} look={cabLook} />}</div>}
             </>
           ) : (
             <div className="h-24 rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-1 text-center px-3">

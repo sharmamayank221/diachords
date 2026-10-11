@@ -613,16 +613,16 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
           setRigPreset(null);
         }}
         userTones={userTones}
-        onAddFiles={async (files) => {
+        onAddFiles={async (files, t3k) => {
           let last: Omit<UserTone, "data"> | null = null;
-          for (const f of Array.from(files)) last = await addUserTone(f);
+          for (const f of files) last = await addUserTone(f, t3k);
           setUserTones(await listUserTones());
           // switch to what was just loaded so you hear it straight away
           if (last) {
             const added = last;
             setRigPreset(null);
             setRig((r) => (added.kind === "nam" ? { ...r, guitar: "electric", amp: { ...r.amp, model: `user:${added.id}` } } : { ...r, guitar: "electric", cab: `user:${added.id}` }));
-            trackEvent("rig_user_tone_added", { kind: added.kind });
+            trackEvent("rig_user_tone_added", { kind: added.kind, source: t3k ? "tone3000" : "file" });
           }
         }}
         onRemoveTone={async (id) => {

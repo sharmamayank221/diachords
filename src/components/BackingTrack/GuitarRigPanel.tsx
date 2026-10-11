@@ -1,7 +1,10 @@
+/* eslint-disable @next/next/no-img-element -- TONE3000 tone images are remote */
 import React, { useRef, useState } from "react";
 import { AmpModel, BUILTIN_NAM, CabType, DelayTime, RIG_PRESETS, RigSettings } from "@/jam/rig";
 import type { UserTone } from "@/jam/userTones";
 import RigVisual from "./RigVisual";
+import Tone3000Browser, { T3KMark } from "./Tone3000Browser";
+import { LICENSE_LABEL, T3KSource, TONE3000_KEY } from "@/jam/tone3000";
 
 type ToneInfo = Omit<UserTone, "data">;
 
@@ -11,7 +14,7 @@ interface Props {
   onPreset: (id: string) => void;
   onChange: (next: RigSettings) => void;
   userTones: ToneInfo[];
-  onAddFiles: (files: FileList) => Promise<void>;
+  onAddFiles: (files: File[], t3k?: T3KSource) => Promise<void>;
   onRemoveTone: (id: string) => void;
   status: string | null; // error message from the amp engine
   loading: boolean;
@@ -79,7 +82,7 @@ export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChan
     setAdding(true);
     setAddError(null);
     try {
-      await onAddFiles(files);
+      await onAddFiles(Array.from(files));
     } catch (e) {
       setAddError(e instanceof Error ? e.message : "Couldn’t add that file.");
     } finally {
@@ -207,16 +210,23 @@ export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChan
         </div>
       </div>
 
+      <Tone3000Browser onAdd={(file, source) => onAddFiles([file], source)} />
+
       {/* your own tones */}
       <div className="rounded-xl border border-dashed border-white/10 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-Inter text-sm font-semibold text-white">Your tones</p>
             <p className="font-Inter text-xs text-gray-500 mt-0.5">
-              Load any Neural Amp Modeler <b>.nam</b> amp or pedal (A1 or A2) or a cabinet <b>.wav</b> IR. Thousands are free on{" "}
-              <a href="https://www.tone3000.com" target="_blank" rel="noreferrer" className="text-[#1BD79E] hover:underline">
-                TONE3000
-              </a>
+              Load any Neural Amp Modeler <b>.nam</b> amp or pedal (A1 or A2) or a cabinet <b>.wav</b> IR from your computer
+              {TONE3000_KEY ? null : (
+                <>
+                  . Thousands are free on{" "}
+                  <a href="https://www.tone3000.com" target="_blank" rel="noreferrer" className="text-[#1BD79E] hover:underline">
+                    TONE3000
+                  </a>
+                </>
+              )}
               . Files stay in this browser.
             </p>
           </div>
@@ -238,9 +248,22 @@ export default function GuitarRigPanel({ settings: s, presetId, onPreset, onChan
         {userTones.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-2">
             {userTones.map((t) => (
-              <li key={t.id} className="inline-flex items-center gap-2 h-8 pl-3 pr-1 rounded-full bg-[#161616] font-Inter text-xs text-gray-200">
+              <li key={t.id} className={`inline-flex items-center gap-2 pr-1 rounded-full bg-[#161616] font-Inter text-xs text-gray-200 max-w-full ${t.t3k ? "h-10 pl-1" : "h-8 pl-3"}`}>
+                {t.t3k?.image && <img src={t.t3k.image} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />}
                 <span className="text-gray-500 uppercase">{t.kind === "nam" ? (t.meta?.architecture === "SlimmableContainer" ? "A2" : "NAM") : "IR"}</span>
-                {t.name}
+                {t.t3k ? (
+                  <span className="min-w-0 flex flex-col leading-tight">
+                    <a href={t.t3k.toneUrl} target="_blank" rel="noreferrer" className="truncate hover:underline" title={`${t.name} — ${LICENSE_LABEL[t.t3k.license] ?? t.t3k.license}`}>
+                      {t.name}
+                    </a>
+                    <a href={t.t3k.creatorUrl} target="_blank" rel="noreferrer" className="truncate text-[10px] text-gray-500 hover:underline">
+                      by {t.t3k.creator}
+                    </a>
+                  </span>
+                ) : (
+                  t.name
+                )}
+                {t.t3k && <T3KMark className="h-3 shrink-0" />}
                 <button type="button" onClick={() => onRemoveTone(t.id)} aria-label={`Remove ${t.name}`} className="h-6 w-6 rounded-full text-gray-500 hover:text-white hover:bg-white/10">
                   ✕
                 </button>
