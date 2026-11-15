@@ -14,13 +14,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useFavorites } from "@/hooks/useFavorites";
 import { track } from "@/lib/analytics";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { IS_NATIVE_APP } from "@/lib/native";
 
 interface IGuitar {
   id?: string;
   data?: A;
 }
 
-// ♥ save to "My library"; signed-out visitors are asked to sign in first
+// ♥ save to "My library"; signed-out website visitors are asked to sign in first (the app saves to iCloud)
 function FavoriteButton({ chordId, chordKey, suffix, chordName }: { chordId: string; chordKey: string; suffix: string; chordName: string }) {
   const { user } = useAuth();
   const { isFavorited, toggle, loading } = useFavorites(chordId, chordKey, suffix);
@@ -30,7 +31,7 @@ function FavoriteButton({ chordId, chordKey, suffix, chordName }: { chordId: str
       <button
         type="button"
         onClick={() => {
-          if (!user) {
+          if (!user && !IS_NATIVE_APP) {
             track("sign_in_open", { from: "favorite" });
             setLoginOpen(true);
             return;
@@ -121,7 +122,7 @@ export default function Guitar({ data }: IGuitar) {
         <div className="min-w-0">
           <div className="flex items-center gap-3">
             <h1 className="font-Lora text-white text-3xl md:text-4xl leading-tight">{chordName}</h1>
-            {isSupabaseConfigured && data?.id && data?.key && (
+            {(isSupabaseConfigured || IS_NATIVE_APP) && data?.id && data?.key && (
               <FavoriteButton chordId={data.id} chordKey={data.key} suffix={data.suffix} chordName={chordName} />
             )}
           </div>

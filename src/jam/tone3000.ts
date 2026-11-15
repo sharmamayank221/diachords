@@ -3,6 +3,8 @@
 // runs client-side with OAuth 2.0 + PKCE; the publishable key is safe to ship.
 // Based on TONE3000's MIT-licensed example client (github.com/tone-3000/t3k-api).
 
+import { APP_URL_SCHEME, IS_NATIVE_APP, NativeShell, SITE_URL } from "@/lib/native";
+
 const T3K = "https://www.tone3000.com";
 export const TONE3000_KEY = process.env.NEXT_PUBLIC_TONE3000_KEY ?? "";
 
@@ -50,7 +52,21 @@ interface Tokens {
 }
 let tokens: Tokens | null = null;
 
-const redirectUri = () => `${window.location.origin}/tone3000-callback.html`;
+// The app has no web origin of its own, so it uses the website's callback page, which hands
+// the result back through the app's URL scheme (see public/tone3000-callback.html).
+const redirectUri = () => `${IS_NATIVE_APP ? SITE_URL : window.location.origin}/tone3000-callback.html`;
+const NATIVE_STATE_PREFIX = "app.";
+
+type PickResult = { code: string | null; toneId: string | null; error: string | null } | null;
+
+async function pickInNativeSheet(url: URL, state: string): Promise<PickResult> {
+  const { url: callback, canceled } = await NativeShell.startWebAuth({ url: url.toString(), callbackScheme: APP_URL_SCHEME });
+  if (canceled || !callback) return null;
+  const p = new URL(callback.replace(`${APP_URL_SCHEME}://`, "https://app/")).searchParams;
+  if (p.get("state") !== state) return null;
+  if (p.get("canceled") === "true" && !p.get("tone_id")) return null;
+  return { code: p.get("code"), toneId: p.get("tone_id"), error: p.get("error") };
+}
 
 function base64url(bytes: Uint8Array): string {
   let s = "";
@@ -96,10 +112,13 @@ async function api(path: string): Promise<Response> {
 export async function browseTone3000(kind: T3KKind, architecture: T3KArchitecture = "2"): Promise<{ tone: T3KTone; models: T3KModel[] } | null> {
   if (!TONE3000_KEY) throw new Error("TONE3000 isn’t set up on this site yet.");
   // open synchronously so popup blockers see the click
-  const popup = window.open("about:blank", "t3k_select", "width=480,height=720,left=" + Math.round(window.screenX + (window.outerWidth - 480) / 2) + ",top=" + Math.round(window.screenY + 40));
-  if (!popup) throw new Error("Your browser blocked the TONE3000 window. Allow pop-ups for this site and try again.");
+  const popup = IS_NATIVE_APP
+    ? null
+    : window.open("about:blank", "t3k_select", "width=480,height=720,left=" + Math.round(window.screenX + (window.outerWidth - 480) / 2) + ",top=" + Math.round(window.screenY + 40));
+  if (!IS_NATIVE_APP && !popup) throw new Error("Your browser blocked the TONE3000 window. Allow pop-ups for this site and try again.");
 
-  const { verifier, state, challenge } = await pkce();
+  const { verifier, state: rawState, challenge } = await pkce();
+  const state = IS_NATIVE_APP ? NATIVE_STATE_PREFIX + rawState : rawState;
   const url = new URL(`${T3K}/api/v1/oauth/authorize`);
   const params: Record<string, string> = {
     client_id: TONE3000_KEY,
@@ -116,12 +135,28 @@ export async function browseTone3000(kind: T3KKind, architecture: T3KArchitectur
   };
   if (kind === "nam") params.architecture = architecture;
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  popup.location.href = url.toString();
 
-  const result = await new Promise<{ code: string | null; toneId: string | null; error: string | null } | null>((resolve) => {
+  const result = popup ? await pickInPopup(popup, url, state) : await pickInNativeSheet(url, state);
+
+  if (!result) return null;
+  if (result.error || !result.code) throw new Error("TONE3000 sign-in didn’t complete. Please try again.");
+  tokens = await tokenRequest({ grant_type: "authorization_code", code: result.code, code_verifier: verifier, redirect_uri: redirectUri() });
+  if (!result.toneId) return null;
+
+  const arch = kind === "nam" ? `&architecture=${architecture}` : "";
+  const [tone, models] = await Promise.all([
+    api(`/api/v1/tones/${result.toneId}?${arch.slice(1)}`).then((r) => r.json() as Promise<T3KTone>),
+    api(`/api/v1/models?tone_id=${result.toneId}&page_size=100${arch}`).then((r) => r.json() as Promise<{ data: T3KModel[] }>),
+  ]);
+  return { tone, models: models.data };
+}
+
+function pickInPopup(popup: Window, url: URL, state: string): Promise<PickResult> {
+  popup.location.href = url.toString();
+  return new Promise<PickResult>((resolve) => {
     let done = false;
     const bc = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("t3k_oauth") : null;
-    const finish = (v: { code: string | null; toneId: string | null; error: string | null } | null) => {
+    const finish = (v: PickResult) => {
       if (done) return;
       done = true;
       window.removeEventListener("message", onMessage);
@@ -144,18 +179,6 @@ export async function browseTone3000(kind: T3KKind, architecture: T3KArchitectur
       if (popup.closed) setTimeout(() => finish(null), 800);
     }, 500);
   });
-
-  if (!result) return null;
-  if (result.error || !result.code) throw new Error("TONE3000 sign-in didn’t complete. Please try again.");
-  tokens = await tokenRequest({ grant_type: "authorization_code", code: result.code, code_verifier: verifier, redirect_uri: redirectUri() });
-  if (!result.toneId) return null;
-
-  const arch = kind === "nam" ? `&architecture=${architecture}` : "";
-  const [tone, models] = await Promise.all([
-    api(`/api/v1/tones/${result.toneId}?${arch.slice(1)}`).then((r) => r.json() as Promise<T3KTone>),
-    api(`/api/v1/models?tone_id=${result.toneId}&page_size=100${arch}`).then((r) => r.json() as Promise<{ data: T3KModel[] }>),
-  ]);
-  return { tone, models: models.data };
 }
 
 /** Downloads one model of a picked tone as a File our tone store understands. */

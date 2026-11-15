@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { applyCors } from "@/lib/cors";
 
 export interface YoutubeTutorialResult {
   videoId:     string | null;
@@ -12,6 +13,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<YoutubeTutorialResult>
 ) {
+  if (applyCors(req, res)) return;
   const { chord } = req.query;
   if (!chord || typeof chord !== "string") {
     return res.status(400).json({ videoId: null, title: null, thumbnail: null, channel: null, duration: null });

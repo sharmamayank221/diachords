@@ -1,8 +1,44 @@
-@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── iOS app (static export inside Capacitor) ── */
+.native-app,
+.native-app body {
+    overscroll-behavior: none;
+}
+
+.native-app body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-text-size-adjust: 100%;
+}
+
+.native-app * {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.native-app input,
+.native-app textarea,
+.native-app select,
+.native-app [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.pt-safe {
+    padding-top: env(safe-area-inset-top);
+}
+
+.pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Room for the bottom tab bar (56px) plus the home indicator */
+.pb-tabbar {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+}
 
 .native-scroll{
     -webkit-overflow-scrolling: touch;

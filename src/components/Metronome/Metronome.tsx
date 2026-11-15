@@ -1,5 +1,6 @@
 import React from "react";
 import { track } from "@/lib/analytics";
+import { setKeepAwake } from "@/lib/native";
 
 // ── Meters & subdivisions ────────────────────────────────────────────────────
 // BPM always counts the pulse: quarter notes in simple meters, dotted quarters in 6/8 and 12/8.
@@ -160,6 +161,13 @@ export default function Metronome() {
 
   const meter = METERS[meterIdx];
   const subdivOptions = meter.compound ? COMPOUND_SUBDIVS : SIMPLE_SUBDIVS;
+
+  React.useEffect(() => {
+    setKeepAwake(playing);
+    return () => {
+      setKeepAwake(false);
+    };
+  }, [playing]);
 
   // restore last-used settings (per browser)
   React.useEffect(() => {

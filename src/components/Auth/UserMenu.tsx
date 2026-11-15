@@ -2,8 +2,31 @@ import React, { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 
+/** Confirms, then permanently deletes the account (App Store guideline 5.1.1(v)). */
+export function useDeleteAccount() {
+  const { deleteAccount } = useAuth();
+  const [deleting, setDeleting] = useState(false);
+  const run = async () => {
+    const ok = window.confirm(
+      "Delete your account? This permanently removes your account and saved chords. It can't be undone."
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      window.alert("Your account has been deleted.");
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Couldn't delete your account. Try again.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+  return { deleting, deleteAccount: run };
+}
+
 export default function UserMenu() {
   const { user, signOut } = useAuth();
+  const { deleting, deleteAccount } = useDeleteAccount();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -71,6 +94,13 @@ export default function UserMenu() {
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
               <span className="font-Manrope text-[#adaaaa] text-[13px] group-hover:text-red-400 transition-colors">Sign out</span>
+            </button>
+            <button
+              onClick={async () => { setOpen(false); await deleteAccount(); }}
+              disabled={deleting}
+              className="w-full px-3 py-2 rounded-xl hover:bg-white/5 transition-all text-left font-Manrope text-[12px] text-[#52525b] hover:text-red-400 disabled:opacity-50"
+            >
+              {deleting ? "Deleting account…" : "Delete account"}
             </button>
           </div>
         </div>

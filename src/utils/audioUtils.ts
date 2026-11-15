@@ -5,7 +5,22 @@ let kickSynth: Tone.MembraneSynth | null = null;
 let snareSynth: Tone.NoiseSynth | null = null;
 let hihatSynth: Tone.MetalSynth | null = null;
 
-export const initAudio = async () => {
+let ready: Promise<void> | null = null;
+
+// One shared load: callers that arrive while the samples are still loading wait for the same
+// promise instead of triggering a Sampler with no buffers (Tone throws "buffer is either not set
+// or not loaded"). A failed load is retried on the next call.
+export const initAudio = (): Promise<void> => {
+  ready ??= setupAudio().catch((e) => {
+    sampler?.dispose();
+    sampler = null;
+    ready = null;
+    throw e;
+  });
+  return ready;
+};
+
+const setupAudio = async () => {
   if (!sampler) {
     sampler = new Tone.Sampler({
       urls: {
@@ -80,22 +95,14 @@ export const initAudio = async () => {
 };
 
 export const playChord = async (midiNotes: number[]) => {
-  if (!sampler) {
-    await initAudio();
-  }
-
-  if (!sampler) return;
-
+  await initAudio();
   midiNotes.forEach(playNoteSingle);
 };
 
 // Play chord with specific duration
 export const playChordWithDuration = async (midiNotes: number[], duration: number) => {
-  if (!sampler) {
-    await initAudio();
-  }
-
-  if (!sampler) return;
+  await initAudio();
+  if (!sampler?.loaded) return;
 
   const now = Tone.now();
   midiNotes.forEach((midiNote) => {
@@ -105,20 +112,21 @@ export const playChordWithDuration = async (midiNotes: number[], duration: numbe
 };
 
 function playNoteSingle(midiNote: number): void {
+  if (!sampler?.loaded) return;
   const now = Tone.now();
   const duration = 2; // Play for 2 seconds
   const freq = Tone.Frequency(midiNote, "midi").toFrequency();
-  sampler!.triggerAttackRelease(freq, duration, now);
+  sampler.triggerAttackRelease(freq, duration, now);
 }
 
 export function playNote(midiNote: number): void {
-  if (!sampler) {
-    initAudio().then(() => {
-      playNoteSingle(midiNote);
-    });
-  } else {
+  if (sampler?.loaded) {
     playNoteSingle(midiNote);
+    return;
   }
+  initAudio()
+    .then(() => playNoteSingle(midiNote))
+    .catch((e) => console.error("[audio] guitar samples failed to load", e));
 }
 
 // Drum functions
@@ -190,7 +198,7 @@ export async function playProgressionWithDrums(
     // Play chord on beat 1 of each measure
     if (beatInMeasure === 0) {
       const chord = chords[currentChordIndex];
-      if (chord && chord.midiNotes && sampler) {
+      if (chord && chord.midiNotes && sampler?.loaded) {
         chord.midiNotes.forEach((midiNote) => {
           const freq = Tone.Frequency(midiNote, "midi").toFrequency();
           sampler!.triggerAttackRelease(freq, "2n", time);

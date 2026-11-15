@@ -1,3 +1,5 @@
+import { publicUrl } from "@/lib/native";
+
 export const JAM_KEYS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 
 const CHROMATIC = JAM_KEYS;
@@ -71,7 +73,7 @@ export function buildJamShareUrl(basePath: string, snapshot: Partial<JamSessionS
   if (snapshot.scale) params.set("scale", snapshot.scale);
   if (snapshot.lastTab === "scales") params.set("tab", "scales");
   const q = params.toString();
-  return q ? `${window.location.origin}${basePath}?${q}` : `${window.location.origin}${basePath}`;
+  return publicUrl(q ? `${basePath}?${q}` : basePath);
 }
 
 /** Four quarter-note clicks before the band enters (Jamzone / Moises-style count-in). */

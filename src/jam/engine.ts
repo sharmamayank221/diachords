@@ -11,6 +11,7 @@ import { compilePass, CompiledPass, JamEvent } from "./compile";
 import { STYLE_BY_ID, DrumPiece } from "./styles";
 import { DrumKit, drumBuffer, pitchedBuffer, preloadDrums, preloadPitched, resolveManifests } from "./samples";
 import { GuitarRig, RigSettings, RIG_PRESETS } from "./rig";
+import { preferPlaybackAudioSession } from "@/lib/native";
 
 const LOOKAHEAD_S = 0.12;
 const TICK_MS = 25;
@@ -267,11 +268,7 @@ export class JamEngine {
       this.ctx = new Ctx({ latencyHint: "interactive" });
     }
     // on iOS this lets the band play with the silent switch on
-    try {
-      (navigator as any).audioSession && ((navigator as any).audioSession.type = "playback");
-    } catch {
-      /* not supported */
-    }
+    preferPlaybackAudioSession();
     this.rig = new GuitarRig(this.ctx);
     this.rig.apply(this.rigSettings);
     this.graph = buildGraph(this.ctx, this.rig, this.rigSettings);

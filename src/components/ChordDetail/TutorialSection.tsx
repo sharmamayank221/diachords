@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { YoutubeTutorialResult } from "@/pages/api/youtube-tutorial";
+import { apiUrl } from "@/lib/native";
 
 interface Props {
   chordKey:   string; // e.g. "C"
@@ -37,7 +38,7 @@ export default function TutorialSection({ chordKey, chordSuffix }: Props) {
     setLoading(true);
     setPlaying(false);
     setData(null);
-    fetch(`/api/youtube-tutorial?chord=${encodeURIComponent(chordName)}`)
+    fetch(apiUrl(`/api/youtube-tutorial?chord=${encodeURIComponent(chordName)}`))
       .then(r => r.json())
       .then((d: YoutubeTutorialResult) => setData(d))
       .catch(() => setData(null))
