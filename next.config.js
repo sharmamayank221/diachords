@@ -29,7 +29,15 @@ const nextConfig = {
       }
     : {
         async redirects() {
-          return [];
+          return [
+            // The chord library moved from /chords?key=eb to per-key pages at /chords/key/eb
+            {
+              source: "/chords",
+              has: [{ type: "query", key: "key", value: "(?<k>csharp|d|eb|e|f|fsharp|g|ab|a|bb|b)" }],
+              destination: "/chords/key/:k",
+              permanent: true,
+            },
+          ];
         },
       }),
 };
