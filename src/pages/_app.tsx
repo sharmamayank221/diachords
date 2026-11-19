@@ -7,12 +7,32 @@ import { Provider } from "react-redux";
 import type { AppProps } from "next/app";
 import { Analytics } from "@vercel/analytics/react";
 
+import "@fontsource/inter/400";
+import "@fontsource/inter/500";
+import "@fontsource/inter/600";
+import "@fontsource/inter/700";
+import "@fontsource/space-grotesk/400";
+import "@fontsource/space-grotesk/500";
+import "@fontsource/space-grotesk/600";
+import "@fontsource/space-grotesk/700";
+import "@fontsource/manrope/400";
+import "@fontsource/manrope/500";
+import "@fontsource/manrope/600";
+import "@fontsource/manrope/700";
+import "@fontsource/lora/400";
+import "@fontsource/lora/500";
+import "@fontsource/lora/600";
+import "@fontsource/lora/700";
 import "@/styles/globals.css";
 import Layout from "@/components/Layout";
+import { IS_NATIVE_APP, patchBundledFetch, patchMicAudioSession, preferPlaybackAudioSession } from "@/lib/native";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import * as gtag from "@/lib/gtag";
+
+patchBundledFetch();
+patchMicAudioSession();
 
 if (typeof window !== "undefined") {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || "", {
@@ -44,6 +64,17 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, [router.events]);
 
+  useEffect(() => {
+    if (!IS_NATIVE_APP) return;
+    preferPlaybackAudioSession();
+    import("@capacitor/status-bar")
+      .then(({ StatusBar, Style }) => StatusBar.setStyle({ style: Style.Dark }))
+      .catch(() => {});
+    import("@capacitor/splash-screen")
+      .then(({ SplashScreen }) => SplashScreen.hide())
+      .catch(() => {});
+  }, []);
+
   return (
     <AuthProvider>
       {gtag.GA_MEASUREMENT_ID && (
@@ -73,10 +104,10 @@ export default function App({ Component, pageProps }: AppProps) {
           <Head>
             <title>ChordsofGuitar.com - Guitar Chords &amp; Scales</title>
             <meta name="description" content="Learn guitar chords, scales, and jam with AI backing tracks. The ultimate guitar learning companion." />
-            <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+            <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 
             {/* PWA Meta Tags */}
-            <link rel="manifest" href="/manifest.json" />
+            {!IS_NATIVE_APP && <link rel="manifest" href="/manifest.json" />}
             <meta name="theme-color" content="#1BD79E" />
             <meta name="mobile-web-app-capable" content="yes" />
             <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -99,7 +130,7 @@ export default function App({ Component, pageProps }: AppProps) {
             <meta name="google-site-verification" content="viU1cq9SDi_l7ZqBa93316kKaPmYOcC5v0B7CglNvrI" />
           </Head>
           {getLayout(<Component {...pageProps} />)}
-          <Analytics />
+          {!IS_NATIVE_APP && <Analytics />}
         </Provider>
       </PostHogProvider>
     </AuthProvider>

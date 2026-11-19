@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/router";
 import { track as trackEvent } from "@/lib/analytics";
 import { buildJamShareUrl, loadJamSession, saveJamSession } from "@/utils/jamPracticeHelpers";
+import { IS_NATIVE_APP, saveFile, setKeepAwake, shareLink } from "@/lib/native";
 import { findChord } from "@/helpers/chordSearch";
 import ChordDiagram from "@/components/Chord/ChordDiagram";
 import { STYLES, STYLE_BY_ID } from "@/jam/styles";
@@ -279,12 +280,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
       const { renderArrangement, audioBufferToWav } = await import("@/jam/engine");
       const muted = { drums: !parts.drums, bass: !parts.bass, guitar: !parts.guitar, keys: !parts.keys };
       const buf = await renderArrangement(arrangement, passes, { volumes, muted }, rig);
-      const url = URL.createObjectURL(audioBufferToWav(buf));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `diachords-${keyName}${mode === "minor" ? "m" : ""}-${styleId}-${effectiveBpm}bpm.wav`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      await saveFile(audioBufferToWav(buf), `diachords-${keyName}${mode === "minor" ? "m" : ""}-${styleId}-${effectiveBpm}bpm.wav`);
       trackEvent("backing_track_export", { genre: styleId, passes });
     } catch {
       setError("Export failed. Try fewer loops.");
@@ -303,14 +299,18 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
       customChords: customText.trim() || undefined,
     });
     const withMode = `${url}${url.includes("?") ? "&" : "?"}mode=${mode}`;
-    try {
-      await navigator.clipboard.writeText(withMode);
+    if ((await shareLink(withMode, "Jam with me on ChordsofGuitar")) === "copied") {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
-    } catch {
-      window.prompt("Copy this link:", withMode);
     }
   };
+
+  useEffect(() => {
+    setKeepAwake(playing);
+    return () => {
+      setKeepAwake(false);
+    };
+  }, [playing]);
 
   // ── display ────────────────────────────────────────────────────────────────
   const chords = arrangement.chords;
@@ -670,7 +670,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
                       disabled={exporting}
                       className="h-9 px-3.5 rounded-full border border-[#1BD79E]/40 text-[#1BD79E] font-Inter text-sm font-semibold hover:bg-[#1BD79E]/10 disabled:opacity-50"
                     >
-                      {exporting ? "Rendering…" : `⬇ WAV · ${n} loop${n > 1 ? "s" : ""}`}
+                      {exporting ? "Rendering…" : `${IS_NATIVE_APP ? "Save" : "⬇"} WAV · ${n} loop${n > 1 ? "s" : ""}`}
                     </button>
                   ))}
                 </div>
@@ -686,7 +686,7 @@ export default function BackingTrackGenerator({ practiceKey, practiceScaleId, on
                     </button>
                   )}
                   <button type="button" onClick={copyShareLink} className="h-9 px-3.5 rounded-full border border-white/15 text-gray-200 font-Inter text-sm hover:border-white/30">
-                    {shareCopied ? "✓ Link copied" : "Copy share link"}
+                    {shareCopied ? "✓ Link copied" : IS_NATIVE_APP ? "Share this jam" : "Copy share link"}
                   </button>
                 </div>
               </section>

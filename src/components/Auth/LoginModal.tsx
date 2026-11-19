@@ -1,6 +1,6 @@
 import React, { useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-
 interface LoginModalProps {
   onClose: () => void;
 }
@@ -137,8 +137,10 @@ export default function LoginModal({ onClose }: LoginModalProps) {
               </button>
             </form>
 
-            <p className="font-Inter text-[11px] text-[#3f3f46] text-center mt-4 leading-relaxed">
-              By signing in you agree to our terms. No spam, ever.
+            <p className="font-Inter text-[11px] text-[#52525b] text-center mt-4 leading-relaxed">
+              By signing in you agree to our{" "}
+              <Link href="/terms" onClick={onClose} className="underline hover:text-white">terms</Link> and{" "}
+              <Link href="/privacy" onClick={onClose} className="underline hover:text-white">privacy policy</Link>. No spam, ever.
             </p>
           </>
         )}

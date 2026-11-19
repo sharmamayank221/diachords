@@ -17,6 +17,11 @@
       // after a cross-origin sign-in) and close.
       (function () {
         var p = new URLSearchParams(location.search);
+        // Picks started in the iOS app go back to it through its URL scheme.
+        if ((p.get("state") || "").indexOf("app.") === 0) {
+          location.replace("com.chordsofguitar.app://tone3000" + location.search);
+          return;
+        }
         var msg = {
           type: "t3k_oauth_callback",
           code: p.get("code"),

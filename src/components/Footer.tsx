@@ -7,6 +7,9 @@ const LINKS = [
   { href: "/practice", label: "Backing tracks" },
   { href: "/tuner", label: "Guitar tuner" },
   { href: "/metronome", label: "Metronome" },
+  { href: "/support", label: "Support" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
 ];
 
 export default function Footer() {

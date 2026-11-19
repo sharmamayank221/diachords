@@ -1,5 +1,6 @@
 import type { GetServerSideProps } from "next";
 import getIDs from "@/helpers/getIDs";
+import { KEYS, keyPath } from "@/components/Chord/ChordLibrary";
 
 const SITE_URL = "https://chordsofguitar.com";
 
@@ -7,6 +8,12 @@ const SITE_URL = "https://chordsofguitar.com";
 const STATIC_PAGES: { path: string; priority: number; changefreq: string }[] = [
   { path: "/", priority: 1.0, changefreq: "weekly" },
   { path: "/chords", priority: 0.9, changefreq: "weekly" },
+  // per-key chord library pages (C is /chords itself)
+  ...KEYS.filter((k) => k !== "C").map((k) => ({
+    path: keyPath(k),
+    priority: 0.8,
+    changefreq: "monthly",
+  })),
   { path: "/tuner", priority: 0.9, changefreq: "monthly" },
   { path: "/metronome", priority: 0.9, changefreq: "monthly" },
   { path: "/scales", priority: 0.8, changefreq: "monthly" },

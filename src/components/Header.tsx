@@ -10,6 +10,7 @@ import LoginModal from "@/components/Auth/LoginModal";
 import { useAuth } from "@/hooks/useAuth";
 import { track } from "@/lib/analytics";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { IS_NATIVE_APP } from "@/lib/native";
 
 const NAV = [
   { href: "/chords", label: "Chords", match: (p: string) => p.startsWith("/chords") },
@@ -138,15 +139,17 @@ export default function Header() {
     });
 
   return (
-    <header className="bg-black sticky top-0 z-40 border-b border-white/5">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 md:gap-6">
+    <header className={`bg-black sticky top-0 z-40 border-b border-white/5 ${IS_NATIVE_APP ? "pt-safe" : ""}`}>
+      <div className={`max-w-6xl mx-auto px-4 md:px-6 flex items-center gap-3 md:gap-6 ${IS_NATIVE_APP ? "py-2" : "py-3 md:py-4"}`}>
         <Link href="/" aria-label="Chords of Guitar home" className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-[#1BD79E]">
-          <Image src="/Logo.svg" alt="" width={40} height={40} />
+          <Image src="/Logo.svg" alt="" width={IS_NATIVE_APP ? 34 : 40} height={IS_NATIVE_APP ? 34 : 40} />
         </Link>
-        <nav aria-label="Main" className="hidden lg:flex items-center gap-0.5 xl:gap-1">
-          {navLinks("px-2.5 xl:px-3.5 py-2")}
-          <MoreMenu pathname={router.pathname} />
-        </nav>
+        {!IS_NATIVE_APP && (
+          <nav aria-label="Main" className="hidden lg:flex items-center gap-0.5 xl:gap-1">
+            {navLinks("px-2.5 xl:px-3.5 py-2")}
+            <MoreMenu pathname={router.pathname} />
+          </nav>
+        )}
         <div className="flex-1 min-w-0">
           <Searchbar />
         </div>
@@ -161,21 +164,23 @@ export default function Header() {
         </button>
         <AccountButton />
       </div>
-      <nav aria-label="Main" className="lg:hidden max-w-6xl mx-auto px-4 pb-3 flex gap-1 overflow-x-auto no-scrollbar">
-        {navLinks("px-3.5 py-1.5 shrink-0")}
-        {MORE.map((m) => (
-          <Link
-            key={m.href}
-            href={m.href}
-            aria-current={router.pathname.startsWith(m.href) ? "page" : undefined}
-            className={`px-3.5 py-1.5 shrink-0 font-Inter text-sm font-medium rounded-full transition-colors ${
-              router.pathname.startsWith(m.href) ? "text-white bg-white/10" : "text-gray-400 hover:text-white"
-            }`}
-          >
-            {m.label}
-          </Link>
-        ))}
-      </nav>
+      {!IS_NATIVE_APP && (
+        <nav aria-label="Main" className="lg:hidden max-w-6xl mx-auto px-4 pb-3 flex gap-1 overflow-x-auto no-scrollbar">
+          {navLinks("px-3.5 py-1.5 shrink-0")}
+          {MORE.map((m) => (
+            <Link
+              key={m.href}
+              href={m.href}
+              aria-current={router.pathname.startsWith(m.href) ? "page" : undefined}
+              className={`px-3.5 py-1.5 shrink-0 font-Inter text-sm font-medium rounded-full transition-colors ${
+                router.pathname.startsWith(m.href) ? "text-white bg-white/10" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              {m.label}
+            </Link>
+          ))}
+        </nav>
+      )}
       <GuitarHintsModal isOpen={isOpen} onClose={closeModal}>
             {" "}
             <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">

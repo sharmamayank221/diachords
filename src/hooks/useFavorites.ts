@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { IS_NATIVE_APP } from "@/lib/native";
+import { setChordSaved, watchSavedChords } from "@/lib/cloudLibrary";
 
 export function useFavorites(chordId: string, chordKey: string, chordSuffix: string) {
   const { user } = useAuth();
@@ -9,7 +11,9 @@ export function useFavorites(chordId: string, chordKey: string, chordSuffix: str
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || !chordId) return;
+    if (!chordId) return;
+    if (IS_NATIVE_APP) return watchSavedChords((chords) => setIsFavorited(chords.some((c) => c.chord_id === chordId)));
+    if (!user) return;
     supabase
       .from("user_favorites")
       .select("id")
@@ -23,6 +27,10 @@ export function useFavorites(chordId: string, chordKey: string, chordSuffix: str
   }, [user, chordId]);
 
   const toggle = useCallback(async () => {
+    if (IS_NATIVE_APP) {
+      await setChordSaved({ chord_id: chordId, chord_key: chordKey, chord_suffix: chordSuffix }, !isFavorited);
+      return true;
+    }
     if (!user) return false;
     setLoading(true);
     setError(null);

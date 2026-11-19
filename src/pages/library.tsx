@@ -2,6 +2,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { IS_NATIVE_APP } from "@/lib/native";
+import { setChordSaved, watchSavedChords } from "@/lib/cloudLibrary";
 import chordsData from "@/chrods.json";
 
 interface Favorite {
@@ -144,7 +146,8 @@ function ChordCard({ fav, onRemove }: { fav: Favorite; onRemove: (id: string) =>
     e.preventDefault();
     e.stopPropagation();
     setRemoving(true);
-    await supabase.from("user_favorites").delete().eq("id", fav.id);
+    if (IS_NATIVE_APP) await setChordSaved(fav, false);
+    else await supabase.from("user_favorites").delete().eq("id", fav.id);
     onRemove(fav.id);
   }
 
@@ -184,12 +187,22 @@ function ChordCard({ fav, onRemove }: { fav: Favorite; onRemove: (id: string) =>
 }
 
 export default function LibraryPage() {
-  const { user, isLoading } = useAuth();
+  const auth = useAuth();
+  // The app has no accounts: its library is always available and lives in iCloud.
+  const user = IS_NATIVE_APP || auth.user;
+  const isLoading = !IS_NATIVE_APP && auth.isLoading;
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [fetching, setFetching] = useState(true);
   const [filter, setFilter] = useState<Filter>("All");
 
   useEffect(() => {
+    if (IS_NATIVE_APP) {
+      return watchSavedChords((chords) => {
+        setFavorites(chords);
+        setFetching(false);
+      });
+    }
+    const user = auth.user;
     if (!user) { setFetching(false); return; }
     supabase
       .from("user_favorites")
@@ -201,7 +214,7 @@ export default function LibraryPage() {
         else setFavorites(data ?? []);
         setFetching(false);
       });
-  }, [user]);
+  }, [auth.user]);
 
   function handleRemove(id: string) {
     setFavorites(prev => prev.filter(f => f.id !== id));

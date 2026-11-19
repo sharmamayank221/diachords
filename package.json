@@ -7,9 +7,27 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ios:build": "rm -rf .next out && NATIVE_APP=1 next build && NATIVE_APP=1 next export -o out && node scripts/prune-native-export.js && cap sync ios",
+    "ios:open": "cap open ios",
+    "ios:run": "cap run ios",
+    "ios:assets": "node scripts/generate-ios-assets.js"
   },
   "dependencies": {
+    "@capacitor/app": "^8",
+    "@capacitor/browser": "^8",
+    "@capacitor/core": "^8",
+    "@capacitor/filesystem": "^8",
+    "@capacitor/haptics": "^8",
+    "@capacitor/ios": "^8",
+    "@capacitor/keyboard": "^8",
+    "@capacitor/share": "^8",
+    "@capacitor/splash-screen": "^8",
+    "@capacitor/status-bar": "^8",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/lora": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
     "@headlessui/react": "^1.7.14",
     "@opendaw/nam-wasm": "1.2.0",
     "@reduxjs/toolkit": "^1.9.3",
@@ -36,6 +54,8 @@
     "typescript": "5.0.2"
   },
   "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.21",
     "sharp": "^0.34.5",
