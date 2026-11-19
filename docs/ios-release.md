@@ -67,8 +67,6 @@ The redirect URI stays `https://chordsofguitar.com/tone3000-callback.html`, so n
 - Privacy manifest, microphone usage string, and a 1024px icon with no alpha.
 - Audio plays with the silent switch on. The screen stays awake while a jam or the metronome is playing.
 - Native share sheet for links and exported WAV files. Bundled fonts, so it works offline.
-- "New idea" in the jam uses Apple Intelligence on iOS 26+ devices that support it (on-device
-  Foundation Models, nothing leaves the phone). Other devices keep the random preset idea.
 - Native tab bar, safe-area layout, haptics, and a router that serves exported `.html` pages for deep routes.
 
 Not enabled on purpose: background audio (`UIBackgroundModes: audio`). Add it only if playback should

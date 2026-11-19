@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/router";
 import { track as trackEvent } from "@/lib/analytics";
 import { buildJamShareUrl, loadJamSession, saveJamSession } from "@/utils/jamPracticeHelpers";
-import { IS_NATIVE_APP, getAppleIntelligenceStatus, saveFile, setKeepAwake, shareLink } from "@/lib/native";
-import type { JamIdea } from "@/jam/aiIdea";
-import type { ChannelStyle } from "@/jam/channelStyle";
+import { IS_NATIVE_APP, saveFile, setKeepAwake, shareLink } from "@/lib/native";
 import { findChord } from "@/helpers/chordSearch";
 import ChordDiagram from "@/components/Chord/ChordDiagram";
 import { STYLES, STYLE_BY_ID } from "@/jam/styles";
@@ -62,7 +60,7 @@ export interface BackingTrackGeneratorProps {
 
 type SettingsTab = "style" | "band" | "rig";
 
-export default function BackingTrackGenerator({ practiceKey, onPracticeKeyChange, practiceScaleId, onSuggestScale, onOpenScales, renderSolo }: BackingTrackGeneratorProps) {
+export default function BackingTrackGenerator({ practiceKey, practiceScaleId, onSuggestScale, onOpenScales, renderSolo }: BackingTrackGeneratorProps) {
   const router = useRouter();
   const keyName = practiceKey && noteToPc(practiceKey) !== null ? KEY_NAMES[noteToPc(practiceKey)!] : "C";
   const scaleMode: Mode = practiceScaleId && MINOR_SCALES.has(practiceScaleId) ? "minor" : "major";
@@ -96,75 +94,9 @@ export default function BackingTrackGenerator({ practiceKey, onPracticeKeyChange
   const [rigStatus, setRigStatus] = useState<string | null>(null);
   const [rigLoading, setRigLoading] = useState(false);
   const [userTones, setUserTones] = useState<Omit<UserTone, "data">[]>([]);
-  const [aiAvailable, setAiAvailable] = useState(false);
-  const [aiThinking, setAiThinking] = useState(false);
-  const [aiIdea, setAiIdea] = useState<JamIdea | null>(null);
-  const recentAiIdeas = useRef<string[]>([]);
-  const aiFailures = useRef(0);
   const engineRef = useRef<JamEngineType | null>(null);
   const hydrated = useRef(false);
   const style = STYLE_BY_ID[styleId];
-
-  useEffect(() => {
-    if (IS_NATIVE_APP) getAppleIntelligenceStatus().then((s) => setAiAvailable(s.available));
-  }, []);
-  // An Apple Intelligence idea is written in one key; a new key or mode goes back to the presets.
-  const aiIdeaKey = useRef(`${keyName}|${mode}`);
-  const aiIdeaRef = useRef(aiIdea);
-  aiIdeaRef.current = aiIdea;
-  useEffect(() => {
-    const now = `${keyName}|${mode}`;
-    if (aiIdeaKey.current === now) return;
-    aiIdeaKey.current = now;
-    const idea = aiIdeaRef.current;
-    if (!idea) return;
-    setCustomText((text) => (text === idea.chordsText ? "" : text));
-    setAiIdea(null);
-  }, [keyName, mode]);
-  const showAiIdea = aiIdea && customText === aiIdea.chordsText ? aiIdea : null;
-
-  const [channelStyle, setChannelStyle] = useState<ChannelStyle | null>(null);
-  const [channelOpen, setChannelOpen] = useState(false);
-  const [channelInput, setChannelInput] = useState("");
-  const [channelBusy, setChannelBusy] = useState(false);
-  const [channelError, setChannelError] = useState<string | null>(null);
-  useEffect(() => {
-    if (IS_NATIVE_APP) import("@/jam/channelStyle").then(({ loadChannelStyle }) => setChannelStyle(loadChannelStyle()));
-  }, []);
-  const learnChannel = async () => {
-    if (!channelInput.trim()) return;
-    setChannelBusy(true);
-    setChannelError(null);
-    try {
-      const { learnChannelStyle, saveChannelStyle } = await import("@/jam/channelStyle");
-      const learned = await learnChannelStyle(channelInput);
-      saveChannelStyle(learned);
-      setChannelStyle(learned);
-      // A pasted video usually names its key ("Velvet Jazz (Dm)"): jam and solo in that key.
-      if (learned.focusKey) {
-        const pc = noteToPc(learned.focusKey.key);
-        if (pc !== null) onPracticeKeyChange?.(KEY_NAMES[pc]);
-        setMode(learned.focusKey.mode);
-        setModeTouched(true);
-      }
-      setChannelOpen(false);
-      setChannelInput("");
-      trackEvent("backing_track_channel_style", { styles: learned.styles.join(",") });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "";
-      setChannelError(
-        /channel|videos|jam style/i.test(message) && !/Error Domain/.test(message)
-          ? message
-          : "Couldn’t learn from that channel. Check the link and your connection, then try again."
-      );
-    } finally {
-      setChannelBusy(false);
-    }
-  };
-  const forgetChannel = () => {
-    import("@/jam/channelStyle").then(({ saveChannelStyle }) => saveChannelStyle(null));
-    setChannelStyle(null);
-  };
 
   useEffect(() => {
     if (!modeTouched) setMode(scaleMode);
@@ -329,54 +261,12 @@ export default function BackingTrackGenerator({ practiceKey, onPracticeKeyChange
       setRig(RIG_PRESETS[rigId].settings);
     }
   };
-  const randomIdea = () => {
+  const newIdea = () => {
     const nextSeed = hashString(`${Date.now()}|${Math.random()}`);
     setSeed(nextSeed);
     setProgressionIndex(nextSeed % progressions.length);
     setCustomText("");
-    setAiIdea(null);
     trackEvent("backing_track_new_idea", { genre: styleId });
-  };
-  const newIdea = async () => {
-    if (!aiAvailable) return randomIdea();
-    setAiThinking(true);
-    // With a channel, each idea uses one of the channel's styles (and its usual major/minor).
-    let ideaStyle = style;
-    let ideaMode = mode;
-    if (channelStyle) {
-      const choices = channelStyle.styles.length > 1 ? channelStyle.styles.filter((id) => id !== styleId) : channelStyle.styles;
-      const id = choices[Math.floor(Math.random() * choices.length)];
-      ideaStyle = STYLE_BY_ID[id];
-      if (channelStyle.focusKey) ideaMode = channelStyle.focusKey.mode;
-      else if (channelStyle.mode !== "both") ideaMode = channelStyle.mode;
-      if (id !== styleId) changeStyle(id);
-      if (ideaMode !== mode) {
-        aiIdeaKey.current = `${keyName}|${ideaMode}`;
-        setMode(ideaMode);
-        setModeTouched(true);
-      }
-    }
-    try {
-      const [{ generateJamIdea }, { channelInspiration }] = await Promise.all([import("@/jam/aiIdea"), import("@/jam/channelStyle")]);
-      const inspiration = channelStyle
-        ? { text: channelInspiration(channelStyle), tempoMin: channelStyle.tempoMin, tempoMax: channelStyle.tempoMax }
-        : undefined;
-      const idea = await generateJamIdea(ideaStyle, keyName, ideaMode, recentAiIdeas.current, inspiration);
-      recentAiIdeas.current = [idea.chordsText, ...recentAiIdeas.current].slice(0, 3);
-      setCustomText(idea.chordsText);
-      setBpm(idea.bpm);
-      setAiIdea(idea);
-      aiFailures.current = 0;
-      trackEvent("backing_track_new_idea", { genre: styleId, source: "apple_intelligence" });
-    } catch {
-      // The model can report "available" and still refuse requests (e.g. assets not ready, or
-      // the simulator). After two misses in a row, stop making the user wait on it this session.
-      aiFailures.current += 1;
-      if (aiFailures.current >= 2) setAiAvailable(false);
-      randomIdea();
-    } finally {
-      setAiThinking(false);
-    }
   };
   const changeBpm = (v: number) => setBpm(Math.min(MAX_BPM, Math.max(MIN_BPM, Math.round(v))));
   const setVolume = (p: PartId, v: number) => {
@@ -511,78 +401,12 @@ export default function BackingTrackGenerator({ practiceKey, onPracticeKeyChange
               <button
                 type="button"
                 onClick={newIdea}
-                disabled={aiThinking}
-                title={aiAvailable ? "Apple Intelligence writes a new progression in this style" : "New progression and feel in this style"}
-                className="h-14 px-4 rounded-full border border-white/15 font-Inter text-sm font-semibold text-gray-200 hover:border-[#1BD79E]/60 disabled:opacity-60"
+                title="New progression and feel in this style"
+                className="h-14 px-4 rounded-full border border-white/15 font-Inter text-sm font-semibold text-gray-200 hover:border-[#1BD79E]/60"
               >
-                {aiThinking ? "✨ Writing…" : "✨ New idea"}
+                ✨ New idea
               </button>
             </div>
-            {showAiIdea && (
-              <div className="rounded-2xl bg-[#161616] px-4 py-3" aria-live="polite">
-                <p className="font-Inter text-[11px] uppercase tracking-wider text-gray-500">
-                  Apple Intelligence{channelStyle ? ` · like ${channelStyle.channel}` : ""}
-                </p>
-                <p className="font-Lora text-lg text-white">{showAiIdea.title}</p>
-                {showAiIdea.soloTip && <p className="mt-1 font-Inter text-sm text-gray-400">{showAiIdea.soloTip}</p>}
-              </div>
-            )}
-            {aiAvailable &&
-              (channelStyle ? (
-                <div className="rounded-2xl border border-[#1BD79E]/25 bg-[#1BD79E]/5 px-4 py-3">
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-Inter text-[11px] uppercase tracking-wider text-[#1BD79E]">Sounds like</p>
-                      <p className="font-Inter text-sm font-semibold text-white truncate">{channelStyle.channel}</p>
-                      {channelStyle.focusTitle && <p className="font-Inter text-xs text-gray-300 truncate">Based on “{channelStyle.focusTitle}”</p>}
-                      <p className="mt-0.5 font-Inter text-xs text-gray-400">{channelStyle.summary}</p>
-                      <p className="mt-1 font-Inter text-[11px] text-gray-500">
-                        {channelStyle.styles.map((id) => STYLE_BY_ID[id].name).join(" · ")} · {channelStyle.tempoMin}–{channelStyle.tempoMax} BPM
-                      </p>
-                    </div>
-                    <button type="button" onClick={forgetChannel} aria-label="Stop matching this channel" className="h-7 w-7 shrink-0 rounded-full text-gray-400 hover:text-white hover:bg-white/10">
-                      ×
-                    </button>
-                  </div>
-                </div>
-              ) : channelOpen ? (
-                <form
-                  className="rounded-2xl bg-[#161616] p-3"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    learnChannel();
-                  }}
-                >
-                  <label htmlFor="channel-url" className="block font-Inter text-xs text-gray-400 mb-2">
-                    Paste a YouTube backing-track channel or video. New ideas will sound like it.
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="channel-url"
-                      type="url"
-                      inputMode="url"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      value={channelInput}
-                      onChange={(e) => setChannelInput(e.target.value)}
-                      placeholder="youtube.com/@channel or a video link"
-                      className="min-w-0 flex-1 h-10 px-3 rounded-xl bg-black border border-white/10 font-Inter text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#1BD79E]/50"
-                    />
-                    <button
-                      type="submit"
-                      disabled={channelBusy || !channelInput.trim()}
-                      className="h-10 px-4 rounded-xl bg-[#1BD79E] font-Inter text-sm font-semibold text-black disabled:opacity-50"
-                    >
-                      {channelBusy ? "Learning…" : "Learn"}
-                    </button>
-                  </div>
-                  {channelError && <p className="mt-2 font-Inter text-xs text-amber-400">{channelError}</p>}
-                </form>
-              ) : (
-                <button type="button" onClick={() => setChannelOpen(true)} className="self-start font-Inter text-xs text-gray-400 hover:text-white underline underline-offset-4">
-                  Match a YouTube channel’s style
-                </button>
-              ))}
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => changeBpm(bpm - 5)} aria-label="Slower" className="h-9 w-9 shrink-0 rounded-full bg-[#161616] text-lg hover:bg-[#222]">
                 −
